@@ -1,29 +1,53 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, type KeyboardEvent, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import type { Chat, Message } from "@/lib/types"
+import type { Chat, Message, BranchPoint } from "@/lib/types"
 import { SendIcon, Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
+import { Progress } from "@/components/ui/progress"
+import { toast } from "@/components/ui/use-toast"
 
 interface ChatInterfaceProps {
   chat: Chat
   updateChat: (chat: Chat) => void
   apiKey: string
   selectedModel: string
+  selectedModelInfo: any
+  onBranchConversation: (branchPoint: BranchPoint) => void
 }
 
-export default function ChatInterface({ chat, updateChat, apiKey, selectedModel }: ChatInterfaceProps) {
+export default function ChatInterface({
+  chat,
+  updateChat,
+  apiKey,
+  selectedModel,
+  selectedModelInfo,
+  onBranchConversation,
+}: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
+  const [contextUsage, setContextUsage] = useState(0)
+
+  // Calculate context usage based on message content
+  useEffect(() => {
+    // Simple estimation: 1 token ≈ 4 characters
+    const totalChars = chat.messages.reduce((acc, msg) => acc + msg.content.length, 0) + input.length
+    const estimatedTokens = Math.ceil(totalChars / 4)
+
+    // Calculate percentage of context used
+    const maxContext = selectedModelInfo?.context_length || 4096
+    const usagePercentage = Math.min(100, Math.ceil((estimatedTokens / maxContext) * 100))
+
+    setContextUsage(usagePercentage)
+  }, [chat.messages, input, selectedModelInfo])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -47,6 +71,28 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
     }
   }
 
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content)
+    toast({
+      title: "Copied to clipboard",
+      description: "Message content has been copied to your clipboard",
+      duration: 2000,
+    })
+  }
+
+  const handleBranchFromMessage = (messageId: string) => {
+    const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId)
+    if (messageIndex >= 0) {
+      const branchPoint: BranchPoint = {
+        originalChatId: chat.id,
+        messages: chat.messages.slice(0, messageIndex + 1),
+        branchedFromMessageId: messageId,
+        timestamp: new Date().toISOString(),
+      }
+      onBranchConversation(branchPoint)
+    }
+  }
+
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return
     if (!apiKey) {
@@ -67,6 +113,7 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
       role: "user",
       content: input,
       timestamp: new Date().toISOString(),
+      model: selectedModel,
     }
 
     // Create a placeholder for the assistant's response
@@ -76,6 +123,7 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
+      model: selectedModel,
     }
 
     setStreamingMessageId(assistantMessageId)
@@ -87,6 +135,7 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
       ...chat,
       messages: updatedMessages,
       title: updatedMessages.length === 2 ? input.slice(0, 30) : chat.title,
+      lastModelUsed: selectedModel,
     }
 
     updateChat(updatedChat)
@@ -163,6 +212,7 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
               const updatedChatWithStream = {
                 ...chat,
                 messages: [...chat.messages, userMessage, updatedAssistantMessage],
+                lastModelUsed: selectedModel,
               }
 
               updateChat(updatedChatWithStream)
@@ -185,6 +235,7 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
             content: accumulatedContent,
           },
         ],
+        lastModelUsed: selectedModel,
       }
 
       updateChat(finalUpdatedChat)
@@ -219,7 +270,13 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
             </div>
           ) : (
             chat.messages.map((message) => (
-              <MessageItem key={message.id} message={message} isStreaming={streamingMessageId === message.id} />
+              <MessageItem
+                key={message.id}
+                message={message}
+                isStreaming={streamingMessageId === message.id}
+                onCopy={() => handleCopyMessage(message.content)}
+                onBranch={() => handleBranchFromMessage(message.id)}
+              />
             ))
           )}
           <div ref={messagesEndRef} />
@@ -233,6 +290,14 @@ export default function ChatInterface({ chat, updateChat, apiKey, selectedModel 
       )}
 
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="mb-2">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Context Usage</span>
+            <span>{contextUsage}%</span>
+          </div>
+          <Progress value={contextUsage} className="h-1" />
+        </div>
+
         <div className="flex items-end gap-2">
           <Textarea
             ref={textareaRef}
