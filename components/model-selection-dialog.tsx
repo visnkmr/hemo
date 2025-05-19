@@ -77,7 +77,7 @@ export default function ModelSelectionDialog({
     setFilteredModels(filtered)
   }, [models, searchQuery])
 
-  const HoverMarqueeItem = ({ text }) => {
+  const HoverMarqueeItem = ({ text }: { text: string }) => {
     const [isHovered, setIsHovered] = useState(false);
   
     return (
