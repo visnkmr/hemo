@@ -112,7 +112,9 @@ export default function Home() {
   const updateChat = (updatedChat: Chat) => {
     setChats((prevChats) => prevChats.map((chat) => (chat.id === updatedChat.id ? updatedChat : chat)))
   }
-
+ const renameChat = (id: string, newTitle: string) => {
+    setChats(chats.map((chat) => (chat.id === id ? { ...chat, title: newTitle } : chat)))
+  }
   const deleteChat = (chatId: string) => {
     setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId))
 
@@ -185,11 +187,12 @@ export default function Home() {
 
           <div className="flex-1 overflow-y-auto">
             <ChatHistory
-              chats={chats}
-              currentChatId={currentChatId}
-              setCurrentChatId={setCurrentChatId}
-              deleteChat={deleteChat}
-            />
+            chats={chats}
+            currentChatId={currentChatId}
+            setCurrentChatId={setCurrentChatId}
+            deleteChat={deleteChat}
+            renameChat={renameChat}
+      />
           </div>
         </div>
       )}

@@ -1,19 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import type { Chat } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon, TrashIcon, GitBranchIcon } from "lucide-react"
+import { MessageSquareIcon, TrashIcon, GitBranchIcon, PencilIcon, CheckIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import { Input } from "@/components/ui/input"
 
 interface ChatHistoryProps {
   chats: Chat[]
   currentChatId: string
   setCurrentChatId: (id: string) => void
   deleteChat: (id: string) => void
+  renameChat: (id: string, newTitle: string) => void
 }
 
-export default function ChatHistory({ chats, currentChatId, setCurrentChatId, deleteChat }: ChatHistoryProps) {
+export default function ChatHistory({
+  chats,
+  currentChatId,
+  setCurrentChatId,
+  deleteChat,
+  renameChat,
+}: ChatHistoryProps) {
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+
   if (chats.length === 0) {
     return <div className="p-4 text-center text-gray-500 dark:text-gray-400">No chat history</div>
   }
@@ -51,6 +63,22 @@ export default function ChatHistory({ chats, currentChatId, setCurrentChatId, de
     return colors[index]
   }
 
+  const startEditing = (chat: Chat) => {
+    setEditingChatId(chat.id)
+    setEditTitle(chat.title || "New Chat")
+  }
+
+  const saveEdit = (chatId: string) => {
+    if (editTitle.trim()) {
+      renameChat(chatId, editTitle.trim())
+    }
+    setEditingChatId(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingChatId(null)
+  }
+
   return (
     <div className="space-y-1 p-2">
       {chats.map((chat) => (
@@ -61,7 +89,10 @@ export default function ChatHistory({ chats, currentChatId, setCurrentChatId, de
             chat.id === currentChatId && "bg-gray-100 dark:bg-gray-700",
           )}
         >
-          <div className="flex items-center gap-2 flex-1 min-w-0" onClick={() => setCurrentChatId(chat.id)}>
+          <div
+            className="flex items-center gap-2 flex-1 min-w-0"
+            onClick={() => editingChatId !== chat.id && setCurrentChatId(chat.id)}
+          >
             <div className="relative">
               <MessageSquareIcon className="h-4 w-4 flex-shrink-0" />
               {chat.lastModelUsed && (
@@ -71,25 +102,79 @@ export default function ChatHistory({ chats, currentChatId, setCurrentChatId, de
               )}
               {chat.branchedFrom && <GitBranchIcon className="absolute -top-1 -right-1 h-3 w-3 text-gray-500" />}
             </div>
-            <div className="truncate">
-              <div className="font-medium truncate">{chat.title || "New Chat"}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {format(new Date(chat.createdAt), "MMM d, yyyy")}
+
+            {editingChatId === chat.id ? (
+              <div className="flex-1 flex items-center gap-1">
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="h-7 py-1 text-sm"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit(chat.id)
+                    if (e.key === "Escape") cancelEdit()
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    saveEdit(chat.id)
+                  }}
+                >
+                  <CheckIcon className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    cancelEdit()
+                  }}
+                >
+                  <XIcon className="h-3 w-3" />
+                </Button>
               </div>
-            </div>
+            ) : (
+              <div className="truncate">
+                <div className="font-medium truncate">{chat.title || "New Chat"}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {format(new Date(chat.createdAt), "MMM d, yyyy")}
+                </div>
+              </div>
+            )}
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation()
-              deleteChat(chat.id)
-            }}
-          >
-            <TrashIcon className="h-4 w-4" />
-          </Button>
+          {editingChatId !== chat.id && (
+            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  startEditing(chat)
+                }}
+              >
+                <PencilIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  deleteChat(chat.id)
+                }}
+              >
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       ))}
     </div>
