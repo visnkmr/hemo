@@ -9,7 +9,7 @@ import { SendIcon, Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
 import { Progress } from "@/components/ui/progress"
-import { toast } from "@/components/ui/use-toast"
+// import { toast } from "@/components/ui/use-toast"
 
 interface ChatInterfaceProps {
   chat: Chat
@@ -73,11 +73,11 @@ export default function ChatInterface({
 
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content)
-    toast({
-      title: "Copied to clipboard",
-      description: "Message content has been copied to your clipboard",
-      duration: 2000,
-    })
+    // toast({
+    //   title: "Copied to clipboard",
+    //   description: "Message content has been copied to your clipboard",
+    //   duration: 2000,
+    // })
   }
 
   const handleBranchFromMessage = (messageId: string) => {
