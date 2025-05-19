@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-
+import Marquee from "react-fast-marquee";
 interface ModelSelectionDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -77,6 +77,27 @@ export default function ModelSelectionDialog({
     setFilteredModels(filtered)
   }, [models, searchQuery])
 
+  const HoverMarqueeItem = ({ text }) => {
+    const [isHovered, setIsHovered] = useState(false);
+  
+    return (
+      <div
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="text-center w-full"
+      >
+        <Marquee
+        className="h3 font-medium text-sm truncate w-full"
+          play={isHovered}  // Only play when hovered
+          speed={50}         // Adjust speed here
+          gradient={false}   // No gradient fade effect
+        >
+          <span>{text}</span>
+        </Marquee>
+      </div>
+    );
+  };
+
   // Get a random color for the model icon
   const getModelColor = (modelId: string): string => {
     const colors = [
@@ -115,10 +136,10 @@ export default function ModelSelectionDialog({
     if (numPrice === 0) return "Free"
     return `$${numPrice.toFixed(7)}`
   }
-
+  // const [isHovered, setIsHovered] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] flex flex-col">
+      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Select a Model</DialogTitle>
         </DialogHeader>
@@ -137,7 +158,7 @@ export default function ModelSelectionDialog({
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : (
-          <ScrollArea className="flex-1 pr-4">
+          // <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {filteredModels.map((model) => (
                 <div
@@ -159,10 +180,8 @@ export default function ModelSelectionDialog({
                     <BotIcon className="h-6 w-6 text-white" />
                   </div>
 
-                  <div className="text-center">
-                    <h3 className="font-medium text-sm truncate w-full" title={model.id.split("/").pop()}>
-                      {model.id.split("/").pop()}
-                    </h3>
+                  <div className="text-center w-full">
+                   <HoverMarqueeItem text={model.id.split("/").pop()} />
                     <p className="text-xs text-gray-500 truncate w-full" title={model.id.split("/")[0]}>
                       {model.id.split("/")[0]}
                     </p>
@@ -173,7 +192,7 @@ export default function ModelSelectionDialog({
                       {model.context_length.toLocaleString()} tokens
                     </Badge>
 
-                    <div className="flex justify-between w-full text-xs mt-1">
+                    {/* <div className="flex justify-between w-full text-xs mt-1">
                       <span>Input:</span>
                       <span>{formatPrice(model.pricing?.prompt)}</span>
                     </div>
@@ -181,12 +200,12 @@ export default function ModelSelectionDialog({
                     <div className="flex justify-between w-full text-xs">
                       <span>Output:</span>
                       <span>{formatPrice(model.pricing?.completion)}</span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          // </ScrollArea>
         )}
       </DialogContent>
     </Dialog>

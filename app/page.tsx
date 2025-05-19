@@ -59,7 +59,7 @@ export default function Home() {
 
   // Fetch models when API key is set
   useEffect(() => {
-    if (!apiKey) return
+    // if (!apiKey) return
 
     const fetchModels = async () => {
       try {
