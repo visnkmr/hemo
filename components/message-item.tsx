@@ -5,8 +5,8 @@ import { UserIcon, BotIcon, CopyIcon, GitBranchIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import ReactMarkdown from "react-markdown"
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
+// import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
+// import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 
@@ -34,20 +34,20 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   }, [isStreaming])
 
   // Custom renderer for code blocks
-  const components = {
-    code({ node, inline, className, children, ...props }: any) {
-      const match = /language-(\w+)/.exec(className || "")
-      return !inline && match ? (
-        <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-          {String(children).replace(/\n$/, "")}
-        </SyntaxHighlighter>
-      ) : (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      )
-    },
-  }
+  // const components = {
+  //   code({ node, inline, className, children, ...props }: any) {
+  //     const match = /language-(\w+)/.exec(className || "")
+  //     return !inline && match ? (
+  //       <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+  //         {String(children).replace(/\n$/, "")}
+  //       </SyntaxHighlighter>
+  //     ) : (
+  //       <code className={className} {...props}>
+  //         {children}
+  //       </code>
+  //     )
+  //   },
+  // }
 
   return (
     <div
@@ -89,7 +89,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
         </div>
 
         <div className="prose dark:prose-invert prose-sm max-w-none">
-          <ReactMarkdown components={components}>{message.content}</ReactMarkdown>
+          <ReactMarkdown>{message.content}</ReactMarkdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>
       </div>
