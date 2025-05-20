@@ -71,7 +71,13 @@ export default function ModelSelectionDialog({
 
     const filtered = models.filter((model) => {
       const modelName = model.id.toLowerCase()
-      return modelName.includes(searchQuery.toLowerCase())
+      const provider = model.id.split("/")[0].toLowerCase()
+      const modelId = model.id.split("/").pop().toLowerCase()
+      return (
+        modelName.includes(searchQuery.toLowerCase()) ||
+        provider.includes(searchQuery.toLowerCase()) ||
+        modelId.includes(searchQuery.toLowerCase())
+      )
     })
 
     setFilteredModels(filtered)
