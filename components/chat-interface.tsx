@@ -50,9 +50,9 @@ export default function ChatInterface({
   }, [chat.messages, input, selectedModelInfo])
 
   // Scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [chat.messages])
+  // useEffect(() => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  // }, [chat.messages])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
