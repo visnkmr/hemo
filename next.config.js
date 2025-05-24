@@ -15,9 +15,9 @@ module.exports = {
   experimental: {
     // appDir: true,
     // optimizeCss: true,
-    esmExternals: true,
-    forceSwcTransforms: true,
-    scrollRestoration: true,
+    // esmExternals: true,
+    // forceSwcTransforms: true,
+    // scrollRestoration: true,
     // legacyBrowsers: false,
   },
   typescript: {

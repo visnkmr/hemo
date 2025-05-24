@@ -29,33 +29,33 @@ export default function ModelSelectionDialog({
   const [filteredModels, setFilteredModels] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
 
-  useEffect(() => {
-    if (!apiKey || models.length > 0) return
+  // useEffect(() => {
+  //   if (!apiKey || models.length > 0) return
 
-    const fetchModels = async () => {
-      setIsLoading(true)
-      try {
-        const response = await fetch("https://openrouter.ai/api/v1/models", {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        })
+  //   const fetchModels = async () => {
+  //     setIsLoading(true)
+  //     try {
+  //       const response = await fetch("https://openrouter.ai/api/v1/models", {
+  //         headers: {
+  //           Authorization: `Bearer ${apiKey}`,
+  //         },
+  //       })
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch models")
-        }
+  //       if (!response.ok) {
+  //         throw new Error("Failed to fetch models")
+  //       }
 
-        const data = await response.json()
-        // Models are fetched in the parent component
-      } catch (err) {
-        console.error("Error fetching models:", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  //       const data = await response.json()
+  //       // Models are fetched in the parent component
+  //     } catch (err) {
+  //       console.error("Error fetching models:", err)
+  //     } finally {
+  //       setIsLoading(false)
+  //     }
+  //   }
 
-    fetchModels()
-  }, [apiKey, models.length])
+  //   fetchModels()
+  // }, [apiKey, models.length])
 
   // Filter models based on search query
   useEffect(() => {
@@ -136,12 +136,12 @@ export default function ModelSelectionDialog({
   }
 
   // Format pricing to be more readable
-  const formatPrice = (price: string) => {
-    if (!price) return "N/A"
-    const numPrice = Number.parseFloat(price)
-    if (numPrice === 0) return "Free"
-    return `$${numPrice.toFixed(7)}`
-  }
+  // const formatPrice = (price: string) => {
+  //   if (!price) return "N/A"
+  //   const numPrice = Number.parseFloat(price)
+  //   if (numPrice === 0) return "Free"
+  //   return `$${numPrice.toFixed(7)}`
+  // }
   // const [isHovered, setIsHovered] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

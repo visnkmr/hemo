@@ -4,20 +4,25 @@ import { useEffect, useState } from "react"
 import ChatInterface from "@/components/chat-interface"
 import ChatHistory from "@/components/chat-history"
 import ApiKeyInput from "@/components/api-key-input"
+import LMStudioURL from "@/components/lmstudio-url"
+import LMStudioModelName from "@/components/localmodelname"
 import type { Chat, BranchPoint } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { PlusIcon, MenuIcon, XIcon, Download } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
 import ModelSelectionDialog from "@/components/model-selection-dialog"
 import ExportDialog from "@/components/export-dialog"
 import { Toaster } from "@/components/ui/toaster"
 
 export default function Home() {
   const [apiKey, setApiKey] = useState<string>("")
+  const [lmurl, setlmurl] = useState<string>("")
+  const [model_name, set_model_name] = useState<string>("")
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [selectedModelInfo, setSelectedModelInfo] = useState<any>(null)
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [ollamastate, setollamastate] = useState(false)
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
@@ -27,6 +32,17 @@ export default function Home() {
     const storedApiKey = localStorage.getItem("openrouter_api_key")
     if (storedApiKey) {
       setApiKey(storedApiKey)
+    }
+
+    const storedlmurl = localStorage.getItem("lmstudio_url")
+    if (ollamastate && storedlmurl) {
+      setlmurl(storedlmurl)
+    }
+    
+    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+    if (ollamastate && storedlmurl && stored_lm_model_name) {
+      set_model_name(stored_lm_model_name)
+      setSelectedModel(model_name)
     }
 
     const storedChats = localStorage.getItem("chat_history")
@@ -59,7 +75,7 @@ export default function Home() {
 
   // Fetch models when API key is set
   useEffect(() => {
-    // if (!apiKey) return
+    if (!apiKey) return
 
     const fetchModels = async () => {
       try {
@@ -76,16 +92,16 @@ export default function Home() {
         const data = await response.json()
         setAllModels(data.data)
 
-        // Filter for free models (where pricing is 0)
-        const freeModels = data.data.filter((model: any) => {
-          return Number.parseFloat(model.pricing?.prompt) <= 0 && Number.parseFloat(model.pricing?.completion) <= 0
-        })
+        // // Filter for free models (where pricing is 0)
+        // const freeModels = data.data.filter((model: any) => {
+        //   return Number.parseFloat(model.pricing?.prompt) <= 0 && Number.parseFloat(model.pricing?.completion) <= 0
+        // })
 
         // Set the first model as selected if none is selected
-        if (freeModels.length > 0 && !selectedModel) {
-          setSelectedModel(freeModels[0].id)
-          setSelectedModelInfo(freeModels[0])
-        }
+        // if (freeModels.length > 0 && !selectedModel) {
+        //   setSelectedModel(freeModels[0].id)
+        //   setSelectedModelInfo(freeModels[0])
+        // }
       } catch (err) {
         console.error("Error fetching models:", err)
       }
@@ -184,6 +200,13 @@ export default function Home() {
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
           </div>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
+          </div>
+          
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
+          </div>
 
           <div className="flex-1 overflow-y-auto">
             <ChatHistory
@@ -203,7 +226,7 @@ export default function Home() {
           <Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
           </Button>
-
+          
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
               {selectedModelInfo ? (
@@ -215,7 +238,14 @@ export default function Home() {
                 "Select Model"
               )}
             </Button>
-
+            <Button
+              variant="outline"
+              onClick={()=>{setollamastate(!ollamastate)}}
+              // disabled={!currentChat || currentChat.messages.length === 0}
+            >
+              <Bot size={16} className="mr-2" />
+              {`${ollamastate?"Using LM Studio":"Using Openrouter"}`}
+            </Button>
             <Button
               variant="outline"
               onClick={() => setIsExportDialogOpen(true)}
@@ -229,12 +259,17 @@ export default function Home() {
 
         {currentChat && (
           <ChatInterface
+          ollamastate={ollamastate}
+          lmstudio_model_name={model_name}
+          lmstudio_url={lmurl}
             chat={currentChat}
             updateChat={updateChat}
             apiKey={apiKey}
             selectedModel={selectedModel}
             selectedModelInfo={selectedModelInfo}
             onBranchConversation={handleBranchConversation}
+            directsendmessage={false}
+            messagetosend=""
           />
         )}
       </div>

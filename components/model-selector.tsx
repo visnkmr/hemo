@@ -18,7 +18,7 @@ export default function ModelSelector({ apiKey, selectedModel, setSelectedModel 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // if (!apiKey) return
+    if (!apiKey) return
 
     const fetchModels = async () => {
       setIsLoading(true)

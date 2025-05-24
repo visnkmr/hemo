@@ -9,24 +9,120 @@ import { SendIcon, Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
 import { Progress } from "@/components/ui/progress"
-// import { toast } from "@/components/ui/use-toast"
 
-interface ChatInterfaceProps {
-  chat: Chat
-  updateChat: (chat: Chat) => void
-  apiKey: string
-  selectedModel: string
-  selectedModelInfo: any
-  onBranchConversation: (branchPoint: BranchPoint) => void
+// --- Type Definitions ---
+
+interface SendMessageStreamParams {
+  url: string;
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: string; content: string }>;
 }
 
+interface ChatInterfaceProps {
+  ollamastate: boolean;
+  chat: Chat;
+  updateChat: (chat: Chat) => void;
+  apiKey: string;
+  selectedModel: string; // Keep selectedModel for overall component state
+  selectedModelInfo: any;
+  onBranchConversation: (branchPoint: BranchPoint) => void;
+  lmstudio_url: string;
+  lmstudio_model_name: string;
+  directsendmessage?: boolean;
+  messagetosend?: string;
+}
+
+// --- Exported Send Message Stream Function ---
+
+/**
+ * Sends messages to a chat completion API and yields content chunks as an async generator.
+ *
+ * @param params - The parameters for the API call.
+ * @returns An async generator yielding content chunks.
+ * @throws An error if the API call fails or the response body is null.
+ */
+export async function* sendMessageStream({
+  url,
+  apiKey,
+  model,
+  messages,
+}: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
+  const response = await fetch(`${url}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
+      "X-Title": "Batu",
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    let errorMessage = errorData || "Failed to get response";
+    try {
+      const jsonError = JSON.parse(errorData);
+      errorMessage = jsonError.error?.message || errorMessage;
+    } catch {
+      // Ignore if parsing fails, use the raw text
+    }
+    throw new Error(errorMessage);
+  }
+
+  if (!response.body) {
+    throw new Error("Response body is null");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.replace(/^data: /, "").trim());
+
+    for (const line of lines) {
+      if (line === "[DONE]") continue;
+
+      try {
+        const parsedLine = JSON.parse(line);
+        const content = parsedLine.choices[0]?.delta?.content || "";
+        if (content) {
+          yield content; // Yield each content chunk
+        }
+      } catch (e) {
+        console.warn("Failed to parse stream line:", line, e);
+      }
+    }
+  }
+}
+
+
+// --- Exported Chat Interface Component ---
+
 export default function ChatInterface({
+  ollamastate,
   chat,
   updateChat,
   apiKey,
+  lmstudio_url,
+  lmstudio_model_name,
   selectedModel,
   selectedModelInfo,
   onBranchConversation,
+  directsendmessage = false,
+  messagetosend = "",
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -36,232 +132,152 @@ export default function ChatInterface({
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [contextUsage, setContextUsage] = useState(0)
 
-  // Calculate context usage based on message content
+  // Calculate context usage effect
   useEffect(() => {
-    // Simple estimation: 1 token ≈ 4 characters
     const totalChars = chat.messages.reduce((acc, msg) => acc + msg.content.length, 0) + input.length
     const estimatedTokens = Math.ceil(totalChars / 4)
-
-    // Calculate percentage of context used
     const maxContext = selectedModelInfo?.context_length || 4096
     const usagePercentage = Math.min(100, Math.ceil((estimatedTokens / maxContext) * 100))
-
     setContextUsage(usagePercentage)
   }, [chat.messages, input, selectedModelInfo])
 
-  // Scroll to bottom when messages change
-  // useEffect(() => {
-  //   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  // }, [chat.messages])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-  }
+  // Main function to handle sending a message
+  const handleSendMessage = async (messageContent: string = input) => {
+    if (!messageContent.trim() || isLoading) return;
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send message on Enter (but not when Ctrl/Cmd is pressed)
-    if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+    setError(null);
+    setIsLoading(true);
+    if (messageContent === input) {
+        setInput(""); // Clear input only if sending from text area
     }
 
-    // Add new line on Ctrl+Enter
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      // Let the default behavior happen (new line)
-    }
-  }
-
-  const handleCopyMessage = (content: string) => {
-    navigator.clipboard.writeText(content)
-    // toast({
-    //   title: "Copied to clipboard",
-    //   description: "Message content has been copied to your clipboard",
-    //   duration: 2000,
-    // })
-  }
-
-  const handleBranchFromMessage = (messageId: string) => {
-    const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId)
-    if (messageIndex >= 0) {
-      const branchPoint: BranchPoint = {
-        originalChatId: chat.id,
-        messages: chat.messages.slice(0, messageIndex + 1),
-        branchedFromMessageId: messageId,
-        timestamp: new Date().toISOString(),
-      }
-      onBranchConversation(branchPoint)
-    }
-  }
-
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return
-    if (!apiKey) {
-      setError("Please enter your OpenRouter API key")
-      return
-    }
-    if (!selectedModel) {
-      setError("Please select a model")
-      return
-    }
-
-    setError(null)
-    setIsLoading(true)
-
-    // Add user message to chat
+    // Prepare user and assistant messages
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: messageContent,
       timestamp: new Date().toISOString(),
       model: selectedModel,
-    }
-
-    // Create a placeholder for the assistant's response
-    const assistantMessageId = (Date.now() + 1).toString()
+    };
+    const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
       model: selectedModel,
-    }
+    };
 
-    setStreamingMessageId(assistantMessageId)
+    setStreamingMessageId(assistantMessageId);
 
-    const updatedMessages = [...chat.messages, userMessage, assistantMessage]
-
-    // Update chat with user message and empty assistant message
-    const updatedChat = {
-      ...chat,
-      messages: updatedMessages,
-      title: updatedMessages.length === 2 ? input.slice(0, 30) : chat.title,
-      lastModelUsed: selectedModel,
-    }
-
-    updateChat(updatedChat)
-    setInput("")
+    const initialMessages = chat.messages;
+    // Update chat with user message & placeholder
+    let currentChatState = {
+        ...chat,
+        messages: [...initialMessages, userMessage, assistantMessage],
+        title: initialMessages.length === 0 ? messageContent.slice(0, 30) : chat.title,
+        lastModelUsed: selectedModel,
+    };
+    updateChat(currentChatState);
 
     try {
-      // Call OpenRouter API with streaming enabled
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.href,
-          "X-Title": "AI Chat Interface",
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: updatedMessages
-            .filter((msg) => msg.id !== assistantMessageId) // Don't include the empty assistant message
-            .map((msg) => ({
-              role: msg.role,
-              content: msg.content,
-            })),
-          stream: true, // Enable streaming
-        }),
-      })
+        // Determine API URL and model
+        const apiUrl = !ollamastate ? "https://openrouter.ai/api" : lmstudio_url;
+        const modelToSend = apiKey.trim().length > 0 ? selectedModel : lmstudio_model_name;
+        const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+        }));
 
-      if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(errorData || "Failed to get response from OpenRouter")
-      }
+        let accumulatedContent = "";
 
-      if (!response.body) {
-        throw new Error("Response body is null")
-      }
+        // Call the generator and process the stream
+        for await (const contentChunk of sendMessageStream({
+            url: apiUrl,
+            apiKey: apiKey,
+            model: modelToSend,
+            messages: messagesToSend,
+        })) {
+            accumulatedContent += contentChunk;
 
-      // Process the stream
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder("utf-8")
-      let accumulatedContent = ""
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        // Decode the chunk
-        const chunk = decoder.decode(value)
-
-        // Process each line in the chunk
-        const lines = chunk
-          .split("\n")
-          .filter((line) => line.trim() !== "")
-          .filter((line) => !line.includes('"OPENROUTER PROCESSING"'))
-          .map((line) => line.replace(/^data: /, "").trim())
-
-        for (const line of lines) {
-          if (line === "[DONE]") continue
-
-          try {
-            const parsedLine = JSON.parse(line)
-            const content = parsedLine.choices[0]?.delta?.content || ""
-
-            if (content) {
-              // Accumulate content
-              accumulatedContent += content
-
-              // Update the assistant message with the accumulated content
-              const updatedAssistantMessage = {
-                ...assistantMessage,
+            // Update the last message (assistant's) with new content
+            const updatedMessages = [...currentChatState.messages];
+            updatedMessages[updatedMessages.length - 1] = {
+                ...updatedMessages[updatedMessages.length - 1],
                 content: accumulatedContent,
-              }
+            };
 
-              // Update the chat with the new content
-              const updatedChatWithStream = {
-                ...chat,
-                messages: [...chat.messages, userMessage, updatedAssistantMessage],
-                lastModelUsed: selectedModel,
-              }
-
-              updateChat(updatedChatWithStream)
-            }
-          } catch (e) {
-            // Skip invalid JSON lines
-            console.warn("Failed to parse line:", line)
-          }
+            currentChatState = {
+                ...currentChatState,
+                messages: updatedMessages,
+            };
+            updateChat(currentChatState); // Update UI
         }
-      }
 
-      // Final update with complete message
-      const finalUpdatedChat = {
-        ...chat,
-        messages: [
-          ...chat.messages,
-          userMessage,
-          {
-            ...assistantMessage,
-            content: accumulatedContent,
-          },
-        ],
-        lastModelUsed: selectedModel,
-      }
-
-      updateChat(finalUpdatedChat)
-      setStreamingMessageId(null)
     } catch (err) {
-      console.error("Error sending message:", err)
-      setError(err instanceof Error ? err.message : "An error occurred")
-
-      // Remove the assistant message if there was an error
-      updateChat({
-        ...chat,
-        messages: [...chat.messages, userMessage],
-      })
-      setStreamingMessageId(null)
+        console.error("Error sending message:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+        // On error, remove the assistant placeholder message
+        updateChat({
+            ...chat,
+            messages: [...initialMessages, userMessage],
+        });
     } finally {
-      setIsLoading(false)
-      setStreamingMessageId(null)
+        setIsLoading(false);
+        setStreamingMessageId(null);
     }
-  }
+  };
+
+    // Effect for direct message sending
+  useEffect(() => {
+    if (directsendmessage && messagetosend && !isLoading) {
+        handleSendMessage(messagetosend);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directsendmessage, messagetosend, isLoading]); // Dependencies added
+
+  // --- Other Handlers ---
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+    // Add toast logic here if needed
+  };
+
+  const handleBranchFromMessage = (messageId: string) => {
+    const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId);
+    if (messageIndex >= 0) {
+      const branchPoint: BranchPoint = {
+        originalChatId: chat.id,
+        messages: chat.messages.slice(0, messageIndex + 1),
+        branchedFromMessageId: messageId,
+        timestamp: new Date().toISOString(),
+      };
+      onBranchConversation(branchPoint);
+    }
+  };
+
+  // --- JSX Rendering ---
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold truncate">{chat.title || "New Chat"}</h2>
       </div>
 
+      {/* Message Area */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {chat.messages.length === 0 ? (
@@ -283,13 +299,16 @@ export default function ChatInterface({
         </div>
       </ScrollArea>
 
+      {/* Error Display */}
       {error && (
         <div className="p-2 mx-4 mb-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded">
           {error}
         </div>
       )}
 
+      {/* Input Area */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        {/* Context Usage Bar */}
         <div className="mb-2">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>Context Usage</span>
@@ -298,6 +317,7 @@ export default function ChatInterface({
           <Progress value={contextUsage} className="h-1" />
         </div>
 
+        {/* Text Input & Send Button */}
         <div className="flex items-end gap-2">
           <Textarea
             ref={textareaRef}
@@ -308,11 +328,11 @@ export default function ChatInterface({
             className="flex-1 min-h-[80px] max-h-[200px]"
             disabled={isLoading}
           />
-          <Button onClick={handleSendMessage} disabled={isLoading || !input.trim()} className="h-10">
+          <Button onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="h-10">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
         </div>
       </div>
     </div>
-  )
+  );
 }
