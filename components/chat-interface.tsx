@@ -340,17 +340,19 @@ export default function ChatInterface({
   // --- JSX Rendering ---
 
   return (
-    <div className="flex flex-col h-[90%]">
+    <div className="flex flex-col h-[95%]">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold truncate">{chat.title || "New Chat"}</h2>
       </div>
 
       {/* Message Area */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+      {/* <ScrollArea className="flex-1 p-4"> */}
+      <div className="flex-grow overflow-hidden"> {/* Make chat history grow and handle overflow */}
+      <div className="overflow-auto grid gap-4 p-4 h-[100%] mb-5" >
+        <div className="flex items-start gap-4 flex-col flex-grow ">
           {chat.messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full w-full">
               <p className="text-gray-500 dark:text-gray-400">Send a message to start the conversation</p>
             </div>
           ) : (
@@ -366,7 +368,9 @@ export default function ChatInterface({
           )}
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+        </div>
+        </div>
+      {/* </ScrollArea> */}
 
       {/* Error Display */}
       {error && (
