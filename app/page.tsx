@@ -29,21 +29,26 @@ export default function Home() {
 
   // Load API key and chats from localStorage on initial render
   useEffect(() => {
+    const storedlmurl = localStorage.getItem("lmstudio_url")
+    if (ollamastate!==0 && storedlmurl) {
+      setlmurl(storedlmurl)
+    }
+    
+    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+    if (ollamastate!==0 && storedlmurl && stored_lm_model_name) {
+      set_model_name(stored_lm_model_name)
+      setSelectedModel(model_name)
+    }
+  },[ollamastate]);
+  console.log(lmurl)
+  console.log(model_name)
+  useEffect(() => {
     const storedApiKey = localStorage.getItem("openrouter_api_key")
     if (storedApiKey) {
       setApiKey(storedApiKey)
     }
 
-    const storedlmurl = localStorage.getItem("lmstudio_url")
-    if (ollamastate==1 && storedlmurl) {
-      setlmurl(storedlmurl)
-    }
     
-    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
-    if (ollamastate==1 && storedlmurl && stored_lm_model_name) {
-      set_model_name(stored_lm_model_name)
-      setSelectedModel(model_name)
-    }
 
     const storedChats = localStorage.getItem("chat_history")
     if (storedChats) {
@@ -197,16 +202,17 @@ export default function Home() {
             </Button>
           </div>
 
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
-          </div>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          </div>):null}
+          {ollamastate!==0? (<><div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
           </div>
           
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
-          </div>
+          </div></>):<></>}
+          
 
           <div className="flex-1 overflow-y-auto">
             <ChatHistory

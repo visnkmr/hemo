@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,9 @@ interface LMUrlInputProps {
 export default function LMStudioURL({ lmurl, setlmurl }: LMUrlInputProps) {
   // const [showKey, setShowKey] = useState(false)
   const [inputValue, setInputValue] = useState(lmurl)
+  useEffect(()=>{
+    setInputValue(lmurl)
+  },[lmurl])
 
   const handleSave = () => {
     setlmurl(inputValue)
@@ -22,7 +25,7 @@ export default function LMStudioURL({ lmurl, setlmurl }: LMUrlInputProps) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="api-key">LM Studio URL</Label>
+      <Label htmlFor="api-key">Ollama/LM Studio URL</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
