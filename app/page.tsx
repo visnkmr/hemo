@@ -196,6 +196,9 @@ export default function Home() {
       {sidebarVisible && (
         <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <Button className="mb-5" variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
+            {<MenuIcon size={20} />}
+          </Button>
             <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2">
               <PlusIcon size={16} />
               New Chat
@@ -229,9 +232,9 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
+          {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
-          </Button>
+          </Button>):null}
           
           <div className="flex items-center gap-2">
             {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">

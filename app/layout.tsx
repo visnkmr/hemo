@@ -8,8 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "AI Chat Interface",
-  description: "Chat with AI models using OpenRouter",
-    generator: 'v0.dev'
+  description: "Chat with AI models using OpenRouter, Ollama or LM Studio",
 }
 
 export default function RootLayout({
