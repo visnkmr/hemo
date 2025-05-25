@@ -1,34 +1,41 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+// 'use client'
+// import { ThemeProvider } from "../src/components/ThemeContext"
+import React from "react"
+// import { Providers } from "../src/components/ThemeContext"
+// import Thedarkhtml from "../src/components/thedarkhtml"
+// import { useLocalStorage } from "../src/components/useLocalStorage"
+import './globals.css'
+import {Metadata} from 'next'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const metadata:Metadata = {
+  title: 'Hemo',
+  description: 'LLM chat UI made for use with Filedime',
+}
 
-export const metadata: Metadata = {
-  title: "Hemo",
-  description: "GUI for filedime AI interaction",
-};
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
+
+  // const [showon, setshow] = useLocalStorage("dark",true);
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html suppressHydrationWarning className="h-full" lang="en">
+      <body className="h-full flex flex-col dark:bg-gray-900">
+        {/* <Providers> */}
+
+        {/* <Thedarkhtml> */}
+        {/* <Topthread/> */}
+        {/* <DarkButton/> */}
         {children}
+        {/* </Thedarkhtml> */}
+        {/* </Providers> */}
+
+        {/* <Footer/> */}
       </body>
+
     </html>
-  );
+  )
 }
