@@ -22,7 +22,7 @@ export default function Home() {
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [ollamastate, setollamastate] = useState(false)
+  const [ollamastate, setollamastate] = useState(0)
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
@@ -35,12 +35,12 @@ export default function Home() {
     }
 
     const storedlmurl = localStorage.getItem("lmstudio_url")
-    if (ollamastate && storedlmurl) {
+    if (ollamastate==1 && storedlmurl) {
       setlmurl(storedlmurl)
     }
     
     const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
-    if (ollamastate && storedlmurl && stored_lm_model_name) {
+    if (ollamastate==1 && storedlmurl && stored_lm_model_name) {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
     }
@@ -240,11 +240,11 @@ export default function Home() {
             </Button>
             <Button
               variant="outline"
-              onClick={()=>{setollamastate(!ollamastate)}}
+              onClick={()=>{setollamastate((ollamastate+1)%3)}}
               // disabled={!currentChat || currentChat.messages.length === 0}
             >
               <Bot size={16} className="mr-2" />
-              {`${ollamastate?"Using LM Studio":"Using Openrouter"}`}
+              {`${ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")}`}
             </Button>
             <Button
               variant="outline"
