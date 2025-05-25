@@ -234,7 +234,7 @@ export default function Home() {
           </Button>
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
+            {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
               {selectedModelInfo ? (
                 <>
                   <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
@@ -243,7 +243,7 @@ export default function Home() {
               ) : (
                 "Select Model"
               )}
-            </Button>
+            </Button>):null}
             <Button
               variant="outline"
               onClick={()=>{setollamastate((ollamastate+1)%3)}}
@@ -265,9 +265,9 @@ export default function Home() {
 
         {currentChat && (
           <ChatInterface
-          ollamastate={ollamastate}
-          lmstudio_model_name={model_name}
-          lmstudio_url={lmurl}
+            ollamastate={ollamastate}
+            lmstudio_model_name={model_name}
+            lmstudio_url={lmurl}
             chat={currentChat}
             updateChat={updateChat}
             apiKey={apiKey}

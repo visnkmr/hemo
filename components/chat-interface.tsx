@@ -340,7 +340,7 @@ export default function ChatInterface({
   // --- JSX Rendering ---
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-[90%]">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold truncate">{chat.title || "New Chat"}</h2>
