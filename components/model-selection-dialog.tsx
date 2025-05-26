@@ -134,6 +134,7 @@ export default function ModelSelectionDialog({
     const index = Math.abs(hash) % colors.length
     return colors[index]
   }
+  const [modelcount, setmodelcount] = useState(10)
 
   // Format pricing to be more readable
   // const formatPrice = (price: string) => {
@@ -166,7 +167,7 @@ export default function ModelSelectionDialog({
         ) : (
           // <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredModels.map((model) => (
+              {filteredModels.slice(0, modelcount).map((model) => (
                 <div
                   key={model.id}
                   className={cn(
@@ -210,6 +211,24 @@ export default function ModelSelectionDialog({
                   </div>
                 </div>
               ))}
+              {modelcount+10 < filteredModels.length && (<div
+                  key={"othermodels"}
+                  className={cn(
+                    "flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-all",
+                    "border-gray-200 dark:border-gray-700 hover:border-primary hover:bg-primary/5",
+                  )}
+                  onClick={() => setmodelcount( modelcount+10)}
+                >
+                 
+
+                  <div className="flex items-center h-full ">
+                    <p className="h3 font-medium text-sm truncate w-full" >
+                      More models
+                    </p>
+                  </div>
+
+                  
+                </div>)}
             </div>
           // </ScrollArea>
         )}
