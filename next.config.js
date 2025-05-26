@@ -4,7 +4,7 @@
 // const withOptimizedImages = require('next-optimized-images');
 
 
-
+// babel.config.js
 
 // const withBundleAnalyzer = require('@next/bundle-analyzer')({
 //   enabled: process.env.ANALYZE === 'true',
@@ -13,6 +13,7 @@
 module.exports = {
   // withOptimizedImages,
   experimental: {
+    reactCompiler:true,
     // appDir: true,
     // optimizeCss: true,
     // esmExternals: true,
