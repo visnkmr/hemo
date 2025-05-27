@@ -53,7 +53,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   return (
     <div
       className={cn(
-        "flex gap-3 p-4 rounded-lg relative",
+        "flex gap-3 p-4 rounded-lg relative lg:w-full overflow-hidden",
         isUser ? "bg-blue-50 dark:bg-blue-900/20" : "bg-gray-50 dark:bg-gray-800/50",
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -89,7 +89,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
           </span>
         </div>
 
-        <div className="prose dark:prose-invert prose-sm max-w-none">
+        <div className="prose dark:prose-invert prose-sm max-w-[30vh] lg:max-w-full">
           <Markdown>{message.content}</Markdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>
