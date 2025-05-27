@@ -4,7 +4,8 @@ import type { Message } from "@/lib/types"
 import { UserIcon, BotIcon, CopyIcon, GitBranchIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import ReactMarkdown from "react-markdown"
+// import ReactMarkdown from "react-markdown"
+import {Markdown} from "./markdown"
 // import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 // import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useEffect, useState } from "react"
@@ -89,7 +90,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
         </div>
 
         <div className="prose dark:prose-invert prose-sm max-w-none">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <Markdown>{message.content}</Markdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>
       </div>

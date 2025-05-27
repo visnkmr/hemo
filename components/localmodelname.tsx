@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,9 @@ interface LMmodelnameProps {
 export default function LMStudioModelName({ model_name, set_model_name }: LMmodelnameProps) {
   // const [showKey, setShowKey] = useState(false)
   const [inputValue, setInputValue] = useState(model_name)
-
+  useEffect(()=>{
+      setInputValue(model_name)
+    },[model_name])
   const handleSave = () => {
     set_model_name(inputValue)
     localStorage.setItem("lmstudio_model_name", inputValue)
@@ -22,7 +24,7 @@ export default function LMStudioModelName({ model_name, set_model_name }: LMmode
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="api-key">LM Studio Model Name</Label>
+      <Label htmlFor="api-key">Ollama / LM Studio Model Name</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input

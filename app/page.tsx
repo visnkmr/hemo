@@ -22,28 +22,33 @@ export default function Home() {
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [ollamastate, setollamastate] = useState(false)
+  const [ollamastate, setollamastate] = useState(0)
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
 
   // Load API key and chats from localStorage on initial render
   useEffect(() => {
+    const storedlmurl = localStorage.getItem("lmstudio_url")
+    if (ollamastate!==0 && storedlmurl) {
+      setlmurl(storedlmurl)
+    }
+    
+    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+    if (ollamastate!==0 && storedlmurl && stored_lm_model_name) {
+      set_model_name(stored_lm_model_name)
+      setSelectedModel(model_name)
+    }
+  },[ollamastate]);
+  console.log(lmurl)
+  console.log(model_name)
+  useEffect(() => {
     const storedApiKey = localStorage.getItem("openrouter_api_key")
     if (storedApiKey) {
       setApiKey(storedApiKey)
     }
 
-    const storedlmurl = localStorage.getItem("lmstudio_url")
-    if (ollamastate && storedlmurl) {
-      setlmurl(storedlmurl)
-    }
     
-    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
-    if (ollamastate && storedlmurl && stored_lm_model_name) {
-      set_model_name(stored_lm_model_name)
-      setSelectedModel(model_name)
-    }
 
     const storedChats = localStorage.getItem("chat_history")
     if (storedChats) {
@@ -191,22 +196,26 @@ export default function Home() {
       {sidebarVisible && (
         <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <Button className="mb-5" variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
+            {<MenuIcon size={20} />}
+          </Button>
             <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2">
               <PlusIcon size={16} />
               New Chat
             </Button>
           </div>
 
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
-          </div>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          </div>):null}
+          {ollamastate!==0? (<><div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
           </div>
           
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
-          </div>
+          </div></>):<></>}
+          
 
           <div className="flex-1 overflow-y-auto">
             <ChatHistory
@@ -223,12 +232,12 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
+          {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
-          </Button>
+          </Button>):null}
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
+            {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
               {selectedModelInfo ? (
                 <>
                   <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
@@ -237,14 +246,14 @@ export default function Home() {
               ) : (
                 "Select Model"
               )}
-            </Button>
+            </Button>):null}
             <Button
               variant="outline"
-              onClick={()=>{setollamastate(!ollamastate)}}
+              onClick={()=>{setollamastate((ollamastate+1)%3)}}
               // disabled={!currentChat || currentChat.messages.length === 0}
             >
               <Bot size={16} className="mr-2" />
-              {`${ollamastate?"Using LM Studio":"Using Openrouter"}`}
+              {`${ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")}`}
             </Button>
             <Button
               variant="outline"
@@ -259,9 +268,9 @@ export default function Home() {
 
         {currentChat && (
           <ChatInterface
-          ollamastate={ollamastate}
-          lmstudio_model_name={model_name}
-          lmstudio_url={lmurl}
+            ollamastate={ollamastate}
+            lmstudio_model_name={model_name}
+            lmstudio_url={lmurl}
             chat={currentChat}
             updateChat={updateChat}
             apiKey={apiKey}

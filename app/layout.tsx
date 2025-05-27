@@ -8,8 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "AI Chat Interface",
-  description: "Chat with AI models using OpenRouter",
-    generator: 'v0.dev'
+  description: "Chat with AI models using OpenRouter, Ollama or LM Studio",
 }
 
 export default function RootLayout({
@@ -19,6 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script src="https://unpkg.com/react-scan/dist/auto.global.js" />
+        {/* rest of your scripts go under */}
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
