@@ -5,7 +5,7 @@ import { useState, useRef, type KeyboardEvent, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import type { Chat, Message, BranchPoint } from "@/lib/types"
-import { SendIcon, Loader2, MenuIcon } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
 import { Progress } from "@/components/ui/progress"
@@ -40,6 +40,7 @@ interface ChatInterfaceProps {
   setIsModelDialogOpen:any;
   getModelColor:any;
   getModelDisplayName:any;
+  setollamastate:any;
 }
 
 // --- Exported Send Message Stream Function ---
@@ -201,7 +202,8 @@ export default function ChatInterface({
   setSidebarVisible,
   setIsModelDialogOpen,
   getModelDisplayName,
-  getModelColor
+  getModelColor,
+  setollamastate
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -354,9 +356,9 @@ export default function ChatInterface({
   };
 
   // --- JSX Rendering ---
-
+  const [sbi,setcobi] = useState(false)
   return (
-    <div className="">
+    <div className="" onClick={()=>setcobi(false)}>
       
       {/* Header */}
       {/* <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -431,6 +433,14 @@ export default function ChatInterface({
           
         </div>
         <div className="mt-4 flex flex-row gap-4 w-full">
+          <Button
+              variant="outline"
+              onClick={(e)=>{setcobi(true);e.stopPropagation();setollamastate((ollamastate+1)%3)}}
+              // disabled={!currentChat || currentChat.messages.length === 0}
+            >
+              <Bot size={16} className="mr-2"/>
+              {`${sbi?(ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")):""}`}
+            </Button>
           {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
                         {selectedModelInfo ? (
                           <>

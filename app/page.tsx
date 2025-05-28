@@ -28,6 +28,9 @@ export default function Home() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
 
+  useEffect(()=>{
+    setCollapsed(true)
+  },[currentChatId])
   // Load API key and chats from localStorage on initial render
   useEffect(() => {
     const storedlmurl = localStorage.getItem("lmstudio_url")
@@ -205,15 +208,11 @@ const [collapsed, setCollapsed] = useState(true);
           <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
             {<MenuIcon size={20} />}
           </Button>
-         
-            <Button
-              variant="outline"
-              onClick={()=>{setollamastate((ollamastate+1)%3)}}
-              // disabled={!currentChat || currentChat.messages.length === 0}
-            >
-              <Bot size={16} className="mr-2" />
-              {`${ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")}`}
+         <Button onClick={createNewChat} variant={"outline"} className=" w-full flex items-center justify-center gap-2">
+              <PlusIcon size={16} />
+              New Chat
             </Button>
+            
             <Button
               variant="outline"
               onClick={() => setIsExportDialogOpen(true)}
@@ -226,7 +225,7 @@ const [collapsed, setCollapsed] = useState(true);
             </div>
           </div>
           <div className={cn(`absolute top-0 left-0 h-full bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
-          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20")}>
+          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20 border-r border-r-gray-950")}>
           {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
           </div>):null}
@@ -254,14 +253,14 @@ const [collapsed, setCollapsed] = useState(true);
               New Chat
             </Button>
             </div>
-        </div>
+            </div>
         </div>
       )}
                 {/* <SidebarMenu/> */}
       
 
       {/* Main content */}
-      <div className="flex flex-col ">
+      <div className={cn("flex flex-col ")} onClick={()=>{setCollapsed(true)}} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
@@ -270,6 +269,7 @@ const [collapsed, setCollapsed] = useState(true);
 
         {currentChat && (
           <ChatInterface
+          setollamastate={setollamastate}
             ollamastate={ollamastate}
             lmstudio_model_name={model_name}
             lmstudio_url={lmurl}
