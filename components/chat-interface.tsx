@@ -205,6 +205,8 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [dsm,setdsm]=useState(directsendmessage)
+  const [mts,setmts]=useState(messagetosend)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -312,11 +314,13 @@ export default function ChatInterface({
 
     // Effect for direct message sending
   useEffect(() => {
-    if (directsendmessage && messagetosend && !isLoading) {
-        handleSendMessage(messagetosend);
+    if (dsm && mts && !isLoading) {
+        handleSendMessage(mts);
+        setdsm(false)
+        setmts("")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [directsendmessage, messagetosend, isLoading]); // Dependencies added
+  }, [dsm, mts, isLoading]); // Dependencies added
 
   // --- Other Handlers ---
 
@@ -377,6 +381,8 @@ export default function ChatInterface({
                 isStreaming={streamingMessageId === message.id}
                 onCopy={() => handleCopyMessage(message.content)}
                 onBranch={() => handleBranchFromMessage(message.id)}
+                setmts={setmts}
+                setdsm={setdsm}
               />
             ))
           )}

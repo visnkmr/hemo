@@ -1,7 +1,7 @@
 "use client"
 
 import type { Message } from "@/lib/types"
-import { UserIcon, BotIcon, CopyIcon, GitBranchIcon } from "lucide-react"
+import { UserIcon, BotIcon, CopyIcon, GitBranchIcon, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 // import ReactMarkdown from "react-markdown"
@@ -16,9 +16,11 @@ interface MessageItemProps {
   isStreaming?: boolean
   onCopy: () => void
   onBranch: () => void
+  setdsm: any
+  setmts: any
 }
 
-export default function MessageItem({ message, isStreaming = false, onCopy, onBranch }: MessageItemProps) {
+export default function MessageItem({ message, isStreaming = false, onCopy, onBranch,setdsm,setmts }: MessageItemProps) {
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -49,6 +51,10 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   //     )
   //   },
   // }
+  const Resend=()=>{
+    setdsm(true)
+    setmts(message.content)
+  }
 
   return (
     <div className={cn("",isUser?"justify-end":"")} 
@@ -101,6 +107,9 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
     </div>
     {!isStreaming && (
         <div className={cn("gap-1 ",isUser,isHovered?"visible":"invisible")}>
+          <Button variant="ghost" className={(isUser && isHovered ?"visible":"hidden")} size="icon" onClick={Resend} title="Branch from here">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
             <CopyIcon className="h-4 w-4" />
           </Button>
