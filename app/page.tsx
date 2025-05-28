@@ -12,6 +12,7 @@ import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
 import ModelSelectionDialog from "@/components/model-selection-dialog"
 import ExportDialog from "@/components/export-dialog"
 import { Toaster } from "@/components/ui/toaster"
+import { cn } from "@/lib/utils"
 
 export default function Home() {
   const [apiKey, setApiKey] = useState<string>("")
@@ -187,20 +188,45 @@ export default function Home() {
     setSelectedModelInfo(modelInfo || null)
     setIsModelDialogOpen(false)
   }
+const [collapsed, setCollapsed] = useState(true);
+
+  const toggleMenu = () => {
+    setCollapsed(prev => !prev);
+  };
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-      {/* Sidebar */}
-      {sidebarVisible && (
-        <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <Button className="" variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
+    <div className="absolute h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      {(
+        <div className="relative h-full">
+          <div className="absolute top-4 left-4 z-50 p-2 rounded-md  text-white bg-gray-900 ">
+            <div className="flex flex-row gap-4 ">
+          <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
             {<MenuIcon size={20} />}
           </Button>
+         
+            <Button
+              variant="outline"
+              onClick={()=>{setollamastate((ollamastate+1)%3)}}
+              // disabled={!currentChat || currentChat.messages.length === 0}
+            >
+              <Bot size={16} className="mr-2" />
+              {`${ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")}`}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsExportDialogOpen(true)}
+              disabled={!currentChat || currentChat.messages.length === 0}
+            >
+              <Download size={16} className="" />
+              <span className="hidden lg:inline lg:ml-2">Export</span>
+            </Button>
+             
+            </div>
           </div>
-
+          <div className={cn(`absolute top-0 left-0 h-full bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
+          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20")}>
           {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
           </div>):null}
@@ -229,44 +255,18 @@ export default function Home() {
             </Button>
             </div>
         </div>
+        </div>
       )}
+                {/* <SidebarMenu/> */}
+      
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex flex-col ">
+        {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
           </Button>):null}
-          
-          <div className="flex items-center gap-2">
-            {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
-              {selectedModelInfo ? (
-                <>
-                  <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
-                  <span className="truncate max-w-[150px]">{getModelDisplayName(selectedModel)}</span>
-                </>
-              ) : (
-                "Select Model"
-              )}
-            </Button>):null}
-            <Button
-              variant="outline"
-              onClick={()=>{setollamastate((ollamastate+1)%3)}}
-              // disabled={!currentChat || currentChat.messages.length === 0}
-            >
-              <Bot size={16} className="mr-2" />
-              {`${ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")}`}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsExportDialogOpen(true)}
-              disabled={!currentChat || currentChat.messages.length === 0}
-            >
-              <Download size={16} className="mr-2" />
-              Export
-            </Button>
-          </div>
-        </div>
+        </div> */}
 
         {currentChat && (
           <ChatInterface
@@ -281,6 +281,11 @@ export default function Home() {
             onBranchConversation={handleBranchConversation}
             directsendmessage={false}
             messagetosend=""
+            sidebarVisible={sidebarVisible}
+            setSidebarVisible={setSidebarVisible}
+            getModelColor={getModelColor}
+            getModelDisplayName={getModelDisplayName}
+            setIsModelDialogOpen={setIsModelDialogOpen}
           />
         )}
       </div>

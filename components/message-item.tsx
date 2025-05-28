@@ -51,15 +51,17 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   // }
 
   return (
+    <div className={cn("",isUser?"justify-end":"")} 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}>
+    <div className={cn(isUser?"place-items-end":"")}>
     <div
       className={cn(
-        "flex gap-3 p-4 rounded-lg relative lg:w-full overflow-hidden",
+        "gap-3 p-4 rounded-lg relative overflow-hidden",
         isUser ? "bg-blue-50 dark:bg-blue-900/20" : "bg-gray-50 dark:bg-gray-800/50",
       )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex-shrink-0 mt-1">
+      {/* <div className="flex-shrink-0 mt-1">
         {isUser ? (
           <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
             <UserIcon className="h-5 w-5 text-white" />
@@ -74,29 +76,31 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
             <BotIcon className="h-5 w-5 text-white" />
           </div>
         )}
-      </div>
+      </div> */}
 
-      <div className="flex-1 space-y-2">
-        <div className="flex items-center gap-2">
+      <div className="space-y-2">
+        <div className="items-center gap-2">
           <span className="font-medium">
-            {isUser ? "You" : "AI Assistant"}
+            {/* {isUser ? "You" : "AI Assistant"} */}
             {message.model && !isUser && (
               <span className="text-xs ml-2 opacity-70">({getModelDisplayName(message.model)})</span>
             )}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          {/* <span className="text-xs text-gray-500 dark:text-gray-400">
             {format(new Date(message.timestamp), "MMM d, h:mm a")}
-          </span>
+          </span> */}
         </div>
 
-        <div className="prose dark:prose-invert prose-sm max-w-[30vh] lg:max-w-full">
+        <div className={cn( isUser?"max-w-[70vw]":"w-full","prose dark:prose-invert prose-sm break-words")}>
           <Markdown>{message.content}</Markdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>
       </div>
 
-      {isHovered && !isStreaming && (
-        <div className="absolute top-2 right-2 flex gap-1">
+      
+    </div>
+    {!isStreaming && (
+        <div className={cn("gap-1 ",isUser,isHovered?"visible":"invisible")}>
           <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
             <CopyIcon className="h-4 w-4" />
           </Button>
@@ -105,6 +109,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
           </Button>
         </div>
       )}
+      </div>  
     </div>
   )
 }

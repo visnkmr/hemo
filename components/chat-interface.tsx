@@ -5,7 +5,7 @@ import { useState, useRef, type KeyboardEvent, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import type { Chat, Message, BranchPoint } from "@/lib/types"
-import { SendIcon, Loader2 } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
 import { Progress } from "@/components/ui/progress"
@@ -20,6 +20,7 @@ interface SendMessageStreamParams {
   model: string;
   messages: Array<{ role: string; content: string }>;
   lmstudio_url:string;
+  
 }
 
 interface ChatInterfaceProps {
@@ -34,6 +35,11 @@ interface ChatInterfaceProps {
   lmstudio_model_name: string;
   directsendmessage?: boolean;
   messagetosend?: string;
+  sidebarVisible:any;
+  setSidebarVisible:any;
+  setIsModelDialogOpen:any;
+  getModelColor:any;
+  getModelDisplayName:any;
 }
 
 // --- Exported Send Message Stream Function ---
@@ -190,6 +196,12 @@ export default function ChatInterface({
   onBranchConversation,
   directsendmessage = false,
   messagetosend = "",
+  
+  sidebarVisible,
+  setSidebarVisible,
+  setIsModelDialogOpen,
+  getModelDisplayName,
+  getModelColor
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -340,17 +352,19 @@ export default function ChatInterface({
   // --- JSX Rendering ---
 
   return (
-    <div className="flex flex-col h-[95%]">
+    <div className="">
+      
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      {/* <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-semibold truncate">{chat.title || "New Chat"}</h2>
-      </div>
+      </div> */}
 
       {/* Message Area */}
-      <ScrollArea className="h-[60vh] lg:h-full">
-      <div className="flex overflow-hidden"> {/* Make chat history grow and handle overflow */}
-      <div className="grid gap-4 p-4 mb-5" >
-        <div className="flex items-start gap-4 flex-col ">
+      {/* <ScrollArea className="h-full justify-center"> w-9 */}
+      {/* <div className="flex overflow-hidden"> Make chat history grow and handle overflow */}
+      <div className="absolute w-full bottom-0 top-0 pt-20 pb-[144px] overflow-y-scroll pl-8 pr-8" >
+        <div className="mx-auto flex w-full max-w-3xl flex-col pb-10">
+          {/* mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pb-10 pt-safe-offset-10 */}
           {chat.messages.length === 0 ? (
             <div className="flex items-center justify-center h-full w-full">
               <p className="text-gray-500 dark:text-gray-400">Send a message to start the conversation</p>
@@ -369,8 +383,8 @@ export default function ChatInterface({
           <div ref={messagesEndRef} />
         </div>
         </div>
-        </div>
-      </ScrollArea>
+        {/* </div> */}
+      {/* </ScrollArea> */}
 
       {/* Error Display */}
       {error && (
@@ -380,18 +394,23 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="absolute w-full bottom-0  pl-8 pr-8 " >
+        <div className="mx-auto flex w-full max-w-4xl flex-col pb-10 bg-gray-50 dark:bg-gray-900">
+      {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
         {/* Context Usage Bar */}
-        <div className="mb-2">
+        {/* <div className="mb-2">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>Context Usage</span>
             <span>{contextUsage}%</span>
           </div>
           <Progress value={contextUsage} className="h-1" />
-        </div>
+        </div> */}
 
         {/* Text Input & Send Button */}
-        <div className="flex items-end gap-2">
+        
+        <div className="flex flex-grow items-end gap-2">
+          <div className="flex flex-col flex-grow">
+
           <Textarea
             ref={textareaRef}
             value={input}
@@ -401,9 +420,25 @@ export default function ChatInterface({
             className="flex-1 min-h-[80px] max-h-[200px]"
             disabled={isLoading}
           />
-          <Button onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="h-10">
+          <Progress value={contextUsage} className="h-1" />
+          </div>
+          
+        </div>
+        <div className="mt-4 flex flex-row gap-4 w-full">
+          {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
+                        {selectedModelInfo ? (
+                          <>
+                            <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
+                            <span className="truncate max-w-[150px]">{getModelDisplayName(selectedModel)}</span>
+                          </>
+                        ) : (
+                          "Select Model"
+                        )}
+                      </Button>):null}
+                      <Button onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="h-full bg-gray-50">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
+        </div>
         </div>
       </div>
     </div>
