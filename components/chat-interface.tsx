@@ -225,7 +225,7 @@ export default function ChatInterface({
       role: "user",
       content: messageContent,
       timestamp: new Date().toISOString(),
-      model: selectedModel,
+      model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
     };
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
@@ -233,7 +233,7 @@ export default function ChatInterface({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
-      model: selectedModel,
+      model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
     };
 
     setStreamingMessageId(assistantMessageId);
@@ -244,7 +244,7 @@ export default function ChatInterface({
         ...chat,
         messages: [...initialMessages, userMessage, assistantMessage],
         title: initialMessages.length === 0 ? messageContent.slice(0, 30) : chat.title,
-        lastModelUsed: selectedModel,
+        lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
     };
     updateChat(currentChatState);
 
