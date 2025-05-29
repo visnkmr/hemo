@@ -198,7 +198,7 @@ const [collapsed, setCollapsed] = useState(true);
   };
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
-  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [viewportHeight, setViewportHeight] = useState((typeof window === 'undefined')? "h-full" :window.innerHeight);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
