@@ -198,11 +198,30 @@ const [collapsed, setCollapsed] = useState(true);
   };
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setViewportHeight(window.visualViewport?.height || window.innerHeight);
+    };
+
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize);
+
+    // Initial call
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   return (
-    <div className="absolute h-full w-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
+    <div className="absolute w-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" style={{ height: viewportHeight }}>
       {(
-        <div className="relative h-full">
+        <div className="relative h-full overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  text-white bg-gray-900 ">
             <div className="flex flex-row gap-4 ">
           <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
@@ -260,7 +279,7 @@ const [collapsed, setCollapsed] = useState(true);
       
 
       {/* Main content */}
-      <div className={cn("flex flex-col ")} onClick={()=>{setCollapsed(true)}} >
+      <div className={cn("flex flex-col h-full")} onClick={()=>{setCollapsed(true)}} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
