@@ -403,7 +403,7 @@ export default function ChatInterface({
 
       {/* Input Area */}
       <div className="absolute w-full bottom-0  pl-8 pr-8 " >
-        <div className="mx-auto flex w-full max-w-4xl flex-col pb-10 bg-gray-50 dark:bg-gray-900">
+        <div className="mx-auto flex w-full max-w-4xl flex-col pb-10  bg-gray-50 dark:bg-gray-900">
       {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
         {/* Context Usage Bar */}
         {/* <div className="mb-2">
@@ -425,7 +425,7 @@ export default function ChatInterface({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
-            className="flex-1 min-h-[80px] max-h-[200px]"
+            className="flex-1 min-h-[80px] max-h-[200px] dark:bg-gray-900 border bg-gray-50"
             disabled={isLoading}
           />
           <Progress value={contextUsage} className="h-1" />
@@ -451,7 +451,7 @@ export default function ChatInterface({
                           "Select Model"
                         )}
                       </Button>):null}
-                      <Button onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="h-full bg-gray-50">
+                      <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
         </div>

@@ -22,7 +22,7 @@ export default function ApiKeyInput({ apiKey, setApiKey }: ApiKeyInputProps) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="api-key">OpenRouter API Key</Label>
+      <Label className="dark:text-white text-black " htmlFor="api-key">OpenRouter API Key</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input

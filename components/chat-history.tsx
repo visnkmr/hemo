@@ -85,8 +85,8 @@ export default function ChatHistory({
         <div
           key={chat.id}
           className={cn(
-            "flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer group",
-            chat.id === currentChatId && "bg-gray-100 dark:bg-gray-700",
+            "dark:text-white text-black flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer group",
+            chat.id === currentChatId ? " bg-gray-300 dark:bg-gray-700":"",
           )}
         >
           <div

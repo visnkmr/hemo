@@ -13,7 +13,7 @@ import ModelSelectionDialog from "@/components/model-selection-dialog"
 import ExportDialog from "@/components/export-dialog"
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from "@/lib/utils"
-
+import DarkButton from '../components/dark-button'
 export default function Home() {
   const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
@@ -257,7 +257,7 @@ const [collapsed, setCollapsed] = useState(true);
     <div className="absolute min-h-svh flex flex-col inset-0 w-screen bg-gray-50 dark:bg-gray-900">
       {(
         <div  style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
-          <div className="absolute top-4 left-4 z-50 p-2 rounded-md  text-white bg-gray-900 ">
+          <div className="absolute top-4 left-4 z-50 p-2 rounded-md  dark:text-white  dark:bg-gray-900 bg-gray-10 ">
             <div className="flex flex-row gap-4 ">
           <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
             {<MenuIcon size={20} />}
@@ -278,8 +278,12 @@ const [collapsed, setCollapsed] = useState(true);
              
             </div>
           </div>
-          <div className={cn(`absolute top-0 left-0 h-full bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
-          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20 border-r border-r-gray-950")}>
+          <div className="absolute top-4 right-4 z-50 p-2 rounded-md  text-white dark:bg-gray-900 bg-gray-10 ">
+          <DarkButton/>
+
+          </div>
+          <div className={cn(`absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
+          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
           {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
           </div>):null}
@@ -301,8 +305,9 @@ const [collapsed, setCollapsed] = useState(true);
             renameChat={renameChat}
       />
           </div>
-            <div className="flex items-end gap-2 p-4">
-          <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2">
+
+            <div className="absolute bottom-4 left-0 right-0 items-end gap-2 p-4 border-gray-200 dark:border-gray-700">
+          <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">
               <PlusIcon size={16} />
               New Chat
             </Button>
