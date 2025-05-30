@@ -24,6 +24,14 @@ module.exports = {
   typescript: {
     ignoreBuildErrors: true
   },
+  theme: {
+    extend: {
+      colors: {
+        deeppink: '#FF1493',
+        turquoise: '#40E0D0',
+      },
+    },
+  },
   // eslint: {
   //   ignoreDuringBuilds: true
   // },
