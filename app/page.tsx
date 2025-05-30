@@ -198,28 +198,63 @@ const [collapsed, setCollapsed] = useState(true);
   };
 
   const currentChat = chats.find((chat) => chat.id === currentChatId)
-  const [viewportHeight, setViewportHeight] = useState((typeof window === 'undefined')? "h-full" :window.innerHeight);
+  // const [viewportHeight, setViewportHeight] = useState((typeof window === 'undefined')? "h-full" :window.innerHeight);
+
+  // useEffect(() => {
+  //   if (typeof window === 'undefined') return;
+  //   const handleResize = () => {
+  //     setViewportHeight(window.visualViewport?.height || window.innerHeight);
+  //   };
+
+  //   window.visualViewport?.addEventListener('resize', handleResize);
+  //   window.addEventListener('resize', handleResize);
+
+  //   // Initial call
+  //   handleResize();
+
+  //   return () => {
+  //     window.visualViewport?.removeEventListener('resize', handleResize);
+  //     window.removeEventListener('resize', handleResize);
+  //   };
+  // }, []);
+
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => {
-      setViewportHeight(window.visualViewport?.height || window.innerHeight);
+    const setViewportHeight = () => {
+      document.documentElement.style.setProperty('--100vh', `${window.innerHeight}px`);
     };
-
-    window.visualViewport?.addEventListener('resize', handleResize);
-    window.addEventListener('resize', handleResize);
-
-    // Initial call
-    handleResize();
-
+    setViewportHeight();
+    const debouncedSetViewportHeight = debounce(setViewportHeight, 100);
+    window.addEventListener('resize', debouncedSetViewportHeight);
     return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', debouncedSetViewportHeight);
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      // In a real Next.js app, you might use next/router here
+      // For example: router.replace(window.location.href.replace('http:', 'https:'));
+      if (window.location.protocol !== 'https:') {
+        console.warn("Attempting to redirect to HTTPS (simulated for component context)");
+        // window.location.protocol = "https:"; // This would cause a full page reload
+      }
+    }
+  }, []);
+  
   return (
-    <div className="absolute w-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" style={{ height: viewportHeight }}>
+    <div className="absolute inset-0 h-full  w-screen bg-gray-50 dark:bg-gray-900">
       {(
         <div className="relative h-full overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  text-white bg-gray-900 ">
@@ -279,7 +314,7 @@ const [collapsed, setCollapsed] = useState(true);
       
 
       {/* Main content */}
-      <div className={cn("flex flex-col h-full")} onClick={()=>{setCollapsed(true)}} >
+      <div className={cn("absolute h-full bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}

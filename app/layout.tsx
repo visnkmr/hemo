@@ -19,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"/>
         <script src="https://unpkg.com/react-scan/dist/auto.global.js" />
         {/* rest of your scripts go under */}
       </head>
