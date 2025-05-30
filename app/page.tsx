@@ -254,9 +254,9 @@ const [collapsed, setCollapsed] = useState(true);
   }, []);
   
   return (
-    <div className="absolute inset-0 h-full  w-screen bg-gray-50 dark:bg-gray-900">
+    <div className="absolute min-h-svh flex flex-col inset-0 w-screen bg-gray-50 dark:bg-gray-900">
       {(
-        <div className="relative h-full overflow-hidden">
+        <div  style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  text-white bg-gray-900 ">
             <div className="flex flex-row gap-4 ">
           <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
@@ -314,7 +314,7 @@ const [collapsed, setCollapsed] = useState(true);
       
 
       {/* Main content */}
-      <div className={cn("absolute h-full bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
+      <div  style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
