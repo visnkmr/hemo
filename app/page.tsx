@@ -6,6 +6,7 @@ import ChatHistory from "@/components/chat-history"
 import ApiKeyInput from "@/components/api-key-input"
 import LMStudioURL from "@/components/lmstudio-url"
 import LMStudioModelName from "@/components/localmodelname"
+import FileGPTUrl from "@/components/filegpt-url"
 import type { Chat, BranchPoint } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
@@ -14,10 +15,29 @@ import ExportDialog from "@/components/export-dialog"
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from "@/lib/utils"
 import DarkButton from '../components/dark-button'
-export default function Home() {
+interface FileItem {
+    name: string;
+    path: string;
+    is_dir: boolean;
+    size: number;
+    rawfs: number;
+    lmdate: number;
+    timestamp: number;
+    foldercon: number;
+    ftype: string;
+    parent: string;
+  }
+interface gptargs{
+    message?:FileItem,
+    fgptendpoint?:string,
+    setasollama:boolean
+    // localorremote:boolean
+}
+export default function Home({message,fgptendpoint="localhost",setasollama=false}:gptargs) {
   const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
   const [model_name, set_model_name] = useState<string>("")
+  const [filegpturl, setFilegpturl] = useState<string>("")
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [selectedModelInfo, setSelectedModelInfo] = useState<any>(null)
   const [chats, setChats] = useState<Chat[]>([])
@@ -43,7 +63,12 @@ export default function Home() {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
     }
-  },[ollamastate]);
+
+    const storedFilegpturl = localStorage.getItem("filegpt_url")
+    if (ollamastate === 3 && storedFilegpturl) {
+      setFilegpturl(storedFilegpturl)
+    }
+  }, [ollamastate]);
   console.log(lmurl)
   console.log(model_name)
   useEffect(() => {
@@ -218,10 +243,10 @@ const [collapsed, setCollapsed] = useState(true);
   //   };
   // }, []);
 
-  const debounce = (func, wait) => {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
+  const debounce = (func: (...args: any[]) => void, wait: number): (...args: any[]) => void => {
+    let timeout: NodeJS.Timeout | undefined;
+    return function executedFunction(...args: any[]): void {
+      const later = (): void => {
         clearTimeout(timeout);
         func(...args);
       };
@@ -287,13 +312,23 @@ const [collapsed, setCollapsed] = useState(true);
           {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
           </div>):null}
-          {ollamastate!==0? (<><div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
-          </div>
-          
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
-          </div></>):<></>}
+          {ollamastate!==0 ? (
+            <>
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
+              </div>
+              {ollamastate !== 3 && (
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
+                </div>
+              )}
+              {ollamastate === 3 && (
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
+                </div>
+              )}
+            </>
+          ) : <></>}
           
 
           <div className="flex-1 overflow-y-auto">
@@ -328,10 +363,12 @@ const [collapsed, setCollapsed] = useState(true);
 
         {currentChat && (
           <ChatInterface
-          setollamastate={setollamastate}
+            setollamastate={setollamastate}
             ollamastate={ollamastate}
             lmstudio_model_name={model_name}
             lmstudio_url={lmurl}
+            filegpt_url={filegpturl}
+            message={message}
             chat={currentChat}
             updateChat={updateChat}
             apiKey={apiKey}

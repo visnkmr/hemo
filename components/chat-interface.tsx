@@ -4,8 +4,9 @@ import type React from "react"
 import { useState, useRef, type KeyboardEvent, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import type { Chat, Message, BranchPoint } from "@/lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import type { Chat, Message, BranchPoint, FileItem } from "@/lib/types"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import MessageItem from "@/components/message-item"
 import { Progress } from "@/components/ui/progress"
@@ -33,6 +34,8 @@ interface ChatInterfaceProps {
   onBranchConversation: (branchPoint: BranchPoint) => void;
   lmstudio_url: string;
   lmstudio_model_name: string;
+  filegpt_url: string;
+  message?: FileItem;
   directsendmessage?: boolean;
   messagetosend?: string;
   sidebarVisible:any;
@@ -192,6 +195,8 @@ export default function ChatInterface({
   apiKey,
   lmstudio_url,
   lmstudio_model_name,
+  filegpt_url,
+  message,
   selectedModel,
   selectedModelInfo,
   onBranchConversation,
@@ -210,6 +215,7 @@ export default function ChatInterface({
   const [dsm,setdsm]=useState(directsendmessage)
   const [mts,setmts]=useState(messagetosend)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFilePath, setSelectedFilePath] = useState<string>(message?.path || "")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
@@ -223,6 +229,12 @@ export default function ChatInterface({
     const usagePercentage = Math.min(100, Math.ceil((estimatedTokens / maxContext) * 100))
     setContextUsage(usagePercentage)
   }, [chat.messages, input, selectedModelInfo])
+
+  useEffect(() => {
+    if (message?.path) {
+      setSelectedFilePath(message.path)
+    }
+  }, [message])
 
 
   // Main function to handle sending a message
@@ -266,7 +278,14 @@ export default function ChatInterface({
 
     try {
         // Determine API URL and model
-        const apiUrl = ollamastate==0 ? "https://openrouter.ai/api" : lmstudio_url;
+        let apiUrl = "https://openrouter.ai/api";
+        if (ollamastate === 0) {
+          apiUrl = "https://openrouter.ai/api";
+        } else if (ollamastate === 1 || ollamastate === 2) {
+          apiUrl = lmstudio_url;
+        } else if (ollamastate === 3) {
+          apiUrl = filegpt_url;
+        }
         const modelToSend = ollamastate==0 ? selectedModel : lmstudio_model_name;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
             role: msg.role,
@@ -435,11 +454,11 @@ export default function ChatInterface({
         <div className="mt-4 flex flex-row gap-4 w-full">
           <Button
               variant="outline"
-              onClick={(e)=>{setcobi(true);e.stopPropagation();setollamastate((ollamastate+1)%3)}}
+              onClick={(e)=>{setcobi(true);e.stopPropagation();setollamastate((ollamastate+1)%4)}}
               // disabled={!currentChat || currentChat.messages.length === 0}
             >
               <Bot size={16} className="mr-2"/>
-              {`${sbi?(ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":"Using LM Studio")):""}`}
+              {`${sbi?(ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":(ollamastate===2?"Using LM Studio":"Using FileGPT"))):""}`}
             </Button>
           {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
                         {selectedModelInfo ? (
@@ -451,7 +470,21 @@ export default function ChatInterface({
                           "Select Model"
                         )}
                       </Button>):null}
-                      <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
+          {ollamastate===3 && (
+            <div className="flex flex-grow items-center gap-2">
+              <Input
+                type="text"
+                value={selectedFilePath}
+                onChange={(e) => setSelectedFilePath(e.target.value)}
+                placeholder="Enter file path or choose file"
+                className="flex-grow"
+              />
+              <Button variant="outline" size="icon" onClick={() => setSelectedFilePath("")}>
+                <FileIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
         </div>
