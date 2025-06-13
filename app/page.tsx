@@ -1,4 +1,4 @@
-import {ChatUI} from "@/lib/lib/index";
+import ChatUI from "../components/chatui";
 
 export default function Home(){
     return  <>
