@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./lib",
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "module": "commonjs"
+  },
+  "include": ["lib/*.ts"],
+  "exclude": []
+}
