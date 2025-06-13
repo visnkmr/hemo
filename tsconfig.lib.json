@@ -5,7 +5,7 @@
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": false,
-    "module": "commonjs"
+    "module": "esnext"
   },
   "include": ["lib/*.ts"],
   "exclude": []

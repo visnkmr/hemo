@@ -6,8 +6,8 @@
   "module": "./lib/lib/index.js",
   "types": "./lib/lib/index.d.ts",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
+    "dev": "tsc --project tsconfig.lib.json && next dev --turbopack",
+    "build": "tsc --project tsconfig.lib.json && next build",
     "buildlib": "tsc --project tsconfig.lib.json",
     "start": "next start",
     "lint": "next lint"

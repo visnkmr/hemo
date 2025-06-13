@@ -1,42 +1,36 @@
-"use strict";
 "use client";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = ChatUI;
-const react_1 = require("react");
-const chat_interface_1 = __importDefault(require("../components/chat-interface"));
-const chat_history_1 = __importDefault(require("../components/chat-history"));
-const api_key_input_1 = __importDefault(require("../components/api-key-input"));
-const lmstudio_url_1 = __importDefault(require("../components/lmstudio-url"));
-const localmodelname_1 = __importDefault(require("../components/localmodelname"));
-const filegpt_url_1 = __importDefault(require("../components/filegpt-url"));
-const button_1 = require("../components/ui/button");
-const lucide_react_1 = require("lucide-react");
-const model_selection_dialog_1 = __importDefault(require("../components/model-selection-dialog"));
-const export_dialog_1 = __importDefault(require("../components/export-dialog"));
-const toaster_1 = require("../components/ui/toaster");
-const utils_1 = require("../lib/utils");
-const dark_button_1 = __importDefault(require("./dark-button"));
-function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
-    const [apiKey, setApiKey] = (0, react_1.useState)("");
-    const [lmurl, setlmurl] = (0, react_1.useState)("");
-    const [model_name, set_model_name] = (0, react_1.useState)("");
-    const [filegpturl, setFilegpturl] = (0, react_1.useState)("");
-    const [selectedModel, setSelectedModel] = (0, react_1.useState)("");
-    const [selectedModelInfo, setSelectedModelInfo] = (0, react_1.useState)(null);
-    const [chats, setChats] = (0, react_1.useState)([]);
-    const [currentChatId, setCurrentChatId] = (0, react_1.useState)("");
-    const [sidebarVisible, setSidebarVisible] = (0, react_1.useState)(true);
-    const [ollamastate, setollamastate] = (0, react_1.useState)(0);
-    const [isModelDialogOpen, setIsModelDialogOpen] = (0, react_1.useState)(false);
-    const [isExportDialogOpen, setIsExportDialogOpen] = (0, react_1.useState)(false);
-    const [allModels, setAllModels] = (0, react_1.useState)([]);
-    (0, react_1.useEffect)(() => {
+import { useEffect, useState } from "react";
+import ChatInterface from "../components/chat-interface";
+import ChatHistory from "../components/chat-history";
+import ApiKeyInput from "../components/api-key-input";
+import LMStudioURL from "../components/lmstudio-url";
+import LMStudioModelName from "../components/localmodelname";
+import FileGPTUrl from "../components/filegpt-url";
+import { Button } from "../components/ui/button";
+import { PlusIcon, MenuIcon, Download } from "lucide-react";
+import ModelSelectionDialog from "../components/model-selection-dialog";
+import ExportDialog from "../components/export-dialog";
+import { Toaster } from "../components/ui/toaster";
+import { cn } from "../lib/utils";
+import DarkButton from './dark-button';
+export default function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
+    const [apiKey, setApiKey] = useState("");
+    const [lmurl, setlmurl] = useState("");
+    const [model_name, set_model_name] = useState("");
+    const [filegpturl, setFilegpturl] = useState("");
+    const [selectedModel, setSelectedModel] = useState("");
+    const [selectedModelInfo, setSelectedModelInfo] = useState(null);
+    const [chats, setChats] = useState([]);
+    const [currentChatId, setCurrentChatId] = useState("");
+    const [sidebarVisible, setSidebarVisible] = useState(true);
+    const [ollamastate, setollamastate] = useState(0);
+    const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+    const [allModels, setAllModels] = useState([]);
+    useEffect(() => {
         setCollapsed(true);
     }, [currentChatId]);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         const storedlmurl = localStorage.getItem("lmstudio_url");
         if (ollamastate !== 0 && storedlmurl) {
             setlmurl(storedlmurl);
@@ -53,7 +47,7 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
     }, [ollamastate]);
     console.log(lmurl);
     console.log(model_name);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         const storedApiKey = localStorage.getItem("openrouter_api_key");
         if (storedApiKey) {
             setApiKey(storedApiKey);
@@ -79,12 +73,12 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
             createNewChat();
         }
     }, []);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         if (chats.length > 0) {
             localStorage.setItem("chat_history", JSON.stringify(chats));
         }
     }, [chats]);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         if (!apiKey)
             return;
         const fetchModels = async () => {
@@ -170,7 +164,7 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
         setSelectedModelInfo(modelInfo || null);
         setIsModelDialogOpen(false);
     };
-    const [collapsed, setCollapsed] = (0, react_1.useState)(true);
+    const [collapsed, setCollapsed] = useState(true);
     const toggleMenu = () => {
         setCollapsed(prev => !prev);
     };
@@ -186,7 +180,7 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
             timeout = setTimeout(later, wait);
         };
     };
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         const setViewportHeight = () => {
             document.documentElement.style.setProperty('--100vh', `${window.innerHeight}px`);
         };
@@ -197,7 +191,7 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
             window.removeEventListener('resize', debouncedSetViewportHeight);
         };
     }, []);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         if (typeof window !== 'undefined' && !window.isSecureContext) {
             if (window.location.protocol !== 'https:') {
                 console.warn("Attempting to redirect to HTTPS (simulated for component context)");
@@ -208,51 +202,51 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
       {(<div style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  dark:text-white  dark:bg-gray-900 bg-gray-10 ">
             <div className="flex flex-row gap-4 ">
-          <button_1.Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
-            {<lucide_react_1.MenuIcon size={20}/>}
-          </button_1.Button>
-         <button_1.Button onClick={createNewChat} variant={"outline"} className=" w-full flex items-center justify-center gap-2">
-              <lucide_react_1.PlusIcon size={16}/>
+          <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
+            {<MenuIcon size={20}/>}
+          </Button>
+         <Button onClick={createNewChat} variant={"outline"} className=" w-full flex items-center justify-center gap-2">
+              <PlusIcon size={16}/>
               New Chat
-            </button_1.Button>
+            </Button>
             
-            <button_1.Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!currentChat || currentChat.messages.length === 0}>
-              <lucide_react_1.Download size={16} className=""/>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!currentChat || currentChat.messages.length === 0}>
+              <Download size={16} className=""/>
               <span className="hidden lg:inline lg:ml-2">Export</span>
-            </button_1.Button>
+            </Button>
              
             </div>
           </div>
           <div className="absolute top-4 right-4 z-50 p-2 rounded-md  text-white dark:bg-gray-900 bg-gray-10 ">
-          <dark_button_1.default />
+          <DarkButton />
 
           </div>
-          <div className={(0, utils_1.cn)(`absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`, "pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
+          <div className={cn(`absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`, "pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
           {ollamastate == 0 ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <api_key_input_1.default apiKey={apiKey} setApiKey={setApiKey}/>
+            <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey}/>
           </div>) : null}
           {ollamastate !== 0 ? (<>
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <lmstudio_url_1.default lmurl={lmurl} setlmurl={setlmurl}/>
+                <LMStudioURL lmurl={lmurl} setlmurl={setlmurl}/>
               </div>
               {ollamastate !== 3 && (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <localmodelname_1.default model_name={model_name} set_model_name={set_model_name}/>
+                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name}/>
                 </div>)}
               {ollamastate === 3 && (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <filegpt_url_1.default filegpturl={filegpturl} setFilegpturl={setFilegpturl}/>
+                  <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl}/>
                 </div>)}
             </>) : <></>}
           
 
           <div className="flex-1 overflow-y-auto">
-            <chat_history_1.default chats={chats} currentChatId={currentChatId} setCurrentChatId={setCurrentChatId} deleteChat={deleteChat} renameChat={renameChat}/>
+            <ChatHistory chats={chats} currentChatId={currentChatId} setCurrentChatId={setCurrentChatId} deleteChat={deleteChat} renameChat={renameChat}/>
           </div>
 
             <div className="absolute bottom-4 left-0 right-0 items-end gap-2 p-4 border-gray-200 dark:border-gray-700">
-          <button_1.Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">
-              <lucide_react_1.PlusIcon size={16}/>
+          <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">
+              <PlusIcon size={16}/>
               New Chat
-            </button_1.Button>
+            </Button>
             </div>
             </div>
         </div>)}
@@ -260,19 +254,19 @@ function ChatUI({ message, fgptendpoint = "localhost", setasollama = false }) {
       
 
       
-      <div style={{ height: 'var(--100vh, 100vh)' }} className={(0, utils_1.cn)("absolute bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={() => { setCollapsed(true); }}>
+      <div style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={() => { setCollapsed(true); }}>
         
 
-        {currentChat && (<chat_interface_1.default setollamastate={setollamastate} ollamastate={ollamastate} lmstudio_model_name={model_name} lmstudio_url={lmurl} filegpt_url={filegpturl} message={message} chat={currentChat} updateChat={updateChat} apiKey={apiKey} selectedModel={selectedModel} selectedModelInfo={selectedModelInfo} onBranchConversation={handleBranchConversation} directsendmessage={false} messagetosend="" sidebarVisible={sidebarVisible} setSidebarVisible={setSidebarVisible} getModelColor={getModelColor} getModelDisplayName={getModelDisplayName} setIsModelDialogOpen={setIsModelDialogOpen}/>)}
+        {currentChat && (<ChatInterface setollamastate={setollamastate} ollamastate={ollamastate} lmstudio_model_name={model_name} lmstudio_url={lmurl} filegpt_url={filegpturl} message={message} chat={currentChat} updateChat={updateChat} apiKey={apiKey} selectedModel={selectedModel} selectedModelInfo={selectedModelInfo} onBranchConversation={handleBranchConversation} directsendmessage={false} messagetosend="" sidebarVisible={sidebarVisible} setSidebarVisible={setSidebarVisible} getModelColor={getModelColor} getModelDisplayName={getModelDisplayName} setIsModelDialogOpen={setIsModelDialogOpen}/>)}
       </div>
 
       
-      <model_selection_dialog_1.default isOpen={isModelDialogOpen} onClose={() => setIsModelDialogOpen(false)} models={allModels} selectedModel={selectedModel} onSelectModel={handleSelectModel} apiKey={apiKey}/>
+      <ModelSelectionDialog isOpen={isModelDialogOpen} onClose={() => setIsModelDialogOpen(false)} models={allModels} selectedModel={selectedModel} onSelectModel={handleSelectModel} apiKey={apiKey}/>
 
       
-      <export_dialog_1.default isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} chat={currentChat}/>
+      <ExportDialog isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} chat={currentChat}/>
 
-      <toaster_1.Toaster />
+      <Toaster />
     </div>);
 }
 function getModelColor(modelId) {

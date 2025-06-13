@@ -1,15 +1,12 @@
-"use strict";
 "use client";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = ExportDialog;
-const react_1 = require("react");
-const dialog_1 = require("../components/ui/dialog");
-const button_1 = require("../components/ui/button");
-const radio_group_1 = require("../components/ui/radio-group");
-const label_1 = require("../components/ui/label");
-const lucide_react_1 = require("lucide-react");
-function ExportDialog({ isOpen, onClose, chat }) {
-    const [exportFormat, setExportFormat] = (0, react_1.useState)("txt");
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Button } from "../components/ui/button";
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import { Label } from "../components/ui/label";
+import { Download } from "lucide-react";
+export default function ExportDialog({ isOpen, onClose, chat }) {
+    const [exportFormat, setExportFormat] = useState("txt");
     const handleExport = () => {
         if (!chat)
             return;
@@ -91,38 +88,38 @@ function ExportDialog({ isOpen, onClose, chat }) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
-    return (<dialog_1.Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <dialog_1.DialogContent className="sm:max-w-[425px]">
-        <dialog_1.DialogHeader>
-          <dialog_1.DialogTitle>Export Chat</dialog_1.DialogTitle>
-        </dialog_1.DialogHeader>
+    return (<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Export Chat</DialogTitle>
+        </DialogHeader>
 
         <div className="py-4">
-          <radio_group_1.RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value)}>
+          <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value)}>
             <div className="flex items-center space-x-2 mb-2">
-              <radio_group_1.RadioGroupItem value="txt" id="txt"/>
-              <label_1.Label htmlFor="txt">Plain Text (.txt)</label_1.Label>
+              <RadioGroupItem value="txt" id="txt"/>
+              <Label htmlFor="txt">Plain Text (.txt)</Label>
             </div>
             <div className="flex items-center space-x-2 mb-2">
-              <radio_group_1.RadioGroupItem value="json" id="json"/>
-              <label_1.Label htmlFor="json">JSON (.json)</label_1.Label>
+              <RadioGroupItem value="json" id="json"/>
+              <Label htmlFor="json">JSON (.json)</Label>
             </div>
             <div className="flex items-center space-x-2">
-              <radio_group_1.RadioGroupItem value="pdf" id="pdf"/>
-              <label_1.Label htmlFor="pdf">PDF Document (.pdf)</label_1.Label>
+              <RadioGroupItem value="pdf" id="pdf"/>
+              <Label htmlFor="pdf">PDF Document (.pdf)</Label>
             </div>
-          </radio_group_1.RadioGroup>
+          </RadioGroup>
         </div>
 
         <div className="flex justify-end">
-          <button_1.Button variant="outline" onClick={onClose} className="mr-2">
+          <Button variant="outline" onClick={onClose} className="mr-2">
             Cancel
-          </button_1.Button>
-          <button_1.Button onClick={handleExport} disabled={!chat}>
-            <lucide_react_1.Download className="mr-2 h-4 w-4"/>
+          </Button>
+          <Button onClick={handleExport} disabled={!chat}>
+            <Download className="mr-2 h-4 w-4"/>
             Export
-          </button_1.Button>
+          </Button>
         </div>
-      </dialog_1.DialogContent>
-    </dialog_1.Dialog>);
+      </DialogContent>
+    </Dialog>);
 }

@@ -1,18 +1,12 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Markdown = void 0;
-const utils_1 = require("../lib/utils");
-const marked_1 = require("marked");
-const react_1 = require("react");
-const react_markdown_1 = __importDefault(require("react-markdown"));
-const remark_gfm_1 = __importDefault(require("remark-gfm"));
-const codeblock_1 = require("./codeblock");
-const react_2 = __importDefault(require("react"));
+import { cn } from '../lib/utils';
+import { marked } from 'marked';
+import { memo, useId, useMemo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { CodeBlock, CodeBlockCode } from './codeblock';
+import React from 'react';
 function parseMarkdownIntoBlocks(markdown) {
-    const tokens = marked_1.marked.lexer(markdown);
+    const tokens = marked.lexer(markdown);
     return tokens.map((token) => token.raw);
 }
 function extractLanguage(className) {
@@ -26,14 +20,14 @@ const INITIAL_COMPONENTS = {
         const isInline = !props.node?.position?.start.line ||
             props.node?.position?.start.line === props.node?.position?.end.line;
         if (isInline) {
-            return (<span className={(0, utils_1.cn)('bg-primary-foreground dark:bg-zinc-800 dark:border dark:border-zinc-700 rounded-sm px-1 font-mono text-sm', className)} {...props}>
+            return (<span className={cn('bg-primary-foreground dark:bg-zinc-800 dark:border dark:border-zinc-700 rounded-sm px-1 font-mono text-sm', className)} {...props}>
           {children}
         </span>);
         }
         const language = extractLanguage(className);
-        return (<codeblock_1.CodeBlock className="rounded-md overflow-hidden my-4 border border-zinc-200 dark:border-zinc-800">
-        <codeblock_1.CodeBlockCode code={children} language={language} className="text-sm overflow-x-auto"/>
-      </codeblock_1.CodeBlock>);
+        return (<CodeBlock className="rounded-md overflow-hidden my-4 border border-zinc-200 dark:border-zinc-800">
+        <CodeBlockCode code={children} language={language} className="text-sm overflow-x-auto"/>
+      </CodeBlock>);
     },
     pre: function PreComponent({ children }) {
         return <>{children}</>;
@@ -94,22 +88,22 @@ const INITIAL_COMPONENTS = {
       </td>);
     },
 };
-const MemoizedMarkdownBlock = (0, react_1.memo)(function MarkdownBlock({ content, components = INITIAL_COMPONENTS, }) {
-    return (<react_markdown_1.default remarkPlugins={[remark_gfm_1.default]} components={components}>
+const MemoizedMarkdownBlock = memo(function MarkdownBlock({ content, components = INITIAL_COMPONENTS, }) {
+    return (<ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
-      </react_markdown_1.default>);
+      </ReactMarkdown>);
 }, function propsAreEqual(prevProps, nextProps) {
     return prevProps.content === nextProps.content;
 });
 MemoizedMarkdownBlock.displayName = 'MemoizedMarkdownBlock';
 function MarkdownComponent({ children, id, className, components = INITIAL_COMPONENTS, }) {
-    const generatedId = (0, react_1.useId)();
+    const generatedId = useId();
     const blockId = id ?? generatedId;
-    const blocks = (0, react_1.useMemo)(() => parseMarkdownIntoBlocks(children), [children]);
-    return (<div className={(0, utils_1.cn)('prose-code:before:hidden prose-code:after:hidden', className)}>
+    const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children]);
+    return (<div className={cn('prose-code:before:hidden prose-code:after:hidden', className)}>
       {blocks.map((block, index) => (<MemoizedMarkdownBlock key={`${blockId}-block-${index}`} content={block} components={components}/>))}
     </div>);
 }
-const Markdown = (0, react_1.memo)(MarkdownComponent);
-exports.Markdown = Markdown;
+const Markdown = memo(MarkdownComponent);
 Markdown.displayName = 'Markdown';
+export { Markdown };

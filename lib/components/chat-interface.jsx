@@ -1,19 +1,12 @@
-"use strict";
 "use client";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendMessageStream = sendMessageStream;
-exports.default = ChatInterface;
-const react_1 = require("react");
-const textarea_1 = require("../components/ui/textarea");
-const button_1 = require("../components/ui/button");
-const input_1 = require("../components/ui/input");
-const lucide_react_1 = require("lucide-react");
-const message_item_1 = __importDefault(require("../components/message-item"));
-const progress_1 = require("../components/ui/progress");
-async function* sendMessageStream({ notollama, url, apiKey, model, messages, lmstudio_url }) {
+import { useState, useRef, useEffect } from "react";
+import { Textarea } from "../components/ui/textarea";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { SendIcon, Loader2, Bot, FileIcon } from "lucide-react";
+import MessageItem from "../components/message-item";
+import { Progress } from "../components/ui/progress";
+export async function* sendMessageStream({ notollama, url, apiKey, model, messages, lmstudio_url }) {
     let headers_openrouter = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -71,25 +64,25 @@ async function* sendMessageStream({ notollama, url, apiKey, model, messages, lms
         }
     }
 }
-function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lmstudio_model_name, filegpt_url, message, selectedModel, selectedModelInfo, onBranchConversation, directsendmessage = false, messagetosend = "", sidebarVisible, setSidebarVisible, setIsModelDialogOpen, getModelDisplayName, getModelColor, setollamastate }) {
-    const [input, setInput] = (0, react_1.useState)("");
-    const [isLoading, setIsLoading] = (0, react_1.useState)(false);
-    const [dsm, setdsm] = (0, react_1.useState)(directsendmessage);
-    const [mts, setmts] = (0, react_1.useState)(messagetosend);
-    const [error, setError] = (0, react_1.useState)(null);
-    const [selectedFilePath, setSelectedFilePath] = (0, react_1.useState)(message?.path || "");
-    const textareaRef = (0, react_1.useRef)(null);
-    const messagesEndRef = (0, react_1.useRef)(null);
-    const [streamingMessageId, setStreamingMessageId] = (0, react_1.useState)(null);
-    const [contextUsage, setContextUsage] = (0, react_1.useState)(0);
-    (0, react_1.useEffect)(() => {
+export default function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lmstudio_model_name, filegpt_url, message, selectedModel, selectedModelInfo, onBranchConversation, directsendmessage = false, messagetosend = "", sidebarVisible, setSidebarVisible, setIsModelDialogOpen, getModelDisplayName, getModelColor, setollamastate }) {
+    const [input, setInput] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [dsm, setdsm] = useState(directsendmessage);
+    const [mts, setmts] = useState(messagetosend);
+    const [error, setError] = useState(null);
+    const [selectedFilePath, setSelectedFilePath] = useState(message?.path || "");
+    const textareaRef = useRef(null);
+    const messagesEndRef = useRef(null);
+    const [streamingMessageId, setStreamingMessageId] = useState(null);
+    const [contextUsage, setContextUsage] = useState(0);
+    useEffect(() => {
         const totalChars = chat.messages.reduce((acc, msg) => acc + msg.content.length, 0) + input.length;
         const estimatedTokens = Math.ceil(totalChars / 4);
         const maxContext = selectedModelInfo?.context_length || 4096;
         const usagePercentage = Math.min(100, Math.ceil((estimatedTokens / maxContext) * 100));
         setContextUsage(usagePercentage);
     }, [chat.messages, input, selectedModelInfo]);
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         if (message?.path) {
             setSelectedFilePath(message.path);
         }
@@ -177,7 +170,7 @@ function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lm
             setStreamingMessageId(null);
         }
     };
-    (0, react_1.useEffect)(() => {
+    useEffect(() => {
         if (dsm && mts && !isLoading) {
             handleSendMessage(mts);
             setdsm(false);
@@ -208,7 +201,7 @@ function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lm
             onBranchConversation(branchPoint);
         }
     };
-    const [sbi, setcobi] = (0, react_1.useState)(false);
+    const [sbi, setcobi] = useState(false);
     return (<div className="" onClick={() => setcobi(false)}>
       
       
@@ -222,7 +215,7 @@ function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lm
           
           {chat.messages.length === 0 ? (<div className="flex items-center justify-center h-full w-full">
               <p className="text-gray-500 dark:text-gray-400">Send a message to start the conversation</p>
-            </div>) : (chat.messages.map((message) => (<message_item_1.default key={message.id} message={message} isStreaming={streamingMessageId === message.id} onCopy={() => handleCopyMessage(message.content)} onBranch={() => handleBranchFromMessage(message.id)} setmts={setmts} setdsm={setdsm}/>)))}
+            </div>) : (chat.messages.map((message) => (<MessageItem key={message.id} message={message} isStreaming={streamingMessageId === message.id} onCopy={() => handleCopyMessage(message.content)} onBranch={() => handleBranchFromMessage(message.id)} setmts={setmts} setdsm={setdsm}/>)))}
           <div ref={messagesEndRef}/>
         </div>
         </div>
@@ -246,31 +239,31 @@ function ChatInterface({ ollamastate, chat, updateChat, apiKey, lmstudio_url, lm
         <div className="flex flex-grow items-end gap-2">
           <div className="flex flex-col flex-grow">
 
-          <textarea_1.Textarea ref={textareaRef} value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)" className="flex-1 min-h-[80px] max-h-[200px] dark:bg-gray-900 border bg-gray-50" disabled={isLoading}/>
-          <progress_1.Progress value={contextUsage} className="h-1"/>
+          <Textarea ref={textareaRef} value={input} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)" className="flex-1 min-h-[80px] max-h-[200px] dark:bg-gray-900 border bg-gray-50" disabled={isLoading}/>
+          <Progress value={contextUsage} className="h-1"/>
           </div>
           
         </div>
         <div className="mt-4 flex flex-row gap-4 w-full">
-          <button_1.Button variant="outline" onClick={(e) => { setcobi(true); e.stopPropagation(); setollamastate((ollamastate + 1) % 4); }}>
-              <lucide_react_1.Bot size={16} className="mr-2"/>
+          <Button variant="outline" onClick={(e) => { setcobi(true); e.stopPropagation(); setollamastate((ollamastate + 1) % 4); }}>
+              <Bot size={16} className="mr-2"/>
               {`${sbi ? (ollamastate === 0 ? "Using Openrouter" : (ollamastate === 1 ? "Using Ollama" : (ollamastate === 2 ? "Using LM Studio" : "Using FileGPT"))) : ""}`}
-            </button_1.Button>
-          {ollamastate == 0 ? (<button_1.Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
+            </Button>
+          {ollamastate == 0 ? (<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
                         {selectedModelInfo ? (<>
                             <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
                             <span className="truncate max-w-[150px]">{getModelDisplayName(selectedModel)}</span>
                           </>) : ("Select Model")}
-                      </button_1.Button>) : null}
+                      </Button>) : null}
           {ollamastate === 3 && (<div className="flex flex-grow items-center gap-2">
-              <input_1.Input type="text" value={selectedFilePath} onChange={(e) => setSelectedFilePath(e.target.value)} placeholder="Enter file path or choose file" className="flex-grow"/>
-              <button_1.Button variant="outline" size="icon" onClick={() => setSelectedFilePath("")}>
-                <lucide_react_1.FileIcon className="h-4 w-4"/>
-              </button_1.Button>
+              <Input type="text" value={selectedFilePath} onChange={(e) => setSelectedFilePath(e.target.value)} placeholder="Enter file path or choose file" className="flex-grow"/>
+              <Button variant="outline" size="icon" onClick={() => setSelectedFilePath("")}>
+                <FileIcon className="h-4 w-4"/>
+              </Button>
             </div>)}
-          <button_1.Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
-            {isLoading ? <lucide_react_1.Loader2 className="h-4 w-4 animate-spin"/> : <lucide_react_1.SendIcon className="h-4 w-4"/>}
-          </button_1.Button>
+          <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <SendIcon className="h-4 w-4"/>}
+          </Button>
         </div>
         </div>
       </div>

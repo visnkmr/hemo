@@ -1,17 +1,14 @@
-"use strict";
 "use client";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = MessageItem;
-const lucide_react_1 = require("lucide-react");
-const utils_1 = require("../lib/utils");
-const markdown_1 = require("./markdown");
-const react_1 = require("react");
-const button_1 = require("../components/ui/button");
-function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts }) {
+import { CopyIcon, GitBranchIcon, RefreshCw } from "lucide-react";
+import { cn } from "../lib/utils";
+import { Markdown } from "./markdown";
+import { useEffect, useState } from "react";
+import { Button } from "../components/ui/button";
+export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts }) {
     const isUser = message.role === "user";
-    const [showCursor, setShowCursor] = (0, react_1.useState)(true);
-    const [isHovered, setIsHovered] = (0, react_1.useState)(false);
-    (0, react_1.useEffect)(() => {
+    const [showCursor, setShowCursor] = useState(true);
+    const [isHovered, setIsHovered] = useState(false);
+    useEffect(() => {
         if (!isStreaming)
             return;
         const interval = setInterval(() => {
@@ -23,9 +20,9 @@ function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, s
         setdsm(true);
         setmts(message.content);
     };
-    return (<div className={(0, utils_1.cn)("", isUser ? "justify-end" : "")} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-    <div className={(0, utils_1.cn)(isUser ? "place-items-end" : "")}>
-    <div className={(0, utils_1.cn)("gap-3 p-4 rounded-lg relative overflow-hidden", isUser ? "bg-blue-50 dark:bg-blue-900/20" : "bg-gray-50 dark:bg-gray-800/50")}>
+    return (<div className={cn("", isUser ? "justify-end" : "")} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+    <div className={cn(isUser ? "place-items-end" : "")}>
+    <div className={cn("gap-3 p-4 rounded-lg relative overflow-hidden", isUser ? "bg-blue-50 dark:bg-blue-900/20" : "bg-gray-50 dark:bg-gray-800/50")}>
       
 
       <div className="space-y-2">
@@ -37,24 +34,24 @@ function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, s
           
         </div>
 
-        <div className={(0, utils_1.cn)(isUser ? "max-w-[70vw]" : "w-full", "prose dark:prose-invert prose-sm break-words")}>
-          <markdown_1.Markdown>{message.content}</markdown_1.Markdown>
+        <div className={cn(isUser ? "max-w-[70vw]" : "w-full", "prose dark:prose-invert prose-sm break-words")}>
+          <Markdown>{message.content}</Markdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>
       </div>
 
       
     </div>
-    {!isStreaming && (<div className={(0, utils_1.cn)("gap-1 ", isUser, isHovered ? "visible" : "invisible")}>
-          <button_1.Button variant="ghost" className={(isUser && isHovered ? "visible" : "hidden")} size="icon" onClick={Resend} title="Branch from here">
-            <lucide_react_1.RefreshCw className="h-4 w-4"/>
-          </button_1.Button>
-          <button_1.Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
-            <lucide_react_1.CopyIcon className="h-4 w-4"/>
-          </button_1.Button>
-          <button_1.Button variant="ghost" size="icon" onClick={onBranch} title="Branch from here">
-            <lucide_react_1.GitBranchIcon className="h-4 w-4"/>
-          </button_1.Button>
+    {!isStreaming && (<div className={cn("gap-1 ", isUser, isHovered ? "visible" : "invisible")}>
+          <Button variant="ghost" className={(isUser && isHovered ? "visible" : "hidden")} size="icon" onClick={Resend} title="Branch from here">
+            <RefreshCw className="h-4 w-4"/>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
+            <CopyIcon className="h-4 w-4"/>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onBranch} title="Branch from here">
+            <GitBranchIcon className="h-4 w-4"/>
+          </Button>
         </div>)}
       </div>  
     </div>);
