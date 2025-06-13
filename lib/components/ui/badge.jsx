@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.badgeVariants = void 0;
 exports.Badge = Badge;
 const class_variance_authority_1 = require("class-variance-authority");
-const utils_1 = require("@/lib/utils");
+const utils_1 = require("../../lib/utils");
 const badgeVariants = (0, class_variance_authority_1.cva)("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2", {
     variants: {
         variant: {

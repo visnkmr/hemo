@@ -37,7 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ScrollBar = exports.ScrollArea = void 0;
 const React = __importStar(require("react"));
 const ScrollAreaPrimitive = __importStar(require("@radix-ui/react-scroll-area"));
-const utils_1 = require("@/lib/utils");
+const utils_1 = require("../../lib/utils");
 const ScrollArea = React.forwardRef(({ className, children, ...props }, ref) => (<ScrollAreaPrimitive.Root ref={ref} className={(0, utils_1.cn)("relative overflow-hidden", className)} {...props}>
     <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
       {children}

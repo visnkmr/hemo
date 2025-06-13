@@ -3,9 +3,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = ApiKeyInput;
 const react_1 = require("react");
-const input_1 = require("@/components/ui/input");
-const label_1 = require("@/components/ui/label");
-const button_1 = require("@/components/ui/button");
+const input_1 = require("../components/ui/input");
+const label_1 = require("../components/ui/label");
+const button_1 = require("../components/ui/button");
 const lucide_react_1 = require("lucide-react");
 function ApiKeyInput({ apiKey, setApiKey }) {
     const [showKey, setShowKey] = (0, react_1.useState)(false);

@@ -1,4 +1,4 @@
-import type { Chat } from "@/lib/types";
+import type { Chat } from "../lib/types";
 interface ChatHistoryProps {
     chats: Chat[];
     currentChatId: string;

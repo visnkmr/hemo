@@ -2,14 +2,14 @@
 
 import type React from "react"
 import { useState, useRef, type KeyboardEvent, useEffect } from "react"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import type { Chat, Message, BranchPoint, FileItem } from "@/lib/types"
+import { Textarea } from "../components/ui/textarea"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
 import { SendIcon, Loader2, MenuIcon, Bot, FileIcon } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import MessageItem from "@/components/message-item"
-import { Progress } from "@/components/ui/progress"
+import { ScrollArea } from "../components/ui/scroll-area"
+import MessageItem from "../components/message-item"
+import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
 
 // --- Type Definitions ---

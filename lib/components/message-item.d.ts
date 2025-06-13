@@ -1,4 +1,4 @@
-import type { Message } from "@/lib/types";
+import type { Message } from "../lib/types";
 interface MessageItemProps {
     message: Message;
     isStreaming?: boolean;

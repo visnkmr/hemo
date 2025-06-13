@@ -6,11 +6,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = ModelSelectionDialog;
 const react_1 = require("react");
-const dialog_1 = require("@/components/ui/dialog");
+const dialog_1 = require("../components/ui/dialog");
 const lucide_react_1 = require("lucide-react");
-const utils_1 = require("@/lib/utils");
-const input_1 = require("@/components/ui/input");
-const badge_1 = require("@/components/ui/badge");
+const utils_1 = require("../lib/utils");
+const input_1 = require("../components/ui/input");
+const badge_1 = require("../components/ui/badge");
 const react_fast_marquee_1 = __importDefault(require("react-fast-marquee"));
 function ModelSelectionDialog({ isOpen, onClose, models, selectedModel, onSelectModel, apiKey, }) {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);

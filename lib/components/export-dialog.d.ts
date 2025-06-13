@@ -1,4 +1,4 @@
-import type { Chat } from "@/lib/types";
+import type { Chat } from "../lib/types";
 interface ExportDialogProps {
     isOpen: boolean;
     onClose: () => void;

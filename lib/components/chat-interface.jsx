@@ -7,12 +7,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendMessageStream = sendMessageStream;
 exports.default = ChatInterface;
 const react_1 = require("react");
-const textarea_1 = require("@/components/ui/textarea");
-const button_1 = require("@/components/ui/button");
-const input_1 = require("@/components/ui/input");
+const textarea_1 = require("../components/ui/textarea");
+const button_1 = require("../components/ui/button");
+const input_1 = require("../components/ui/input");
 const lucide_react_1 = require("lucide-react");
-const message_item_1 = __importDefault(require("@/components/message-item"));
-const progress_1 = require("@/components/ui/progress");
+const message_item_1 = __importDefault(require("../components/message-item"));
+const progress_1 = require("../components/ui/progress");
 async function* sendMessageStream({ notollama, url, apiKey, model, messages, lmstudio_url }) {
     let headers_openrouter = {
         "Content-Type": "application/json",

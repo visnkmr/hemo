@@ -2,8 +2,8 @@
 "use client";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Toaster = Toaster;
-const use_toast_1 = require("@/hooks/use-toast");
-const toast_1 = require("@/components/ui/toast");
+const use_toast_1 = require("../../hooks/use-toast");
+const toast_1 = require("../../components/ui/toast");
 function Toaster() {
     const { toasts } = (0, use_toast_1.useToast)();
     return (<toast_1.ToastProvider>

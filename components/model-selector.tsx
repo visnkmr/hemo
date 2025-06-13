@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
+import { Label } from "../components/ui/label"
 import { Loader2 } from "lucide-react"
-import type { Model } from "@/lib/types"
+// import type { Model } from "../lib/types"
 
 interface ModelSelectorProps {
   apiKey: string
@@ -13,7 +13,7 @@ interface ModelSelectorProps {
 }
 
 export default function ModelSelector({ apiKey, selectedModel, setSelectedModel }: ModelSelectorProps) {
-  const [models, setModels] = useState<Model[]>([])
+  const [models, setModels] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

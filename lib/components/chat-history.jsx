@@ -3,11 +3,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = ChatHistory;
 const react_1 = require("react");
-const button_1 = require("@/components/ui/button");
+const button_1 = require("../components/ui/button");
 const lucide_react_1 = require("lucide-react");
-const utils_1 = require("@/lib/utils");
+const utils_1 = require("../lib/utils");
 const date_fns_1 = require("date-fns");
-const input_1 = require("@/components/ui/input");
+const input_1 = require("../components/ui/input");
 function ChatHistory({ chats, currentChatId, setCurrentChatId, deleteChat, renameChat, }) {
     const [editingChatId, setEditingChatId] = (0, react_1.useState)(null);
     const [editTitle, setEditTitle] = (0, react_1.useState)("");

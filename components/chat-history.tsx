@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import type { Chat } from "@/lib/types"
-import { Button } from "@/components/ui/button"
+import type { Chat } from "../lib/types"
+import { Button } from "../components/ui/button"
 import { MessageSquareIcon, TrashIcon, GitBranchIcon, PencilIcon, CheckIcon, XIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "../lib/utils"
 import { format } from "date-fns"
-import { Input } from "@/components/ui/input"
+import { Input } from "../components/ui/input"
 
 interface ChatHistoryProps {
   chats: Chat[]

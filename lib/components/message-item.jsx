@@ -3,10 +3,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = MessageItem;
 const lucide_react_1 = require("lucide-react");
-const utils_1 = require("@/lib/utils");
+const utils_1 = require("../lib/utils");
 const markdown_1 = require("./markdown");
 const react_1 = require("react");
-const button_1 = require("@/components/ui/button");
+const button_1 = require("../components/ui/button");
 function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts }) {
     const isUser = message.role === "user";
     const [showCursor, setShowCursor] = (0, react_1.useState)(true);

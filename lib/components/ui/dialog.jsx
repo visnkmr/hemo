@@ -38,7 +38,7 @@ exports.DialogDescription = exports.DialogTitle = exports.DialogFooter = exports
 const React = __importStar(require("react"));
 const DialogPrimitive = __importStar(require("@radix-ui/react-dialog"));
 const lucide_react_1 = require("lucide-react");
-const utils_1 = require("@/lib/utils");
+const utils_1 = require("../../lib/utils");
 const Dialog = DialogPrimitive.Root;
 exports.Dialog = Dialog;
 const DialogTrigger = DialogPrimitive.Trigger;

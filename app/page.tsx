@@ -1,4 +1,4 @@
-import {ChatUI} from "../lib/lib/index";
+import {ChatUI} from "@/lib/lib/index";
 
 export default function Home(){
     return  <>

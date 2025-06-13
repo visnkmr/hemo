@@ -3,10 +3,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = ExportDialog;
 const react_1 = require("react");
-const dialog_1 = require("@/components/ui/dialog");
-const button_1 = require("@/components/ui/button");
-const radio_group_1 = require("@/components/ui/radio-group");
-const label_1 = require("@/components/ui/label");
+const dialog_1 = require("../components/ui/dialog");
+const button_1 = require("../components/ui/button");
+const radio_group_1 = require("../components/ui/radio-group");
+const label_1 = require("../components/ui/label");
 const lucide_react_1 = require("lucide-react");
 function ExportDialog({ isOpen, onClose, chat }) {
     const [exportFormat, setExportFormat] = (0, react_1.useState)("txt");

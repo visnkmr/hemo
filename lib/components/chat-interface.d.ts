@@ -1,5 +1,5 @@
 import type React from "react";
-import type { Chat, BranchPoint, FileItem } from "@/lib/types";
+import type { Chat, BranchPoint, FileItem } from "../lib/types";
 interface SendMessageStreamParams {
     notollama: number;
     url: string;
