@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Button } from "../components/ui/button"
 import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
 
 interface ApiKeyInputProps {
@@ -14,7 +14,11 @@ interface ApiKeyInputProps {
 export default function ApiKeyInput({ apiKey, setApiKey }: ApiKeyInputProps) {
   const [showKey, setShowKey] = useState(false)
   const [inputValue, setInputValue] = useState(apiKey)
-
+  useEffect(()=>{
+    const storedApiKey = localStorage.getItem("openrouter_api_key")
+      if (storedApiKey) {
+        setInputValue(storedApiKey)
+      }},[])
   const handleSave = () => {
     setApiKey(inputValue)
     localStorage.setItem("openrouter_api_key", inputValue)
