@@ -33,98 +33,89 @@ interface FileItem {
 interface gptargs{
     message?:FileItem,
     fgptendpoint?:string,
-    setasollama:boolean
+    setasollama:boolean,
+    whichgpt:number
     // localorremote:boolean
 }
 
-let fgtest=async (filegptendpoint):Promise<boolean> => {
-      try {
-        await axios.get(`${filegptendpoint}/`);
-        return true
-      } catch (error) {
-        return false
-      }
-    };
-let oir=async (fgptendpoint):Promise<boolean> => {
-      try {
-        await axios.head(`http://${fgptendpoint}:11434/`); //endpoint to check for ollama
-        return true
-      } catch (error) {
-        return false
-      }
-    };
-async function fileloader(filegptendpoint:string,filePaths:string[]):Promise<boolean>{
-  try{
+// let fgtest=async (filegptendpoint):Promise<boolean> => {
+//       try {
+//         await axios.get(`${filegptendpoint}/`);
+//         return true
+//       } catch (error) {
+//         return false
+//       }
+//     };
+// let oir=async (fgptendpoint):Promise<boolean> => {
+//       try {
+//         await axios.head(`http://${fgptendpoint}:11434/`); //endpoint to check for ollama
+//         return true
+//       } catch (error) {
+//         return false
+//       }
+//     };
 
-    const response = await axios.post(`${filegptendpoint}/embed`, { files: filePaths });
-    if(response.status==200) return true
-  }
-  catch(e){
-    console.log(e)
-  }
-  return false      
-}
-async function sendtofilegpt(filegptendpoint,question,isollama,setcbs,setmessage,setchathistory){
-   const abortController = new AbortController();
-  const signal = abortController.signal;
+// async function sendtofilegpt(filegptendpoint,question,isollama,setcbs,setmessage,setchathistory){
+//    const abortController = new AbortController();
+//   const signal = abortController.signal;
   
-  await fetchEventSource(`${filegptendpoint}/query-stream`, {
-    signal:signal,
+//   await fetchEventSource(`${filegptendpoint}/query-stream`, {
+//     signal:signal,
     
-    method: "POST",
-    body: JSON.stringify({
-      query:question,
-      where:question.toLocaleLowerCase().startsWith("generally")||isollama?"ollama":""
-    }),
-    headers: { 'Content-Type': 'application/json', Accept: "text/event-stream" },
-    onopen: async (res)=> {
-      if (res.ok && res.status === 200) {
-        setcbs(true)
-        console.log("Connection made ", res);
-        // setmessage("")
-      } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
-        setcbs(false)
-        console.log("Client-side error ", res);
-      }
-    },
-    onmessage: async (event)=> {
-      {
-    // if(typeof event.data === "string"){
-      try{
-        let jp=JSON.parse(event.data);
-        setmessage((old)=>{
-          // console.log("-----------"+old)
-          console.log(event.data);
-            let dm=old+jp.token;
-          return dm});
-      }
-      catch(e){
+//     method: "POST",
+//     body: JSON.stringify({
+//       query:question,
+//       where:question.toLocaleLowerCase().startsWith("generally")||isollama?"ollama":""
+//     }),
+//     headers: { 'Content-Type': 'application/json', Accept: "text/event-stream" },
+//     onopen: async (res)=> {
+//       if (res.ok && res.status === 200) {
+//         setcbs(true)
+//         console.log("Connection made ", res);
+//         // setmessage("")
+//       } else if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+//         setcbs(false)
+//         console.log("Client-side error ", res);
+//       }
+//     },
+//     onmessage: async (event)=> {
+//       {
+//     // if(typeof event.data === "string"){
+//       try{
+//         let jp=JSON.parse(event.data);
+//         setmessage((old)=>{
+//           // console.log("-----------"+old)
+//           console.log(event.data);
+//             let dm=old+jp.token;
+//           return dm});
+//       }
+//       catch(e){
         
-      }
+//       }
         
-        }
-          // (divRef.current! as HTMLDivElement).scrollIntoView({ behavior: "smooth", block: "end" })
-      // }
-    },
-    onclose:async ()=> {
-      setcbs(false)
-      console.log("Connection closed by the server");
+//         }
+//           // (divRef.current! as HTMLDivElement).scrollIntoView({ behavior: "smooth", block: "end" })
+//       // }
+//     },
+//     onclose:async ()=> {
+//       setcbs(false)
+//       console.log("Connection closed by the server");
       
-    },
-    onerror (err) {
-      setchathistory((old)=>[...old,{
-        from:"bot",
-        message:`Issue finding Filegpt endpoint ${filegptendpoint} endpoint, maybe its not be running.`,
-        time:getchattime(),
-        timestamp:getchattimestamp()
-      }])
-      throw "There was some issue with your filedimegpt instance. Is it not running?"
-      // abortController.abort()
-      // console.log("There was an error from server", err);
-    },
-  });
-}
-export default function ChatUI({message,fgptendpoint="localhost",setasollama=false}:gptargs) {
+//     },
+//     onerror (err) {
+//       setchathistory((old)=>[...old,{
+//         from:"bot",
+//         message:`Issue finding Filegpt endpoint ${filegptendpoint} endpoint, maybe its not be running.`,
+//         time:getchattime(),
+//         timestamp:getchattimestamp()
+//       }])
+//       throw "There was some issue with your filedimegpt instance. Is it not running?"
+//       // abortController.abort()
+//       // console.log("There was an error from server", err);
+//     },
+//   });
+// }
+export default function ChatUI({message,fgptendpoint="localhost",setasollama=false,whichgpt=0}:gptargs) {
   const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
   const [model_name, set_model_name] = useState<string>("")
@@ -134,13 +125,13 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [ollamastate, setollamastate] = useState(0)
+  const [ollamastate, setollamastate] = useState(whichgpt)
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
-  const [filePaths, setFilePaths] = useState([message?message.path:null]);
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
+
   useEffect(()=>{
     setCollapsed(true)
   },[currentChatId])
@@ -148,8 +139,14 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   //     if (storedApiKey) {
   //       setApiKey(storedApiKey)
   //     }},[collapsed])
+  // useEffect(()=>{
+  //   if (message && message.path && filePaths && whichgpt!==0  && whichgpt!==1 && whichgpt!==2){
+
+  //     fileloader(filegpturl,filePaths as string[])
+  //   }},[filePaths])
   // Load API key and chats from localStorage on initial render
   useEffect(() => {
+    
     const storedlmurl = localStorage.getItem("lmstudio_url")
     if (storedlmurl) {
       setlmurl(storedlmurl)
@@ -306,11 +303,11 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
     fetchModels()
   }, [apiKey])
 
-  const createNewChat = () => {
+  const createNewChat = (chattitle="New Chat") => {
     const newChatId = Date.now().toString()
     const newChat: Chat = {
       id: newChatId,
-      title: "New Chat",
+      title: chattitle,
       messages: [],
       createdAt: new Date().toISOString(),
       lastModelUsed: selectedModel,
@@ -432,6 +429,8 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   }, []);
 
   useEffect(() => {
+    // (async ()=>createNewChat((await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ","")))()
+    createNewChat();
     if (typeof window !== 'undefined' && !window.isSecureContext) {
       // In a real Next.js app, you might use next/router here
       // For example: router.replace(window.location.href.replace('http:', 'https:'));
@@ -519,19 +518,24 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
             </div> */}
 
       {/* Main content */}
-      <div  style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full px-2 bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
+      <div  style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
           </Button>):null}
         </div> */}
-
+        
         {currentChat && (
           <ChatInterface
+          // fileloader={fileloader}
+          // filegpturl={filegpturl}
+          // filePaths={filePaths}
             setollamastate={setollamastate}
             ollamastate={ollamastate}
             lmstudio_model_name={model_name}
+            setlmmodel={set_model_name}
             lmstudio_url={lmurl}
+            setlmurl={setlmurl}
             filegpt_url={filegpturl}
             message={message}
             chat={currentChat}

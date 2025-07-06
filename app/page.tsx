@@ -12,6 +12,6 @@ export default function Home(){
     foldercon: 999,
     ftype: "string",
     parent: "string",
-  }}/>
+  }} whichgpt={1}/>
     </>
 }

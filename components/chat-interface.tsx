@@ -5,15 +5,21 @@ import { useState, useRef, type KeyboardEvent, useEffect, useCallback } from "re
 import { Textarea } from "../components/ui/textarea"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
+import { HoverCard,HoverCardContent,HoverCardTrigger } from "../components/ui/hover-card"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
+
 import MessageItem from "../components/message-item"
 import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
-
+import axios from "axios"
+// import { invoke } from "@tauri-apps/api/tauri";
+import { Label } from "./ui/label"
+// import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
-
+export let setcolorpertheme="bg-white dark:bg-gray-800"
 interface SendMessageStreamParams {
   notollama: number;
   url: string;
@@ -21,10 +27,12 @@ interface SendMessageStreamParams {
   model: string;
   messages: Array<{ role: string; content: string }>;
   lmstudio_url:string;
-  
+  context:string
 }
 
 interface ChatInterfaceProps {
+  setlmurl:any;
+  setlmmodel:any;
   ollamastate: number;
   chat: Chat;
   updateChat: (chat: Chat) => void;
@@ -46,6 +54,68 @@ interface ChatInterfaceProps {
   setollamastate:any;
 }
 
+// async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,lmstudio_model_name: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
+//   // try{
+
+//   //   const response = await axios.post(`${filegptendpoint}/embed`, { files: filePaths.map((r)=>r.replace("C:\\","\\mnt\\c\\")) });
+//   //   if(response.status==200) return true
+//   // }
+//   // catch(e){
+//   //   console.log(e)
+//   // }
+//   setIsLoading(true)
+//   console.log(filePaths)
+//   invoke("embedfile",{path:filePaths,embeddingmodelname:"nomic-embed-text"}).then((e)=>{
+//             console.log(e)
+//             // Prepare user and assistant messages
+//               const assistantMessageId = (Date.now() + 1).toString();
+//               const assistantMessage: Message = {
+//                 id: assistantMessageId,
+//                 role: "assistant",
+//                 content:  `File: ${filePaths} added to context`,
+//                 timestamp: new Date().toISOString(),
+//                 model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//               };
+
+
+//               const initialMessages = chat.messages;
+//               let currentChatState = {
+//                   ...chat,
+//                   messages: [...initialMessages, assistantMessage],
+//                   title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
+//                   lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//               };
+//               updateChat(currentChatState);
+//         })
+//         .catch((e)=>{
+//           const assistantMessageId = (Date.now() + 1).toString();
+//               const assistantMessage: Message = {
+//                 id: assistantMessageId,
+//                 role: "assistant",
+//                 content:  `Faled to add File: ${filePaths}`,
+//                 timestamp: new Date().toISOString(),
+//                 model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//               };
+
+
+//               const initialMessages = chat.messages;
+//               let currentChatState = {
+//                   ...chat,
+//                   messages: [...initialMessages, assistantMessage],
+//                   title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
+//                   lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//               };
+//               updateChat(currentChatState);
+//               setIsLoading(false)
+//         })
+
+//         .finally(()=>{
+//           setIsLoading(false)
+//         })
+//         setIsLoading(false)
+//   return false      
+// }
+
 // --- Exported Send Message Stream Function ---
 
 /**
@@ -61,11 +131,15 @@ export async function* sendMessageStream({
   apiKey,
   model,
   messages,
-  lmstudio_url
+  lmstudio_url,
+  context
 }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
+  const storedApiKey = localStorage.getItem("openrouter_api_key")
+  let prompt = context.trim()===""?`Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length-1].content}`:`Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length-1].content}`;
+  console.log(prompt)
   let headers_openrouter = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${storedApiKey}`,
         "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
         "X-Title": "Batu",
       };
@@ -76,7 +150,7 @@ export async function* sendMessageStream({
       headers: (notollama===0 || notollama===2)?headers_openrouter:headers_ollama,
       body: JSON.stringify({
         model: model,
-        messages: messages,
+        messages: [{role:'user',content:prompt}],
         stream: true,
       }),
     });
@@ -194,6 +268,8 @@ export default function ChatInterface({
   updateChat,
   apiKey,
   lmstudio_url,
+  setlmmodel,
+  setlmurl,
   lmstudio_model_name,
   filegpt_url,
   message,
@@ -210,16 +286,19 @@ export default function ChatInterface({
   getModelColor,
   setollamastate
 }: ChatInterfaceProps) {
+  // const [filePaths, setFilePaths] = useState([message?message.path:""]);
+
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [dsm,setdsm]=useState(directsendmessage)
   const [mts,setmts]=useState(messagetosend)
   const [error, setError] = useState<string | null>(null)
-  const [selectedFilePath, setSelectedFilePath] = useState<string>(message?.path || "")
+  const [selectedFilePath, setSelectedFilePath] = useState<string[]>([message?.path?message.path:""])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [contextUsage, setContextUsage] = useState(0)
+  const [answerfromfile, setanswerfromfile] = useState(false)
 
   // Calculate context usage effect
   useEffect(() => {
@@ -230,17 +309,44 @@ export default function ChatInterface({
     setContextUsage(usagePercentage)
   }, [chat.messages, input, selectedModelInfo])
 
+  // useEffect(()=>{
+  //   invoke("fileslist",{}).then((filePaths)=>{
+  //           console.log(filePaths)
+  //           // Prepare user and assistant messages
+  //             const assistantMessageId = (Date.now() + 1).toString();
+  //             const assistantMessage: Message = {
+  //               id: assistantMessageId,
+  //               role: "assistant",
+  //               content:  `File: ${filePaths} added to context`,
+  //               timestamp: new Date().toISOString(),
+  //               model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+  //             };
+
+
+  //             const initialMessages = chat.messages;
+  //             let currentChatState = {
+  //                 ...chat,
+  //                 messages: [...initialMessages, assistantMessage],
+  //                 title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
+  //                 lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+  //             };
+  //             updateChat(currentChatState);
+  //       })
+  // },[])
   useEffect(() => {
     if (message?.path) {
-      setSelectedFilePath(message.path)
+      setSelectedFilePath([...message.path])
+      // setFilePaths([message.path])
+      // fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,lmstudio_model_name,filegpt_url,selectedFilePath)
     }
   }, [message])
 
+            // const [context,setcontext]=useState("")
 
   // State for dialog to request URL and model name
   const [showDialog, setShowDialog] = useState(false);
-  const [tempUrl, setTempUrl] = useState(lmstudio_url);
-  const [tempModelName, setTempModelName] = useState(lmstudio_model_name);
+  // const [tempUrl, setTempUrl] = useState(lmstudio_url);
+  // const [tempModelName, setTempModelName] = useState(lmstudio_model_name);
 
   // Main function to handle sending a message
   const handleSendMessage = async (messageContent: string = input) => {
@@ -291,61 +397,125 @@ export default function ChatInterface({
     };
     updateChat(currentChatState);
 
-    try {
-        // Determine API URL and model
-        let apiUrl = "https://openrouter.ai/api";
-        if (ollamastate === 0) {
-          apiUrl = "https://openrouter.ai/api";
-        } else if (ollamastate === 1 || ollamastate === 2) {
-          apiUrl = lmstudio_url;
-        } else if (ollamastate === 3) {
-          apiUrl = filegpt_url;
-        }
-        const modelToSend = ollamastate==0 ? selectedModel : lmstudio_model_name;
-        const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-        }));
-
-        let accumulatedContent = "";
+    
 
         // Call the generator and process the stream
-        for await (const contentChunk of sendMessageStream({
-            url: apiUrl,
-            notollama: ollamastate,
-            apiKey: apiKey,
-            model: modelToSend,
-            messages: messagesToSend,
-            lmstudio_url:lmstudio_url,
-        })) {
-            accumulatedContent += contentChunk;
+        if(ollamastate!==3){
+          try {
+            // Determine API URL and model
+            let apiUrl = "";
+            if (ollamastate === 0) {
+              apiUrl = "https://openrouter.ai/api";
+            } else if (ollamastate === 1 || ollamastate === 2) {
+              apiUrl = lmstudio_url;
+            } else if (ollamastate === 3) {
+              apiUrl = filegpt_url;
+            }
+            const modelToSend = ollamastate==0 ? selectedModel : lmstudio_model_name;
+            const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+            }));
+             const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+            let accumulatedContent = "";
+            let context=""
+            // const context=answerfromfile?(await invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
+            //  model:stored_lm_model_name?stored_lm_model_name:"qwen2.5:3b",
+            //  embeddingmodelname:"nomic-embed-text",
+            //  usecompletefile:fullfileascontext,
+            //  pathstr: searchcurrent?(await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ",""):"ALL"
+            // }).catch(e=>console.log(e)) as string):""; 
+            // console.log(`----------context: ${context}`)
 
-            // Update the last message (assistant's) with new content
-            const updatedMessages = [...currentChatState.messages];
-            updatedMessages[updatedMessages.length - 1] = {
-                ...updatedMessages[updatedMessages.length - 1],
-                content: accumulatedContent,
-            };
-
-            currentChatState = {
-                ...currentChatState,
-                messages: updatedMessages,
-            };
-            updateChat(currentChatState); // Update UI
+              for await (const contentChunk of sendMessageStream({
+                  url: apiUrl,
+                  notollama: ollamastate,
+                  apiKey: apiKey,
+                  model: modelToSend,
+                  messages: sendwithhistory?messagesToSend:[messagesToSend[messagesToSend.length-1]],
+                  lmstudio_url:lmstudio_url,
+                  context:answerfromfile?context:""
+              })) {
+                  accumulatedContent += contentChunk;
+      
+                  // Update the last message (assistant's) with new content
+                  const updatedMessages = [...currentChatState.messages];
+                  updatedMessages[updatedMessages.length - 1] = {
+                      ...updatedMessages[updatedMessages.length - 1],
+                      content: accumulatedContent,
+                  };
+      
+                  currentChatState = {
+                      ...currentChatState,
+                      messages: updatedMessages,
+                  };
+                  updateChat(currentChatState); // Update UI
+              }
+            } catch (err) {
+              console.error("Error sending message:", err);
+              setError(err instanceof Error ? err.message : "An error occurred");
+              // On error, remove the assistant placeholder message
+              updateChat({
+                  ...chat,
+                  messages: [...initialMessages, userMessage],
+              });
+            } finally {
+                setIsLoading(false);
+                setStreamingMessageId(null);
+            }
         }
-
-    } catch (err) {
-        console.error("Error sending message:", err);
-        setError(err instanceof Error ? err.message : "An error occurred");
-        // On error, remove the assistant placeholder message
-        updateChat({
-            ...chat,
-            messages: [...initialMessages, userMessage],
-        });
-    } finally {
+        else{
+           const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+            }));
+        const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+        //   invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
+        //      model:stored_lm_model_name?stored_lm_model_name:"qwen2.5:3b",
+        //      embeddingmodelname:"nomic-embed-text",
+        //      usecompletefile:fullfileascontext,
+        //      pathstr: searchcurrent?(await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ",""):"ALL"
+        //     }).then((e)=>{
+        //     // console.log(e)
+        //      // Update the last message (assistant's) with new content
+        //       const updatedMessages = [...currentChatState.messages];
+        //       updatedMessages[updatedMessages.length - 1] = {
+        //           ...updatedMessages[updatedMessages.length - 1],
+        //           content: e as string,
+        //       };
+  
+        //       currentChatState = {
+        //           ...currentChatState,
+        //           messages: updatedMessages,
+        //       };
+        //       updateChat(currentChatState); // Update UI
+        //       setIsLoading(false);
+        //       setStreamingMessageId(null);
+        // //     setlocalip(
+        // //         <>
+        // //             <p className="font-semibold">Ollama should be running @ http://{e}:11434.</p>
+        // //             <p className="font-semibold"><Link target="_blank" href="https://github.com/visnkmr/filegpt-filedime">FiledimeGPT python server</Link> if installed should be running @ http://{e}:8694.</p>
+        // //             <p className="font-semibold">FiledimeGPT LAN local instance is accessible @ http://{e}:8477 for any device on your connected network.</p>
+        // //         </>
+        // // );
+        // }).catch((e)=>{
+        //   const updatedMessages = [...currentChatState.messages];
+        //       updatedMessages[updatedMessages.length - 1] = {
+        //           ...updatedMessages[updatedMessages.length - 1],
+        //           content: e as string,
+        //       };
+  
+        //       currentChatState = {
+        //           ...currentChatState,
+        //           messages: updatedMessages,
+        //       };
+        //       updateChat(currentChatState); // Update UI
+        // })
         setIsLoading(false);
         setStreamingMessageId(null);
-    }
+        }
+
+    
   };
 
     // Effect for direct message sending
@@ -391,19 +561,23 @@ export default function ChatInterface({
 
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
-    if (tempUrl && tempModelName) {
+    if (lmstudio_model_name && lmstudio_url) {
+      // localStorage.setItem("lmstudio_url", tempUrl)
+      // localStorage.setItem("lmstudio_model_name", tempModelName)
       // Assuming there is a way to update these values in the parent component or context
       // For now, we'll just log a message since updating parent state requires additional props
-      console.log("Updated LM Studio/Ollama URL and Model:", tempUrl, tempModelName);
+      // console.log("Updated LM Studio/Ollama URL and Model:", tempUrl, tempModelName);
       setShowDialog(false);
       // Trigger sending the message again with updated values
-      // This is a placeholder; actual implementation depends on how state is managed
       handleSendMessage();
     } else {
       setError("Both URL and model name are required.");
     }
   };
   const [autoscroll,setautoscroll]=useState(false);
+  const [fullfileascontext,setfullfileascontext]=useState(false);
+  const [sendwithhistory,setsendwithhistory]=useState(false);
+  const [searchcurrent,setsearchcurrent]=useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrolltobottom = useCallback(() => {
       if (containerRef.current) {
@@ -416,11 +590,12 @@ export default function ChatInterface({
       setTimeout(scrolltobottom, 2); // run the function every 2ms
     }
     }, [chat]);
-  // --- JSX Rendering ---
-  const [sbi,setcobi] = useState(false)
-
+    const [morethanonefile,setmtof]=useState(false)
+    // useEffect(()=>{
+    //   invoke("fileslist",{}).then((filePaths)=>{setmtof(filePaths!.length>1?true:false)})
+    // },[])
   return (
-    <div className="" onClick={()=>setcobi(false)}>
+    <div className="">
       {/* Dialog for URL and Model Name */}
       {showDialog && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -435,8 +610,8 @@ export default function ChatInterface({
               <label className="block text-sm font-medium mb-1">URL</label>
               <Input
                 type="text"
-                value={tempUrl}
-                onChange={(e) => setTempUrl(e.target.value)}
+                value={lmstudio_url}
+                onChange={(e) => setlmurl(e.target.value)}
                 placeholder="Enter URL"
                 className="w-full"
                 autoFocus
@@ -446,8 +621,8 @@ export default function ChatInterface({
               <label className="block text-sm font-medium mb-1">Model Name</label>
               <Input
                 type="text"
-                value={tempModelName}
-                onChange={(e) => setTempModelName(e.target.value)}
+                value={lmstudio_model_name}
+                onChange={(e) => setlmmodel(e.target.value)}
                 placeholder="Enter Model Name"
                 className="w-full"
               />
@@ -536,14 +711,28 @@ export default function ChatInterface({
           
         </div>
         <div className="mt-4 flex flex-row gap-4 w-full">
-          <Button
-              variant="outline"
-              onClick={(e)=>{setcobi(true);e.stopPropagation();setollamastate((ollamastate+1)%4)}}
-              // disabled={!currentChat || currentChat.messages.length === 0}
-            >
-              <Bot size={16} className="mr-2"/>
-              {`${sbi?(ollamastate===0?"Using Openrouter":(ollamastate===1?"Using Ollama":(ollamastate===2?"Using LM Studio":"Using FileGPT"))):""}`}
-            </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Bot size={16} className="mr-2"/>
+                {(ollamastate === 0 ? "Using Openrouter" : (ollamastate === 1 ? "Using Ollama" : (ollamastate === 2 ? "Using LM Studio" : "Using FileGPT"))) }
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => { setollamastate(0); }}>
+                Openrouter
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setollamastate(1); }}>
+                Ollama
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setollamastate(2); }}>
+                LM Studio
+              </DropdownMenuItem>
+              {/* <DropdownMenuItem onClick={() => { setcobi(true); setollamastate(3); }}>
+                FileGPT
+              </DropdownMenuItem> */}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {ollamastate==0?(<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
                         {selectedModelInfo ? (
                           <>
@@ -555,17 +744,21 @@ export default function ChatInterface({
                         )}
                       </Button>):null}
           {ollamastate===3 && (
-            <div className="flex flex-grow items-center gap-2">
+            <div className="flex items-center gap-2">
+              {/* <FileUploader/> */}
+               {/* <Label htmlFor="picture">Picture</Label>
+            <Input id="picture" type="file" />
               <Input
                 type="text"
-                value={selectedFilePath}
-                onChange={(e) => setSelectedFilePath(e.target.value)}
+                value={selectedFilePath[(selectedFilePath.length-1)]}
+                onChange={(e) => setSelectedFilePath([...e.target.value])}
                 placeholder="Enter file path or choose file"
                 className="flex-grow"
-              />
-              <Button variant="outline" size="icon" onClick={() => setSelectedFilePath("")}>
+              /> */}
+              {/* <Button variant="outline" size="icon" onClick={() => fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,lmstudio_model_name,filegpt_url,selectedFilePath)}>
                 <FileIcon className="h-4 w-4" />
-              </Button>
+                <Input  id="picture" type="file" />
+              </Button> */}
             </div>
           )}
           <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
@@ -589,6 +782,70 @@ export default function ChatInterface({
         >
           <Scroll className="h-4 w-4" />
         </Button>
+        {answerfromfile?(<HoverCard>
+          <HoverCardTrigger>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={()=>setfullfileascontext(cv=>!cv)} 
+              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+              // title="Include file history"
+            >
+              {fullfileascontext?(<FileCheck className="h-4 w-4" />):(<FileMinus className="h-4 w-4"/>)}
+          </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+            {fullfileascontext?"Full file contents will be passed as context":"Embeddings will be passed as context"}
+          </HoverCardContent>
+        </HoverCard>):null}
+        <HoverCard>
+          <HoverCardTrigger>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={()=>setsendwithhistory(cv=>!cv)} 
+              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+              // title="Include chat history"
+            >
+              {sendwithhistory?(<FileClock className="h-4 w-4" />):(<BookX className="h-4 w-4"/>)}
+          </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+            {sendwithhistory?"Full chat history will be passed as context":"Ignore chat history"}
+          </HoverCardContent>
+        </HoverCard>
+        {(morethanonefile)?( <HoverCard>
+          <HoverCardTrigger>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={()=>setsearchcurrent(cv=>!cv)} 
+              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+              // title="Search which files"
+            >
+              {searchcurrent?(<File className="h-4 w-4" />):(<FileStack className="h-4 w-4"/>)}
+          </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+            {searchcurrent?"Search current file":"Search all the files"}
+          </HoverCardContent>
+        </HoverCard>):null}
+       {(true)?( <HoverCard>
+          <HoverCardTrigger>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={()=>setanswerfromfile(cv=>!cv)} 
+              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+              // title="Search which files"
+            >
+              {answerfromfile?(<FilePlus className="h-4 w-4" />):(<FileMinus className="h-4 w-4"/>)}
+          </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+            {answerfromfile?"answer from file":"Answer without context"}
+          </HoverCardContent>
+        </HoverCard>):null}
         </div>
         </div>
       </div>
