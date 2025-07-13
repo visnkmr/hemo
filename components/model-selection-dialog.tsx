@@ -31,33 +31,33 @@ export default function ModelSelectionDialog({
   const [filteredModels, setFilteredModels] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
 
-  // useEffect(() => {
-  //   if (!apiKey || models.length > 0) return
+  useEffect(() => {
+    if (!apiKey || models.length > 0) return
 
-  //   const fetchModels = async () => {
-  //     setIsLoading(true)
-  //     try {
-  //       const response = await fetch("https://openrouter.ai/api/v1/models", {
-  //         headers: {
-  //           Authorization: `Bearer ${apiKey}`,
-  //         },
-  //       })
+    const fetchModels = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/models", {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        })
 
-  //       if (!response.ok) {
-  //         throw new Error("Failed to fetch models")
-  //       }
+        if (!response.ok) {
+          throw new Error("Failed to fetch models")
+        }
 
-  //       const data = await response.json()
-  //       // Models are fetched in the parent component
-  //     } catch (err) {
-  //       console.error("Error fetching models:", err)
-  //     } finally {
-  //       setIsLoading(false)
-  //     }
-  //   }
+        const data = await response.json()
+        // Models are fetched in the parent component
+      } catch (err) {
+        console.error("Error fetching models:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  //   fetchModels()
-  // }, [apiKey, models.length])
+    fetchModels()
+  }, [apiKey, models.length])
 
   // Filter models based on search query
   useEffect(() => {
@@ -148,7 +148,7 @@ export default function ModelSelectionDialog({
   // const [isHovered, setIsHovered] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col bg-gray-900">
+      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Select a Model</DialogTitle>
         </DialogHeader>
