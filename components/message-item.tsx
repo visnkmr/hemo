@@ -98,6 +98,11 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
         </div>
 
         <div className={cn( isUser?"max-w-[70vw]":"w-full","prose dark:prose-invert prose-sm break-words")}>
+          {message.imageUrl && (
+            <div className="mt-2">
+              <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full" />
+            </div>
+          )}
           <Markdown>{message.content}</Markdown>
           {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
         </div>

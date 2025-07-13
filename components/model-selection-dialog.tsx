@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog"
 import { BotIcon, CloudIcon, EyeIcon, FileIcon, Loader2 } from "lucide-react"
 import { cn } from "../lib/utils"
@@ -137,6 +137,12 @@ export default function ModelSelectionDialog({
     return colors[index]
   }
   const [modelcount, setmodelcount] = useState(10)
+  useEffect(() => {
+    setmodelcount(10)
+  },[isOpen])
+  const handleScroll = () => {
+    setmodelcount((prevCount) => prevCount + 10);
+  };
 
   // Format pricing to be more readable
   // const formatPrice = (price: string) => {
@@ -148,7 +154,7 @@ export default function ModelSelectionDialog({
   // const [isHovered, setIsHovered] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col">
+      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col"  onScroll={handleScroll}>
         <DialogHeader>
           <DialogTitle>Select a Model</DialogTitle>
         </DialogHeader>
@@ -218,7 +224,7 @@ export default function ModelSelectionDialog({
                   </div>
                 </div>
               ))}
-              {modelcount+10 < filteredModels.length && (<div
+              {modelcount+1 < filteredModels.length && (<div
                   key={"othermodels"}
                   className={cn(
                     "flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-all",
