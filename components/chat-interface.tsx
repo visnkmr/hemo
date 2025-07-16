@@ -23,7 +23,7 @@ export let setcolorpertheme="bg-white dark:bg-gray-800"
 interface SendMessageStreamParams {
   notollama: number;
   url: string;
-  apiKey: string;
+  // apiKey: number;
   model: string;
   messages: Array<{ role: string; content: string }>;
   lmstudio_url:string;
@@ -36,7 +36,7 @@ interface ChatInterfaceProps {
   ollamastate: number;
   chat: Chat;
   updateChat: (chat: Chat) => void;
-  apiKey: string;
+  // apiKey: string;
   selectedModel: string; // Keep selectedModel for overall component state
   selectedModelInfo: any;
   onBranchConversation: (branchPoint: BranchPoint) => void;
@@ -128,13 +128,17 @@ interface ChatInterfaceProps {
 export async function* sendMessageStream({
   notollama,
   url,
-  apiKey,
+  // apiKey,
   model,
   messages,
   lmstudio_url,
   context
 }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
-  const storedApiKey = localStorage.getItem("openrouter_api_key")
+  const storedApiKey = localStorage.getItem(notollama==4?"groq_api_key":"openrouter_api_key")
+  console.log(storedApiKey)
+  const modelname = notollama==1?model:localStorage.getItem(notollama==4?"groq_model_name":"lmstudio_model_name")
+    
+
   let prompt = context.trim()===""?`Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length-1].content}`:`Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length-1].content}`;
   console.log(prompt)
   let headers_openrouter = {
@@ -147,9 +151,9 @@ export async function* sendMessageStream({
   // if (notollama===0 || notollama===2) {
     const response = await fetch(`${url}/v1/chat/completions`, {
       method: "POST",
-      headers: (notollama===0 || notollama===2)?headers_openrouter:headers_ollama,
+      headers: (notollama===0 || notollama===2 || notollama===4)?headers_openrouter:headers_ollama,
       body: JSON.stringify({
-        model: model,
+        model: modelname,
         messages: [{role:'user',content:prompt}],
         stream: true,
       }),
@@ -266,7 +270,7 @@ export default function ChatInterface({
   ollamastate,
   chat,
   updateChat,
-  apiKey,
+  // apiKey,
   lmstudio_url,
   setlmmodel,
   setlmurl,
@@ -406,6 +410,8 @@ export default function ChatInterface({
             let apiUrl = "";
             if (ollamastate === 0) {
               apiUrl = "https://openrouter.ai/api";
+            } else if (ollamastate === 4) {
+              apiUrl = "https://api.groq.com/openai";
             } else if (ollamastate === 1 || ollamastate === 2) {
               apiUrl = lmstudio_url;
             } else if (ollamastate === 3) {
@@ -416,7 +422,7 @@ export default function ChatInterface({
                 role: msg.role,
                 content: msg.content,
             }));
-             const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+            //  const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
             let accumulatedContent = "";
             let context=""
             // const context=answerfromfile?(await invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
@@ -430,7 +436,7 @@ export default function ChatInterface({
               for await (const contentChunk of sendMessageStream({
                   url: apiUrl,
                   notollama: ollamastate,
-                  apiKey: apiKey,
+                  // apiKey: ollamastate,
                   model: modelToSend,
                   messages: sendwithhistory?messagesToSend:[messagesToSend[messagesToSend.length-1]],
                   lmstudio_url:lmstudio_url,
@@ -469,7 +475,7 @@ export default function ChatInterface({
                 role: msg.role,
                 content: msg.content,
             }));
-        const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+        // const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
         //   invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
         //      model:stored_lm_model_name?stored_lm_model_name:"qwen2.5:3b",
         //      embeddingmodelname:"nomic-embed-text",
@@ -594,6 +600,34 @@ export default function ChatInterface({
     // useEffect(()=>{
     //   invoke("fileslist",{}).then((filePaths)=>{setmtof(filePaths!.length>1?true:false)})
     // },[])
+    const [vendor,setvendor]=useState("Openrouter")
+    // const [label,setlabel]=useState("")
+    useEffect(()=>{
+      const lastState = localStorage.getItem("laststate");
+    setollamastate(lastState ? parseInt(lastState, 10) : 0);
+    },[])
+  useEffect(()=>{
+
+    switch (ollamastate) {
+      case 0:
+        setvendor("Openrouter")
+        break;
+      case 1:
+        setvendor("Ollama")
+        break;
+      case 2:
+        setvendor("LM studio")
+        break;
+      case 4:
+        setvendor("Groq")
+        break;
+    
+      default:
+        break;
+    }
+    localStorage.setItem("laststate",ollamastate.toString())
+    
+  },[ollamastate])
   return (
     <div className="">
       {/* Dialog for URL and Model Name */}
@@ -715,18 +749,33 @@ export default function ChatInterface({
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 <Bot size={16} className="mr-2"/>
-                {(ollamastate === 0 ? "Using Openrouter" : (ollamastate === 1 ? "Using Ollama" : (ollamastate === 2 ? "Using LM Studio" : "Using FileGPT"))) }
+                {vendor}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => { setollamastate(0); }}>
+              <DropdownMenuItem onClick={() => { 
+                setvendor("Openrouter")
+                setollamastate(0);
+              }}>
                 Openrouter
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setollamastate(1); }}>
+              <DropdownMenuItem onClick={() => {
+                setvendor("Ollama")
+                 setollamastate(1); 
+              }}>
                 Ollama
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setollamastate(2); }}>
+              <DropdownMenuItem onClick={() => { 
+                setvendor("LM Studio")
+                setollamastate(2); 
+              }}>
                 LM Studio
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { 
+                setvendor("Groq")
+                setollamastate(4); 
+              }}>
+                Groq
               </DropdownMenuItem>
               {/* <DropdownMenuItem onClick={() => { setcobi(true); setollamastate(3); }}>
                 FileGPT

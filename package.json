@@ -69,7 +69,6 @@
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
     "axios": "^1.10.0",
-    "@microsoft/fetch-event-source": "^2.0.1",
     "js-big-decimal": "^2.2.0"
   },
   "devDependencies": {

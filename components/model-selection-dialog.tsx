@@ -16,7 +16,7 @@ interface ModelSelectionDialogProps {
   models: any[]
   selectedModel: string
   onSelectModel: (modelId: string) => void
-  apiKey: string
+  // apiKey: string
 }
 
 export default function ModelSelectionDialog({
@@ -25,7 +25,7 @@ export default function ModelSelectionDialog({
   models,
   selectedModel,
   onSelectModel,
-  apiKey,
+  // apiKey,
 }: ModelSelectionDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [filteredModels, setFilteredModels] = useState<any[]>([])

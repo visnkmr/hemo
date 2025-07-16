@@ -15,8 +15,8 @@ import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
-import axios from "axios"
-import { fetchEventSource } from "@microsoft/fetch-event-source"
+// import axios from "axios"
+// import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
 interface FileItem {
     name: string;
@@ -116,7 +116,7 @@ interface gptargs{
 //   });
 // }
 export default function ChatUI({message,fgptendpoint="localhost",setasollama=false,whichgpt=0}:gptargs) {
-  const [apiKey, setApiKey] = useState<string>("")
+  // const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
   const [model_name, set_model_name] = useState<string>("")
   const [filegpturl, setFilegpturl] = useState<string>("")
@@ -152,7 +152,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
       setlmurl(storedlmurl)
     }
     
-    const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+    const stored_lm_model_name = localStorage.getItem(ollamastate==4?"groq_model_name":"lmstudio_model_name")
     if (storedlmurl && stored_lm_model_name) {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
@@ -164,10 +164,10 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
     }
     console.log("checking here for ollamastate val")
     {
-      const storedApiKey = localStorage.getItem("openrouter_api_key")
-      if (storedApiKey) {
-        setApiKey(storedApiKey)
-      }
+      // const storedApiKey = localStorage.getItem(ollamastate==4?"groq_api_key":"openrouter_api_key")
+      // if (storedApiKey) {
+      //   setApiKey(storedApiKey)
+      // }
       const selmodel = localStorage.getItem("or_model")
       const selmodelinfo = localStorage.getItem("or_model_info")
       if(selmodel)
@@ -175,7 +175,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
       setSelectedModelInfo(selmodelinfo)
     }
 
-    localStorage.setItem("laststate",ollamastate.toString())
+    // localStorage.setItem("laststate",ollamastate.toString())
   }, []);
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
@@ -226,7 +226,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
       try {
         const response = await fetch("https://openrouter.ai/api/v1/models", {
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            // Authorization: `Bearer ${apiKey}`,
           },
         })
 
@@ -301,7 +301,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
     }
 
     fetchModels()
-  }, [apiKey])
+  }, [ollamastate])
 
   const createNewChat = (chattitle="New Chat") => {
     const newChatId = Date.now().toString()
@@ -450,7 +450,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
           <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
             {<MenuIcon size={20} />}
           </Button>
-         <Button onClick={createNewChat} variant={"outline"} className=" w-full flex items-center justify-center gap-2">
+         <Button variant={"outline"} onClick={()=>createNewChat} className=" w-full flex items-center justify-center gap-2">
               <PlusIcon size={16} />
               New Chat
             </Button>
@@ -472,17 +472,22 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
           </div>
           <div className={cn(`overflow-y-auto absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
           collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
-          {ollamastate==0?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <ApiKeyInput apiKey={apiKey} setApiKey={setApiKey} />
+          {(ollamastate==0 || ollamastate==4)?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <ApiKeyInput ollamastate={ollamastate} />
           </div>):null}
-          {ollamastate!==0 ? (
+          {ollamastate == 4 && (
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
+                </div>
+              )}
+          {(ollamastate!==0 && ollamastate!==4)?(
             <>
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <LMStudioURL lmurl={lmurl} setlmurl={setlmurl} />
+                <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
               </div>
               {ollamastate !== 3 && (
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} />
+                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
                 </div>
               )}
               {ollamastate === 3 && (
@@ -540,7 +545,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
             message={message}
             chat={currentChat}
             updateChat={updateChat}
-            apiKey={apiKey}
+            // apiKey={apiKey}
             selectedModel={selectedModel}
             selectedModelInfo={selectedModelInfo}
             onBranchConversation={handleBranchConversation}
@@ -562,7 +567,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
         models={allModels}
         selectedModel={selectedModel}
         onSelectModel={handleSelectModel}
-        apiKey={apiKey}
+        // apiKey={apiKey}
       />
 
       {/* Export Dialog */}

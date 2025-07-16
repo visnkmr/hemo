@@ -8,10 +8,11 @@ import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
 
 interface LMUrlInputProps {
   lmurl: string
+  ollamastate:number
   setlmurl: (key: string) => void
 }
 
-export default function LMStudioURL({ lmurl, setlmurl }: LMUrlInputProps) {
+export default function LMStudioURL({ lmurl, setlmurl, ollamastate }: LMUrlInputProps) {
   // const [showKey, setShowKey] = useState(false)
   const [inputValue, setInputValue] = useState(lmurl)
   useEffect(()=>{
@@ -22,10 +23,30 @@ export default function LMStudioURL({ lmurl, setlmurl }: LMUrlInputProps) {
     setlmurl(inputValue)
     localStorage.setItem("lmstudio_url", inputValue)
   }
+const [label,setlabel]=useState("")
+  useEffect(()=>{
 
+    switch (ollamastate) {
+      case 0:
+        setlabel("Openrouter")
+        break;
+      case 1:
+        setlabel("Ollama")
+        break;
+      case 2:
+        setlabel("LM studio")
+        break;
+      case 4:
+        setlabel("Groq")
+        break;
+    
+      default:
+        break;
+    }
+  },[ollamastate])
   return (
     <div className="space-y-2">
-      <Label htmlFor="api-key">Ollama/LM Studio URL</Label>
+      <Label htmlFor="api-key">{label} URL</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
