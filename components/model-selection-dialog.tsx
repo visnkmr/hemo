@@ -32,7 +32,7 @@ export default function ModelSelectionDialog({
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
-    if (!apiKey || models.length > 0) return
+    if (models.length > 0) return
 
     const fetchModels = async () => {
       setIsLoading(true)
@@ -57,7 +57,7 @@ export default function ModelSelectionDialog({
     }
 
     fetchModels()
-  }, [apiKey, models.length])
+  }, [models.length])
 
   // Filter models based on search query
   useEffect(() => {
