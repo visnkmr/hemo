@@ -233,7 +233,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
         if (!response.ok) {
           throw new Error("Failed to fetch models")
         }
-
+        console.log("loaded models")
         const data = await response.json()
         const models = data.data
     const freemodelss=models.filter((model)=>{if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion ){return false}return true}).filter((m)=>{return parseFloat(new bigDecimal(m.pricing.prompt).getValue())<=0?true:false}).sort((a, b) => b.created-(a.created))  ;  

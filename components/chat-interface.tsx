@@ -293,15 +293,22 @@ export default function ChatInterface({
   // const [filePaths, setFilePaths] = useState([message?message.path:""]);
 
   const [input, setInput] = useState("")
+  const [isInputFocused, setIsInputFocused] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [dsm,setdsm]=useState(directsendmessage)
   const [mts,setmts]=useState(messagetosend)
   const [error, setError] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string[]>([message?.path?message.path:""])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [contextUsage, setContextUsage] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
-  const [contextUsage, setContextUsage] = useState(0)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [input]);
   const [answerfromfile, setanswerfromfile] = useState(false)
 
   // Calculate context usage effect
@@ -565,6 +572,84 @@ export default function ChatInterface({
     }
   };
 
+  const generateImage = async (prompt: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: prompt,
+      timestamp: new Date().toISOString(),
+      model: selectedModel,
+    };
+
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+      model: selectedModel,
+    };
+
+    setStreamingMessageId(assistantMessageId);
+
+    const initialMessages = chat.messages;
+    let currentChatState = {
+      ...chat,
+      messages: [...initialMessages, userMessage, assistantMessage],
+      title: initialMessages.length === 0 ? prompt.slice(0, 30) : chat.title,
+      lastModelUsed: selectedModel,
+    };
+    updateChat(currentChatState);
+
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          n: 1,
+          size: "512x512",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate image");
+      }
+
+      const data = await response.json();
+      const imageUrl = data.data[0].url;
+
+      const updatedMessages = [...currentChatState.messages];
+      updatedMessages[updatedMessages.length - 1] = {
+        ...updatedMessages[updatedMessages.length - 1],
+        content: `Image generated for prompt: ${prompt}`,
+        imageUrl: imageUrl,
+      };
+
+      currentChatState = {
+        ...currentChatState,
+        messages: updatedMessages,
+      };
+      updateChat(currentChatState);
+    } catch (err) { 
+      console.error("Error generating image:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+      updateChat({
+        ...chat,
+        messages: [...initialMessages, userMessage],
+      });
+    } finally {
+      setIsLoading(false);
+      setStreamingMessageId(null);
+    }
+  };
+
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
     if (lmstudio_model_name && lmstudio_url) {
@@ -714,7 +799,7 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <div className="absolute w-full bottom-0  pl-8 pr-8 " >
+      <div className={`absolute w-full bottom-0  pl-8 pr-8 ${isInputFocused ? '' : ''}`} >
         <div className="mx-auto flex w-full max-w-4xl flex-col pb-10  bg-gray-50 dark:bg-gray-900">
       {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
         {/* Context Usage Bar */}
@@ -736,8 +821,10 @@ export default function ChatInterface({
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
             placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
-            className="flex-1 min-h-[80px] max-h-[200px] dark:bg-gray-900 border bg-gray-50"
+            className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
             disabled={isLoading}
           />
           <Progress value={contextUsage} className="h-1" />
@@ -810,7 +897,7 @@ export default function ChatInterface({
               </Button> */}
             </div>
           )}
-          <Button variant={"outline"} onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
+          <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className= "text-black dark:text-white ">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
            <Button 

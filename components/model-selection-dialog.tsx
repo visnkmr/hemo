@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog"
 import { BotIcon, CloudIcon, EyeIcon, FileIcon, Loader2 } from "lucide-react"
 import { cn } from "../lib/utils"
@@ -31,33 +31,33 @@ export default function ModelSelectionDialog({
   const [filteredModels, setFilteredModels] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
 
-  // useEffect(() => {
-  //   if (!apiKey || models.length > 0) return
+  useEffect(() => {
+    if (!apiKey || models.length > 0) return
 
-  //   const fetchModels = async () => {
-  //     setIsLoading(true)
-  //     try {
-  //       const response = await fetch("https://openrouter.ai/api/v1/models", {
-  //         headers: {
-  //           Authorization: `Bearer ${apiKey}`,
-  //         },
-  //       })
+    const fetchModels = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/models", {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        })
 
-  //       if (!response.ok) {
-  //         throw new Error("Failed to fetch models")
-  //       }
+        if (!response.ok) {
+          throw new Error("Failed to fetch models")
+        }
 
-  //       const data = await response.json()
-  //       // Models are fetched in the parent component
-  //     } catch (err) {
-  //       console.error("Error fetching models:", err)
-  //     } finally {
-  //       setIsLoading(false)
-  //     }
-  //   }
+        const data = await response.json()
+        // Models are fetched in the parent component
+      } catch (err) {
+        console.error("Error fetching models:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  //   fetchModels()
-  // }, [apiKey, models.length])
+    fetchModels()
+  }, [apiKey, models.length])
 
   // Filter models based on search query
   useEffect(() => {
@@ -137,6 +137,12 @@ export default function ModelSelectionDialog({
     return colors[index]
   }
   const [modelcount, setmodelcount] = useState(10)
+  useEffect(() => {
+    setmodelcount(10)
+  },[isOpen])
+  const handleScroll = () => {
+    setmodelcount((prevCount) => prevCount + 10);
+  };
 
   // Format pricing to be more readable
   // const formatPrice = (price: string) => {
@@ -148,7 +154,7 @@ export default function ModelSelectionDialog({
   // const [isHovered, setIsHovered] = useState(false);
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col bg-gray-900">
+      <DialogContent className="overflow-y-auto sm:max-w-[800px] max-h-[80vh] flex flex-col"  onScroll={handleScroll}>
         <DialogHeader>
           <DialogTitle>Select a Model</DialogTitle>
         </DialogHeader>
@@ -218,7 +224,7 @@ export default function ModelSelectionDialog({
                   </div>
                 </div>
               ))}
-              {modelcount+10 < filteredModels.length && (<div
+              {modelcount+1 < filteredModels.length && (<div
                   key={"othermodels"}
                   className={cn(
                     "flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-all",

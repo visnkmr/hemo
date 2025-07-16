@@ -29,7 +29,7 @@ export default function ApiKeyInput({  ollamastate }: ApiKeyInputProps) {
   }
 
   return (
-    <div className="space-y-2">
+      <div className="space-y-2 text-black dark:text-white">
       <Label className="dark:text-white text-black " htmlFor="api-key">{ollamastate==4?"Groq":"OpenRouter"} API Key</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">

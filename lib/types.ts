@@ -17,6 +17,7 @@ export interface Message {
   content: string;
   timestamp: string;
   model: string;
+  imageUrl?: string;
 }
 
 export interface BranchPoint {

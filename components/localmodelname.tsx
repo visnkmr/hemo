@@ -50,7 +50,7 @@ export default function LMStudioModelName({ model_name, set_model_name,ollamasta
   },[ollamastate])
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 text-black dark:text-white">
       <Label htmlFor="api-key">{label} Model Name</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">

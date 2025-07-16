@@ -13,7 +13,7 @@
 module.exports = {
   // withOptimizedImages,
   experimental: {
-    reactCompiler:true,
+    // reactCompiler:true,
     // appDir: true,
     // optimizeCss: true,
     // esmExternals: true,
