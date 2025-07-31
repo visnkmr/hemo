@@ -136,8 +136,28 @@ export async function* sendMessageStream({
 }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
   const storedApiKey = localStorage.getItem(notollama==4?"groq_api_key":"openrouter_api_key")
   console.log(storedApiKey)
-  const modelname = notollama==1?model:localStorage.getItem(notollama==4?"groq_model_name":"lmstudio_model_name")
-    
+  console.log("========"+notollama)
+  // const or_mi=localStorage.getItem("or_model_info")
+  let modelname
+  switch(notollama){
+    case 0:
+      modelname=localStorage.getItem("or_model")
+      break;
+    case 1:
+      modelname=localStorage.getItem("lmstudio_model_name")
+      break;
+    case 2:
+      modelname=localStorage.getItem("lmstudio_model_name")
+      break;
+    case 3:
+      modelname=""
+      break;
+    case 4:
+      modelname=localStorage.getItem("groq_model_name")
+      break;
+  }
+  // const modelname = notollama==0?model:
+  console.log(modelname)  
 
   let prompt = context.trim()===""?`Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length-1].content}`:`Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0,messages.length-1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length-1].content}`;
   console.log(prompt)
