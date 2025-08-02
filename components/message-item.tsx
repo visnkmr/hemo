@@ -103,8 +103,10 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
               <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full" />
             </div>
           )}
-          <Markdown>{message.content}</Markdown>
-          {isStreaming && showCursor && <span className="animate-pulse">▌</span>}
+          <Markdown>
+            {message.content}
+          </Markdown>
+          <span className={`animate-pulse ${isStreaming? (showCursor?"" : "invisible"):"hidden"}`}>▌</span>
         </div>
       </div>
 
