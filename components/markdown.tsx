@@ -50,11 +50,11 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     language=(language==="plantuml")?"plaintext":language 
 
     return (
-      <CodeBlock className="rounded-md overflow-hidden my-4 border border-zinc-200 dark:border-zinc-800">
+      <CodeBlock className="rounded-md overflow-hidden my-4 border border-zinc-200 dark:border-zinc-800 max-w-full">
         <CodeBlockCode
           code={children as string}
           language={language}
-          className="text-sm overflow-x-auto"
+          className="text-sm overflow-x-auto max-w-full"
         />
       </CodeBlock>
     );
@@ -118,13 +118,20 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     return (
       <a
         href={href}
-        className="text-primary hover:underline dark:text-blue-400"
+        className="text-primary hover:underline dark:text-blue-400 break-words"
         target="_blank"
         rel="noopener noreferrer"
         {...props}
       >
         {children}
       </a>
+    );
+  },
+  p: function Paragraph({ children, ...props }: any) {
+    return (
+      <p className="my-2 break-words overflow-wrap-anywhere" {...props}>
+        {children}
+      </p>
     );
   },
   table: function Table({ children, ...props }: any) {
@@ -190,7 +197,7 @@ function MarkdownComponent({
   return (
     <div
       className={cn(
-        'prose-code:before:hidden prose-code:after:hidden',
+        'prose-code:before:hidden prose-code:after:hidden break-words overflow-wrap-anywhere',
         className,
       )}
     >

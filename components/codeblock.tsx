@@ -52,13 +52,13 @@ function CodeBlockCode({
   // SSR fallback: render plain code if not hydrated yet
   return highlightedHtml ? (
     <div
-      className={classNames}
+      className={cn(classNames, "overflow-x-auto max-w-full")}
       dangerouslySetInnerHTML={{ __html: highlightedHtml }}
       {...props}
     />
   ) : (
-    <div className={classNames} {...props}>
-      <pre>
+    <div className={cn(classNames, "overflow-x-auto max-w-full")} {...props}>
+      <pre className="whitespace-pre-wrap break-words">
         <code>{code}</code>
       </pre>
     </div>
