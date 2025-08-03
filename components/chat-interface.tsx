@@ -158,20 +158,36 @@ interface QuestionGroupProps {
   streamingMessageId?: string | null
   isQuestionExpanded: boolean
   onToggleQuestionExpand: () => void
+  currentAnswerIndex: number
+  onAnswerIndexChange: (index: number) => void
 }
 
-function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand }: QuestionGroupProps) {
-  const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0)
-
+function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
   const handlePrevious = () => {
-    setCurrentAnswerIndex(prev => Math.max(0, prev - 1))
+    const newIndex = Math.max(0, currentAnswerIndex - 1)
+    onAnswerIndexChange(newIndex)
   }
 
   const handleNext = () => {
-    setCurrentAnswerIndex(prev => Math.min(answers.length - 1, prev + 1))
+    const newIndex = Math.min(answers.length - 1, currentAnswerIndex + 1)
+    onAnswerIndexChange(newIndex)
+  }
+
+  const handleDotClick = (index: number) => {
+    onAnswerIndexChange(index)
   }
 
   const currentAnswer = answers[currentAnswerIndex]
+
+  // Auto-switch to latest answer when streaming
+  useEffect(() => {
+    if (isStreaming && streamingMessageId) {
+      const streamingAnswerIndex = answers.findIndex(answer => answer.id === streamingMessageId)
+      if (streamingAnswerIndex !== -1 && streamingAnswerIndex !== currentAnswerIndex) {
+        onAnswerIndexChange(streamingAnswerIndex)
+      }
+    }
+  }, [isStreaming, streamingMessageId, answers, currentAnswerIndex, onAnswerIndexChange])
 
   return (
     <div className="w-full space-y-4">
@@ -211,7 +227,7 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
                 {answers.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => setCurrentAnswerIndex(index)}
+                    onClick={() => handleDotClick(index)}
                     className={`w-2 h-2 rounded-full transition-colors ${index === currentAnswerIndex
                       ? 'bg-blue-500'
                       : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
@@ -828,6 +844,18 @@ export default function ChatInterface({
     });
   };
 
+  const getQuestionKey = (question: Message) => {
+    return question.content.toLowerCase().trim();
+  };
+
+  const handleAnswerIndexChange = (questionKey: string, newIndex: number) => {
+    setQuestionGroupAnswerIndices(prev => {
+      const newMap = new Map(prev);
+      newMap.set(questionKey, newIndex);
+      return newMap;
+    });
+  };
+
   const handleBranchFromMessage = (messageId: string) => {
     const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId);
     if (messageIndex >= 0) {
@@ -940,6 +968,8 @@ export default function ChatInterface({
   const [searchcurrent, setsearchcurrent] = useState(true);
   const [questionsSidebarCollapsed, setQuestionsSidebarCollapsed] = useState(true);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [questionGroupAnswerIndices, setQuestionGroupAnswerIndices] = useState<Map<string, number>>(new Map());
+  const [messageToGroupMap, setMessageToGroupMap] = useState<Map<string, string>>(new Map());
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -955,6 +985,7 @@ export default function ChatInterface({
 
     const questionAnswerMap = new Map<string, Message[]>()
     const processedQuestions = new Set<string>()
+    const newMessageToGroupMap = new Map<string, string>()
 
     // First pass: group questions with their answers
     for (let i = 0; i < chat.messages.length; i++) {
@@ -969,6 +1000,16 @@ export default function ChatInterface({
             questionAnswerMap.set(questionKey, [])
           }
           questionAnswerMap.get(questionKey)!.push(nextMessage)
+          
+          // Auto-set to latest answer when new answer is added
+          const currentAnswers = questionAnswerMap.get(questionKey)!
+          if (currentAnswers.length > 1) {
+            setQuestionGroupAnswerIndices(prev => {
+              const newMap = new Map(prev)
+              newMap.set(questionKey, currentAnswers.length - 1) // Set to latest answer
+              return newMap
+            })
+          }
         }
       }
     }
@@ -983,11 +1024,18 @@ export default function ChatInterface({
 
         if (answers.length > 1 && !processedQuestions.has(questionKey)) {
           // Multiple answers - create a question group
+          const groupId = `group-${message.id}`
           groups.push({
             type: 'question-group',
             question: message,
             answers: answers,
-            id: `group-${message.id}`
+            id: groupId
+          })
+          // Map the question message ID to the group ID
+          newMessageToGroupMap.set(message.id, groupId)
+          // Map all answer message IDs to the group ID
+          answers.forEach(answer => {
+            newMessageToGroupMap.set(answer.id, groupId)
           })
           processedQuestions.add(questionKey)
           i++ // Skip the next assistant message as it's included in the group
@@ -998,12 +1046,16 @@ export default function ChatInterface({
             message: message,
             id: message.id
           })
+          // Map the message ID to itself for single messages
+          newMessageToGroupMap.set(message.id, message.id)
           if (i + 1 < chat.messages.length && chat.messages[i + 1].role === 'assistant') {
+            const assistantMessage = chat.messages[i + 1]
             groups.push({
               type: 'single',
-              message: chat.messages[i + 1],
-              id: chat.messages[i + 1].id
+              message: assistantMessage,
+              id: assistantMessage.id
             })
+            newMessageToGroupMap.set(assistantMessage.id, assistantMessage.id)
             i++ // Skip the next message as we've processed it
           }
           processedQuestions.add(questionKey)
@@ -1020,10 +1072,14 @@ export default function ChatInterface({
             message: message,
             id: message.id
           })
+          newMessageToGroupMap.set(message.id, message.id)
         }
       }
     }
 
+    // Update the message-to-group mapping
+    setMessageToGroupMap(newMessageToGroupMap)
+    
     return groups
   }, [chat.messages])
   const scrolltobottom = useCallback(() => {
@@ -1033,14 +1089,16 @@ export default function ChatInterface({
   }, []);
 
   const scrollToMessage = useCallback((messageId: string) => {
-    const messageElement = messageRefs.current.get(messageId);
+    // Get the group ID that contains this message
+    const groupId = messageToGroupMap.get(messageId) || messageId;
+    const messageElement = messageRefs.current.get(groupId);
     if (messageElement && containerRef.current) {
       messageElement.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
       });
     }
-  }, []);
+  }, [messageToGroupMap]);
 
   useEffect(() => {
     if (autoscroll) {
@@ -1170,18 +1228,26 @@ export default function ChatInterface({
                       />
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
-                    <QuestionGroup
-                      question={group.question}
-                      answers={group.answers}
-                      onCopy={handleCopyMessage}
-                      onBranch={handleBranchFromMessage}
-                      setmts={setmts}
-                      setdsm={setdsm}
-                      isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
-                      streamingMessageId={streamingMessageId}
-                      isQuestionExpanded={expandedMessages.has(group.question.id)}
-                      onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
-                    />
+                    (() => {
+                      const questionKey = getQuestionKey(group.question);
+                      const currentIndex = questionGroupAnswerIndices.get(questionKey) ?? group.answers.length - 1; // Default to latest answer
+                      return (
+                        <QuestionGroup
+                          question={group.question}
+                          answers={group.answers}
+                          onCopy={handleCopyMessage}
+                          onBranch={handleBranchFromMessage}
+                          setmts={setmts}
+                          setdsm={setdsm}
+                          isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
+                          streamingMessageId={streamingMessageId}
+                          isQuestionExpanded={expandedMessages.has(group.question.id)}
+                          onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
+                          currentAnswerIndex={currentIndex}
+                          onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
+                        />
+                      );
+                    })()
                   ) : null}
                 </div>
               ))
@@ -1211,8 +1277,8 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <div className={`absolute bottom-0 left-0 right-64 pl-8 pr-4 ${isInputFocused ? '' : ''}`} >
-        <div className="mx-auto flex w-full max-w-4xl flex-col pb-10  bg-gray-50 dark:bg-gray-900">
+      <div className={`absolute bottom-0 left-0 right-0 pl-8 pr-4 ${isInputFocused ? '' : ''}`} >
+        <div className="mx-auto flex w-full max-w-3xl flex-col pb-10 bg-gray-50 dark:bg-gray-900">
           {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
           {/* Context Usage Bar */}
           {/* <div className="mb-2">
