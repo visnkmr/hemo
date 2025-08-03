@@ -39,7 +39,7 @@ export default function ModelSelectionDialog({
       try {
         const response = await fetch("https://openrouter.ai/api/v1/models", {
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${localStorage.getItem("openrouter_api_key")}`,
           },
         })
 

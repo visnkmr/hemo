@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import ChatInterface from "../components/chat-interface"
 import ChatHistory from "../components/chat-history"
+import { useIsMobile } from "../hooks/use-mobile"
 import ApiKeyInput from "../components/api-key-input"
 import LMStudioURL from "../components/lmstudio-url"
 import LMStudioModelName from "../components/localmodelname"
@@ -19,23 +20,23 @@ import DarkButton from './dark-button'
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
 interface FileItem {
-    name: string;
-    path: string;
-    is_dir: boolean;
-    size: number;
-    rawfs: number;
-    lmdate: number;
-    timestamp: number;
-    foldercon: number;
-    ftype: string;
-    parent: string;
-  }
-interface gptargs{
-    message?:FileItem,
-    fgptendpoint?:string,
-    setasollama:boolean,
-    whichgpt:number
-    // localorremote:boolean
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  rawfs: number;
+  lmdate: number;
+  timestamp: number;
+  foldercon: number;
+  ftype: string;
+  parent: string;
+}
+interface gptargs {
+  message?: FileItem,
+  fgptendpoint?: string,
+  setasollama: boolean,
+  whichgpt: number
+  // localorremote:boolean
 }
 
 // let fgtest=async (filegptendpoint):Promise<boolean> => {
@@ -58,10 +59,10 @@ interface gptargs{
 // async function sendtofilegpt(filegptendpoint,question,isollama,setcbs,setmessage,setchathistory){
 //    const abortController = new AbortController();
 //   const signal = abortController.signal;
-  
+
 //   await fetchEventSource(`${filegptendpoint}/query-stream`, {
 //     signal:signal,
-    
+
 //     method: "POST",
 //     body: JSON.stringify({
 //       query:question,
@@ -90,9 +91,9 @@ interface gptargs{
 //           return dm});
 //       }
 //       catch(e){
-        
+
 //       }
-        
+
 //         }
 //           // (divRef.current! as HTMLDivElement).scrollIntoView({ behavior: "smooth", block: "end" })
 //       // }
@@ -100,7 +101,7 @@ interface gptargs{
 //     onclose:async ()=> {
 //       setcbs(false)
 //       console.log("Connection closed by the server");
-      
+
 //     },
 //     onerror (err) {
 //       setchathistory((old)=>[...old,{
@@ -115,7 +116,7 @@ interface gptargs{
 //     },
 //   });
 // }
-export default function ChatUI({message,fgptendpoint="localhost",setasollama=false,whichgpt=0}:gptargs) {
+export default function ChatUI({ message, fgptendpoint = "localhost", setasollama = false, whichgpt = 0 }: gptargs) {
   // const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
   const [model_name, set_model_name] = useState<string>("")
@@ -131,10 +132,11 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   const [allModels, setAllModels] = useState<any[]>([])
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
+  const isMobile = useIsMobile();
 
-  useEffect(()=>{
+  useEffect(() => {
     setCollapsed(true)
-  },[currentChatId])
+  }, [currentChatId])
   // useEffect(()=>{const storedApiKey = localStorage.getItem("openrouter_api_key")
   //     if (storedApiKey) {
   //       setApiKey(storedApiKey)
@@ -146,13 +148,13 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   //   }},[filePaths])
   // Load API key and chats from localStorage on initial render
   useEffect(() => {
-    
+
     const storedlmurl = localStorage.getItem("lmstudio_url")
     if (storedlmurl) {
       setlmurl(storedlmurl)
     }
-    
-    const stored_lm_model_name = localStorage.getItem(ollamastate==4?"groq_model_name":"lmstudio_model_name")
+
+    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : "lmstudio_model_name")
     if (storedlmurl && stored_lm_model_name) {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
@@ -170,8 +172,8 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
       // }
       const selmodel = localStorage.getItem("or_model")
       const selmodelinfo = localStorage.getItem("or_model_info")
-      if(selmodel)
-      setSelectedModel(selmodel)
+      if (selmodel)
+        setSelectedModel(selmodel)
       setSelectedModelInfo(selmodelinfo)
     }
 
@@ -183,12 +185,12 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
 
   //Chat history loader
   useEffect(() => {
- console.log("checking here for ollamastate val 1")
+    console.log("checking here for ollamastate val 1")
     const lastState = localStorage.getItem("laststate");
     setollamastate(lastState ? parseInt(lastState, 10) : 0);
-    
 
-    
+
+
 
     const storedChats = localStorage.getItem("chat_history")
     if (storedChats) {
@@ -220,7 +222,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
 
   // Fetch models when API key is set
   useEffect(() => {
-    if (ollamastate!==0) return
+    if (ollamastate !== 0) return
 
     const fetchModels = async () => {
       try {
@@ -236,53 +238,53 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
         console.log("loaded models")
         const data = await response.json()
         const models = data.data
-    const freemodelss=models.filter((model)=>{if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion ){return false}return true}).filter((m)=>{return parseFloat(new bigDecimal(m.pricing.prompt).getValue())<=0?true:false}).sort((a, b) => b.created-(a.created))  ;  
-      console.log(freemodelss)
-    // // Create main directory
-    // if (!fs.existsSync(PATH_TO_PROVIDERS)) {
-    //     fs.mkdirSync(PATH_TO_PROVIDERS)
-    // }
+        const freemodelss = models.filter((model: any) => { if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion) { return false } return true }).filter((m: any) => { return parseFloat(new bigDecimal(m.pricing.prompt).getValue()) <= 0 ? true : false }).sort((a: any, b: any) => b.created - (a.created));
+        console.log(freemodelss)
+        // // Create main directory
+        // if (!fs.existsSync(PATH_TO_PROVIDERS)) {
+        //     fs.mkdirSync(PATH_TO_PROVIDERS)
+        // }
 
-    // Group models by provider
-    // const providerModels = new Map<string, ModelRow[]>()
-        
-    // for (const model of models) {
-    //     if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion ) {
-    //         console.warn('Skipping invalid model:', model)
-    //         continue
-    //     }
-    //     const [provider, ...modelParts] = model.id.split('/')
-    //     // if (!supportedProviderList.includes(provider)) {
-    //     //     continue
-    //     // }
-    //     if (!providerModels.has(provider)) {
-    //         providerModels.set(provider, [])
-    //     }
+        // Group models by provider
+        // const providerModels = new Map<string, ModelRow[]>()
 
-    //     // Convert pricing values to numbers before using toFixed(10)
-    //     const promptPrice = new bigDecimal(model.pricing.prompt).getValue()
-    //     const completionPrice = new bigDecimal(model.pricing.completion).getValue()
+        // for (const model of models) {
+        //     if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion ) {
+        //         console.warn('Skipping invalid model:', model)
+        //         continue
+        //     }
+        //     const [provider, ...modelParts] = model.id.split('/')
+        //     // if (!supportedProviderList.includes(provider)) {
+        //     //     continue
+        //     // }
+        //     if (!providerModels.has(provider)) {
+        //         providerModels.set(provider, [])
+        //     }
 
-    //     const modelRow: ModelRow = {
-    //         id:model.id,
-    //         context_length:model.context_length,
-    //         model: modelParts.join('/'), // Only include the part after the provider
-    //         cost: {
-    //             prompt_token: parseFloat(promptPrice),
-    //             completion_token: parseFloat(completionPrice),
-    //         },
-    //         supported_parameters:model.supported_parameters
-    //     }
+        //     // Convert pricing values to numbers before using toFixed(10)
+        //     const promptPrice = new bigDecimal(model.pricing.prompt).getValue()
+        //     const completionPrice = new bigDecimal(model.pricing.completion).getValue()
 
-    //     providerModels.get(provider)!.push(modelRow)
-    // }
+        //     const modelRow: ModelRow = {
+        //         id:model.id,
+        //         context_length:model.context_length,
+        //         model: modelParts.join('/'), // Only include the part after the provider
+        //         cost: {
+        //             prompt_token: parseFloat(promptPrice),
+        //             completion_token: parseFloat(completionPrice),
+        //         },
+        //         supported_parameters:model.supported_parameters
+        //     }
 
-    // const allProviders = Array.from(providerModels.values()).flat()
+        //     providerModels.get(provider)!.push(modelRow)
+        // }
 
-    // Sort by model name for easier diffs
-    // const freemodels=allProviders.filter((m)=>{return m.cost.prompt_token<=0?true:false}).sort((a, b) => a.model.localeCompare(b.model))  
-    // console.log(freemodels)
-    setAllModels(freemodelss)
+        // const allProviders = Array.from(providerModels.values()).flat()
+
+        // Sort by model name for easier diffs
+        // const freemodels=allProviders.filter((m)=>{return m.cost.prompt_token<=0?true:false}).sort((a, b) => a.model.localeCompare(b.model))  
+        // console.log(freemodels)
+        setAllModels(freemodelss)
         // setAllModels(data.data)
 
         // // Filter for free models (where pricing is 0)
@@ -303,7 +305,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
     fetchModels()
   }, [ollamastate])
 
-  const createNewChat = (chattitle="New Chat") => {
+  const createNewChat = (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
     const newChat: Chat = {
       id: newChatId,
@@ -321,7 +323,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
   const updateChat = (updatedChat: Chat) => {
     setChats((prevChats) => prevChats.map((chat) => (chat.id === updatedChat.id ? updatedChat : chat)))
   }
- const renameChat = (id: string, newTitle: string) => {
+  const renameChat = (id: string, newTitle: string) => {
     setChats(chats.map((chat) => (chat.id === id ? { ...chat, title: newTitle } : chat)))
   }
   const deleteChat = (chatId: string) => {
@@ -371,10 +373,10 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
 
   const handleSelectModel = (modelId: string) => {
     setSelectedModel(modelId)
-    localStorage.setItem("or_model",modelId);
+    localStorage.setItem("or_model", modelId);
     const modelInfo = allModels.find((model: any) => model.id === modelId)
     setSelectedModelInfo(modelInfo || null)
-    localStorage.setItem("or_model_info",modelInfo ||null);
+    localStorage.setItem("or_model_info", modelInfo || null);
     setIsModelDialogOpen(false)
   }
 
@@ -440,101 +442,100 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
       }
     }
   }, []);
-  
+
   return (
     <div className="absolute min-h-svh flex flex-col inset-0 w-screen bg-gray-50 dark:bg-gray-900">
       {(
-        <div  style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
+        <div style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  dark:text-white  dark:bg-gray-900 bg-gray-10 ">
             <div className="flex flex-row gap-4 ">
-          <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
-            {<MenuIcon size={20} />}
-          </Button>
-         <Button variant={"outline"} onClick={()=>createNewChat} className=" w-full flex items-center justify-center gap-2">
-              <PlusIcon size={16} />
-              New Chat
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => setIsExportDialogOpen(true)}
-              disabled={!currentChat || currentChat.messages.length === 0}
-            >
-              <Download size={16} className="" />
-              <span className="hidden lg:inline lg:ml-2">Export</span>
-            </Button>
-             
+              <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
+                {<MenuIcon size={20} />}
+              </Button>
+              <Button variant={"outline"} onClick={() => createNewChat} className=" w-full flex items-center justify-center gap-2">
+                <PlusIcon size={16} />
+                New Chat
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsExportDialogOpen(true)}
+                disabled={!currentChat || currentChat.messages.length === 0}
+              >
+                <Download size={16} className="" />
+                <span className="hidden lg:inline lg:ml-2">Export</span>
+              </Button>
+
             </div>
           </div>
           <div className="absolute top-4 right-4 z-50 p-2 rounded-md  text-white dark:bg-gray-900 bg-gray-10 ">
-          <DarkButton/>
+            <DarkButton />
 
           </div>
-          <div className={cn(`overflow-y-auto absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${
-          collapsed ? '-translate-x-full' : 'translate-x-0'}`,"pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
-          {(ollamastate==0 || ollamastate==4)?(<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <ApiKeyInput ollamastate={ollamastate} />
-          </div>):null}
-          {ollamastate == 4 && (
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
-                </div>
-              )}
-          {(ollamastate!==0 && ollamastate!==4)?(
-            <>
+          <div className={cn(`overflow-y-auto absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`, "pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
+            {(ollamastate == 0 || ollamastate == 4) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <ApiKeyInput ollamastate={ollamastate} />
+            </div>) : null}
+            {ollamastate == 4 && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
+                <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
               </div>
-              {ollamastate !== 3 && (
+            )}
+            {(ollamastate !== 0 && ollamastate !== 4) ? (
+              <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
+                  <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
                 </div>
-              )}
-              {ollamastate === 3 && (
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
-                </div>
-              )}
-            </>
-          ) : <></>}
-          
+                {ollamastate !== 3 && (
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
+                  </div>
+                )}
+                {ollamastate === 3 && (
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
+                  </div>
+                )}
+              </>
+            ) : <></>}
 
-          <div className="flex-1 overflow-y-auto pb-16 ">
-            <ChatHistory
-            chats={chats}
-            currentChatId={currentChatId}
-            setCurrentChatId={setCurrentChatId}
-            deleteChat={deleteChat}
-            renameChat={renameChat}
-      />
+
+            <div className="flex-1 overflow-y-auto pb-16 ">
+              <ChatHistory
+                chats={chats}
+                currentChatId={currentChatId}
+                setCurrentChatId={setCurrentChatId}
+                deleteChat={deleteChat}
+                renameChat={renameChat}
+              />
+            </div>
+
+
           </div>
 
-            
-            </div>
-           
         </div>
       )}
-                {/* <SidebarMenu/> */}
-       {/* <div className={` ${!collapsed?"absolute bottom-0 left-0 p-4 z-50 w-48":"hidden"}`}> */}
-              {/* <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">
+      {/* <SidebarMenu/> */}
+      {/* <div className={` ${!collapsed?"absolute bottom-0 left-0 p-4 z-50 w-48":"hidden"}`}> */}
+      {/* <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">
                 <PlusIcon size={16} />
                 New Chat
               </Button>
             </div> */}
 
       {/* Main content */}
-      <div  style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={()=>{setCollapsed(true)}} >
+      <div style={{ height: 'var(--100vh, 100vh)' }} className={cn("absolute bottom-0 z-10 w-full bg-gray-50 dark:bg-gray-900 overflow-hidden")} onClick={() => { setCollapsed(true) }} >
         {/* <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           {!sidebarVisible?(<Button variant="ghost" size="icon" onClick={() => setSidebarVisible(!sidebarVisible)}>
             {<MenuIcon size={20} />}
           </Button>):null}
         </div> */}
-        
+
         {currentChat && (
           <ChatInterface
-          // fileloader={fileloader}
-          // filegpturl={filegpturl}
-          // filePaths={filePaths}
+            // fileloader={fileloader}
+            // filegpturl={filegpturl}
+            // filePaths={filePaths}
             setollamastate={setollamastate}
             ollamastate={ollamastate}
             lmstudio_model_name={model_name}
@@ -567,7 +568,7 @@ export default function ChatUI({message,fgptendpoint="localhost",setasollama=fal
         models={allModels}
         selectedModel={selectedModel}
         onSelectModel={handleSelectModel}
-        // apiKey={apiKey}
+      // apiKey={apiKey}
       />
 
       {/* Export Dialog */}
