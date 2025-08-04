@@ -140,6 +140,10 @@ export default function ModelSelectionDialog({
             placeholder="Search models..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Prevent DropdownMenu from stealing focus/navigation when typing
+              e.stopPropagation()
+            }}
             className="w-full"
           />
           <div className="flex items-center space-x-2">
@@ -171,6 +175,8 @@ export default function ModelSelectionDialog({
                   {filteredModels.slice(0, visibleCount).map((model: OpenRouterModel) => (
                     <DropdownMenuItem
                       key={model.id}
+                      // Prevent first-letter typeahead from auto-focusing items while typing in the search box
+                      onKeyDown={(e) => e.stopPropagation()}
                       className={cn(
                         "flex items-center justify-between p-3 cursor-pointer focus:bg-accent focus:text-accent-foreground",
                         selectedModel === model.id && "bg-primary/10"
@@ -198,23 +204,66 @@ export default function ModelSelectionDialog({
                               {model.context_length?.toLocaleString() || "N/A"}
                             </Badge>
                             {(() => {
+                              // Show "Free" if both prompt and completion pricing are 0, otherwise show formatted pricing
                               try {
-                                // Use bigDecimal for accurate pricing comparison
                                 const promptPrice = parseFloat(new bigDecimal(model.pricing?.prompt || "0").getValue())
                                 const completionPrice = parseFloat(new bigDecimal(model.pricing?.completion || "0").getValue())
+
+                                if (promptPrice <= 0 && completionPrice <= 0) {
+                                  return (
+                                    <Badge variant="secondary" className="text-xs px-1 py-0">
+                                      Free
+                                    </Badge>
+                                  )
+                                }
+                                // Non-free: show per-million-token pricing in the requested format
+                                // If pricing is provided per token, scale by 1,000,000
+                                const scale = 1_000_000
+                                const rawPrompt = model.pricing?.prompt ?? "0"
+                                const rawCompletion = model.pricing?.completion ?? "0"
+                                const promptPerTok = parseFloat(
+                                  typeof rawPrompt === "string"
+                                    ? new bigDecimal(rawPrompt).getValue()
+                                    : String(rawPrompt)
+                                )
+                                const completionPerTok = parseFloat(
+                                  typeof rawCompletion === "string"
+                                    ? new bigDecimal(rawCompletion).getValue()
+                                    : String(rawCompletion)
+                                )
+                                const promptPerM = isFinite(promptPerTok) ? promptPerTok * scale : NaN
+                                const completionPerM = isFinite(completionPerTok) ? completionPerTok * scale : NaN
+                                const fmt = (v: number) =>
+                                  isFinite(v) && v >= 0
+                                    ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}/M`
+                                    : "?"
                                 
-                                return promptPrice <= 0 && completionPrice <= 0 && (
-                                  <Badge variant="secondary" className="text-xs px-1 py-0">
-                                    Free
+                                return (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                    {"<"}{fmt(promptPerM)}/{fmt(completionPerM)}/etc{">"}
                                   </Badge>
                                 )
                               } catch (error) {
-                                // Fallback to regular parsing
                                 const promptPrice = parseFloat(model.pricing?.prompt || "0")
                                 const completionPrice = parseFloat(model.pricing?.completion || "0")
-                                return promptPrice <= 0 && completionPrice <= 0 && (
-                                  <Badge variant="secondary" className="text-xs px-1 py-0">
-                                    Free
+                                if (promptPrice <= 0 && completionPrice <= 0) {
+                                  return (
+                                    <Badge variant="secondary" className="text-xs px-1 py-0">
+                                      Free
+                                    </Badge>
+                                  )
+                                }
+                                // Fallback path: also present per-million pricing
+                                const scale = 1_000_000
+                                const promptPerM = isFinite(promptPrice) ? promptPrice * scale : NaN
+                                const completionPerM = isFinite(completionPrice) ? completionPrice * scale : NaN
+                                const fmt = (v: number) =>
+                                  isFinite(v) && v >= 0
+                                    ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}/M`
+                                    : "?"
+                                return (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                    {"<"}{fmt(promptPerM)}/{fmt(completionPerM)}/etc{">"}
                                   </Badge>
                                 )
                               }
