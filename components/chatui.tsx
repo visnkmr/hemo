@@ -11,7 +11,7 @@ import FileGPTUrl from "../components/filegpt-url"
 import type { Chat, BranchPoint, ModelRow } from "../lib/types"
 import { Button } from "../components/ui/button"
 import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
-import ModelSelectionDialog from "../components/model-selection-dialog"
+
 import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
@@ -127,9 +127,10 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [ollamastate, setollamastate] = useState(whichgpt)
-  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false)
+
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
   const isMobile = useIsMobile();
@@ -225,6 +226,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     if (ollamastate !== 0) return
 
     const fetchModels = async () => {
+      setIsLoadingModels(true)
       try {
         const response = await fetch("https://openrouter.ai/api/v1/models", {
           headers: {
@@ -238,54 +240,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         console.log("loaded models")
         const data = await response.json()
         const models = data.data
-        const freemodelss = models.filter((model: any) => { if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion) { return false } return true }).filter((m: any) => { return parseFloat(new bigDecimal(m.pricing.prompt).getValue()) <= 0 ? true : false }).sort((a: any, b: any) => b.created - (a.created));
-        console.log(freemodelss)
-        // // Create main directory
-        // if (!fs.existsSync(PATH_TO_PROVIDERS)) {
-        //     fs.mkdirSync(PATH_TO_PROVIDERS)
-        // }
-
-        // Group models by provider
-        // const providerModels = new Map<string, ModelRow[]>()
-
-        // for (const model of models) {
-        //     if (!model?.id || !model?.pricing?.prompt || !model?.pricing?.completion ) {
-        //         console.warn('Skipping invalid model:', model)
-        //         continue
-        //     }
-        //     const [provider, ...modelParts] = model.id.split('/')
-        //     // if (!supportedProviderList.includes(provider)) {
-        //     //     continue
-        //     // }
-        //     if (!providerModels.has(provider)) {
-        //         providerModels.set(provider, [])
-        //     }
-
-        //     // Convert pricing values to numbers before using toFixed(10)
-        //     const promptPrice = new bigDecimal(model.pricing.prompt).getValue()
-        //     const completionPrice = new bigDecimal(model.pricing.completion).getValue()
-
-        //     const modelRow: ModelRow = {
-        //         id:model.id,
-        //         context_length:model.context_length,
-        //         model: modelParts.join('/'), // Only include the part after the provider
-        //         cost: {
-        //             prompt_token: parseFloat(promptPrice),
-        //             completion_token: parseFloat(completionPrice),
-        //         },
-        //         supported_parameters:model.supported_parameters
-        //     }
-
-        //     providerModels.get(provider)!.push(modelRow)
-        // }
-
-        // const allProviders = Array.from(providerModels.values()).flat()
-
-        // Sort by model name for easier diffs
-        // const freemodels=allProviders.filter((m)=>{return m.cost.prompt_token<=0?true:false}).sort((a, b) => a.model.localeCompare(b.model))  
-        // console.log(freemodels)
-        setAllModels(freemodelss)
-        // setAllModels(data.data)
+        
+        // Filter out models with missing required fields and sort by creation date
+        const validModels = models
+          .filter((model: any) => model?.id && model?.pricing?.prompt !== undefined && model?.pricing?.completion !== undefined)
+          .sort((a: any, b: any) => b.created - a.created);
+        
+        console.log("All valid models:", validModels.length)
+        setAllModels(validModels)
 
         // // Filter for free models (where pricing is 0)
         // const freeModels = data.data.filter((model: any) => {
@@ -299,6 +261,8 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         // }
       } catch (err) {
         console.error("Error fetching models:", err)
+      } finally {
+        setIsLoadingModels(false)
       }
     }
 
@@ -377,7 +341,6 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     const modelInfo = allModels.find((model: any) => model.id === modelId)
     setSelectedModelInfo(modelInfo || null)
     localStorage.setItem("or_model_info", modelInfo || null);
-    setIsModelDialogOpen(false)
   }
 
 
@@ -556,20 +519,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             setSidebarVisible={setSidebarVisible}
             getModelColor={getModelColor}
             getModelDisplayName={getModelDisplayName}
-            setIsModelDialogOpen={setIsModelDialogOpen}
+            allModels={allModels}
+            handleSelectModel={handleSelectModel}
+            isLoadingModels={isLoadingModels}
           />
         )}
       </div>
 
-      {/* Model Selection Dialog */}
-      <ModelSelectionDialog
-        isOpen={isModelDialogOpen}
-        onClose={() => setIsModelDialogOpen(false)}
-        models={allModels}
-        selectedModel={selectedModel}
-        onSelectModel={handleSelectModel}
-      // apiKey={apiKey}
-      />
+
 
       {/* Export Dialog */}
       <ExportDialog isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} chat={currentChat} />

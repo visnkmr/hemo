@@ -15,6 +15,7 @@ import { Markdown } from "./markdown"
 import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
 import QuestionsSidebar from "./questions-sidebar"
+import ModelSelectionDialog from "./model-selection-dialog"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -299,10 +300,12 @@ interface ChatInterfaceProps {
   messagetosend?: string;
   sidebarVisible: any;
   setSidebarVisible: any;
-  setIsModelDialogOpen: any;
   getModelColor: any;
   getModelDisplayName: any;
   setollamastate: any;
+  allModels: any[];
+  handleSelectModel: (modelId: string) => void;
+  isLoadingModels: boolean;
 }
 
 // async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,lmstudio_model_name: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
@@ -556,10 +559,12 @@ export default function ChatInterface({
 
   sidebarVisible,
   setSidebarVisible,
-  setIsModelDialogOpen,
   getModelDisplayName,
   getModelColor,
-  setollamastate
+  setollamastate,
+  allModels,
+  handleSelectModel,
+  isLoadingModels
 }: ChatInterfaceProps) {
   // const [filePaths, setFilePaths] = useState([message?message.path:""]);
 
@@ -1347,16 +1352,14 @@ export default function ChatInterface({
               </DropdownMenuItem> */}
               </DropdownMenuContent>
             </DropdownMenu>
-            {ollamastate == 0 ? (<Button variant="outline" onClick={() => setIsModelDialogOpen(true)} className="flex items-center gap-2">
-              {selectedModelInfo ? (
-                <>
-                  <div className={`w-4 h-4 rounded-full bg-${getModelColor(selectedModel)}`}></div>
-                  <span className="truncate max-w-[150px]">{getModelDisplayName(selectedModel)}</span>
-                </>
-              ) : (
-                "Select Model"
-              )}
-            </Button>) : null}
+            {ollamastate == 0 ? (
+              <ModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : null}
             {ollamastate === 3 && (
               <div className="flex items-center gap-2">
                 {/* <FileUploader/> */}

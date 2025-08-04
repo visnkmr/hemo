@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { Label } from "../components/ui/label"
 import { Loader2 } from "lucide-react"
+import React from "react"
 // import type { Model } from "../lib/types"
 
 interface ModelSelectorProps {
@@ -38,22 +39,21 @@ export default function ModelSelector({ apiKey, selectedModel, setSelectedModel 
 
         const data = await response.json()
 
-        // Filter for free models (where pricing is 0)
-        const freeModels = data.data.filter((model: any) => {
-          return Number.parseFloat(model.pricing?.prompt) <= 0 && Number.parseFloat(model.pricing?.completion) <= 0
-        })
+        // Do not filter here; let the UI toggle control filtering.
+        const allModels: any[] = Array.isArray(data?.data) ? data.data : []
 
         setModels(
-          freeModels.map((model: any) => ({
+          allModels.map((model: any) => ({
             id: model.id,
-            name: model.name || model.id.split("/").pop(),
-            provider: model.id.split("/")[0],
+            name: model.name || model.id?.split("/")?.pop(),
+            provider: model.id?.split("/")?.[0],
+            pricing: model.pricing,
           })),
         )
 
         // Set the first model as selected if none is selected
-        if (freeModels.length > 0 && !selectedModel) {
-          setSelectedModel(freeModels[0].id)
+        if (allModels.length > 0 && !selectedModel) {
+          setSelectedModel(allModels[0].id)
         }
       } catch (err) {
         console.error("Error fetching models:", err)
