@@ -705,6 +705,11 @@ export default function ChatInterface({
     };
     updateChat(currentChatState);
 
+    // Scroll to bottom if we were already at the bottom when starting to stream
+    if (isAtBottom) {
+      setTimeout(scrolltobottom, 100);
+    }
+
 
 
     // Call the generator and process the stream
@@ -936,6 +941,11 @@ export default function ChatInterface({
     };
     updateChat(currentChatState);
 
+    // Scroll to bottom if we were already at the bottom when starting to stream
+    if (isAtBottom) {
+      setTimeout(scrolltobottom, 100);
+    }
+
     try {
       const response = await fetch("https://openrouter.ai/api/v1/images/generations", {
         method: "POST",
@@ -1015,6 +1025,8 @@ export default function ChatInterface({
   const [messageToGroupMap, setMessageToGroupMap] = useState<Map<string, string>>(new Map());
   const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // Group messages for Grok-style display
   const groupedMessages = React.useMemo(() => {
@@ -1043,7 +1055,7 @@ export default function ChatInterface({
             questionAnswerMap.set(questionKey, [])
           }
           questionAnswerMap.get(questionKey)!.push(nextMessage)
-          
+
           // Auto-set to latest answer when new answer is added
           const currentAnswers = questionAnswerMap.get(questionKey)!
           if (currentAnswers.length > 1) {
@@ -1122,14 +1134,26 @@ export default function ChatInterface({
 
     // Update the message-to-group mapping
     setMessageToGroupMap(newMessageToGroupMap)
-    
+
     return groups
   }, [chat.messages])
   const scrolltobottom = useCallback(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      setIsAtBottom(true);
+      setShowScrollToBottom(false);
     }
   }, []);
+
+  const checkIfAtBottom = useCallback(() => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const threshold = 100; // pixels from bottom to consider "at bottom"
+      const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
+      setIsAtBottom(atBottom);
+      setShowScrollToBottom(!atBottom && chat.messages.length > 0);
+    }
+  }, [chat.messages.length]);
 
   const scrollToMessage = useCallback((messageId: string) => {
     // Get the group ID that contains this message
@@ -1143,11 +1167,27 @@ export default function ChatInterface({
     }
   }, [messageToGroupMap]);
 
+  // Add scroll event listener
   useEffect(() => {
-    if (autoscroll) {
-      setTimeout(scrolltobottom, 2); // run the function every 2ms
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkIfAtBottom);
+      // Initial check
+      checkIfAtBottom();
+
+      return () => {
+        container.removeEventListener('scroll', checkIfAtBottom);
+      };
     }
-  }, [chat, autoscroll, scrolltobottom]);
+    return undefined;
+  }, [checkIfAtBottom]);
+
+  // Auto-scroll behavior: only scroll when at bottom and streaming
+  useEffect(() => {
+    if (isAtBottom && (isLoading || streamingMessageId)) {
+      scrolltobottom();
+    }
+  }, [chat.messages, isAtBottom, isLoading, streamingMessageId, scrolltobottom]);
   const [morethanonefile, setmtof] = useState(false)
   // useEffect(()=>{
   //   invoke("fileslist",{}).then((filePaths)=>{setmtof(filePaths!.length>1?true:false)})
@@ -1326,6 +1366,20 @@ export default function ChatInterface({
 
           <div className="flex flex-grow items-end gap-2">
             <div className="flex flex-col flex-grow">
+              {showScrollToBottom && (
+                <div className="flex justify-end mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={scrolltobottom}
+                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                    title="Scroll to bottom"
+                  >
+                    <MoveDown className="h-4 w-4 mr-1" />
+                    Scroll to bottom
+                  </Button>
+                </div>
+              )}
 
               <Textarea
                 ref={textareaRef}
@@ -1409,24 +1463,6 @@ export default function ChatInterface({
 
             <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={scrolltobottom}
-              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
-              title="Scroll to bottom"
-            >
-              <MoveDown className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setautoscroll(cv => !cv)}
-              className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
-              title="Autoscroll"
-            >
-              <Scroll className="h-4 w-4" />
             </Button>
             {answerfromfile ? (<HoverCard>
               <HoverCardTrigger>
