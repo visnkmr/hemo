@@ -574,6 +574,8 @@ export default function ChatInterface({
   const [dsm, setdsm] = useState(directsendmessage)
   const [mts, setmts] = useState(messagetosend)
   const [error, setError] = useState<string | null>(null)
+  // Inline error message to append to chat when API calls fail
+  const [pendingErrorMessage, setPendingErrorMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string[]>([message?.path ? message.path : ""])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [contextUsage, setContextUsage] = useState(0)
@@ -665,6 +667,23 @@ export default function ChatInterface({
       timestamp: new Date().toISOString(),
       model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
     };
+    // If there is a leftover pending error message from a previous failure, flush it into the chat
+    if (pendingErrorMessage) {
+      const errorAsAssistant: Message = {
+        id: (Date.now() + 0.5).toString(),
+        role: "assistant",
+        content: pendingErrorMessage,
+        timestamp: new Date().toISOString(),
+        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      }
+      const flushed = {
+        ...chat,
+        messages: [...chat.messages, errorAsAssistant],
+        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      }
+      updateChat(flushed)
+      setPendingErrorMessage(null)
+    }
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
       id: assistantMessageId,
@@ -744,12 +763,23 @@ export default function ChatInterface({
         }
       } catch (err) {
         console.error("Error sending message:", err);
-        setError(err instanceof Error ? err.message : "An error occurred");
-        // On error, remove the assistant placeholder message
+        const errMsg = err instanceof Error ? err.message : "An error occurred";
+        setError(errMsg);
+        // Replace the assistant placeholder with an inline error message in the message stream
+        const errorAssistantMessage: Message = {
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: `Error: ${errMsg}`,
+          timestamp: new Date().toISOString(),
+          model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        };
         updateChat({
           ...chat,
-          messages: [...initialMessages, userMessage],
+          messages: [...initialMessages, userMessage, errorAssistantMessage],
+          lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
         });
+        // In case UI batching prevents immediate update, keep a pending copy to flush on next send
+        setPendingErrorMessage(`Error: ${errMsg}`);
       } finally {
         setIsLoading(false);
         setStreamingMessageId(null);
@@ -955,15 +985,23 @@ export default function ChatInterface({
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
     if (lmstudio_model_name && lmstudio_url) {
-      // localStorage.setItem("lmstudio_url", tempUrl)
-      // localStorage.setItem("lmstudio_model_name", tempModelName)
-      // Assuming there is a way to update these values in the parent component or context
-      // For now, we'll just log a message since updating parent state requires additional props
-      // console.log("Updated LM Studio/Ollama URL and Model:", tempUrl, tempModelName);
       setShowDialog(false);
       // Trigger sending the message again with updated values
       handleSendMessage();
     } else {
+      // Do not use a blocking dialog; surface inline among messages
+      const errorAssistantMessage: Message = {
+        id: (Date.now() + 3).toString(),
+        role: "assistant",
+        content: "Error: Both URL and model name are required.",
+        timestamp: new Date().toISOString(),
+        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      };
+      updateChat({
+        ...chat,
+        messages: [...chat.messages, errorAssistantMessage],
+        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      });
       setError("Both URL and model name are required.");
     }
   };
@@ -1146,16 +1184,11 @@ export default function ChatInterface({
     <div className="">
       {/* Dialog for URL and Model Name */}
       {showDialog && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96 focus:outline-none" tabIndex={-1} onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleDialogSubmit();
-            }
-          }}>
-            <h2 className="text-xl font-semibold mb-4">LM Studio/Ollama Configuration</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Please provide the URL and model name to proceed.</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">URL</label>
+        <div className="mx-auto flex w-full max-w-3xl mb-2 px-4">
+          <div className="w-full border rounded-lg p-3 bg-white dark:bg-gray-800">
+            <h2 className="text-sm font-semibold mb-2">LM Studio/Ollama Configuration</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Provide URL and model to proceed.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <Input
                 type="text"
                 value={lmstudio_url}
@@ -1164,9 +1197,6 @@ export default function ChatInterface({
                 className="w-full"
                 autoFocus
               />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Model Name</label>
               <Input
                 type="text"
                 value={lmstudio_model_name}
@@ -1175,7 +1205,7 @@ export default function ChatInterface({
                 className="w-full"
               />
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mt-2">
               <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
               <Button onClick={handleDialogSubmit}>Submit</Button>
             </div>
@@ -1274,11 +1304,9 @@ export default function ChatInterface({
 
 
 
-      {/* Error Display */}
+      {/* Error Display (kept minimal for accessibility) */}
       {error && (
-        <div className="p-2 mx-4 mb-2 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded">
-          {error}
-        </div>
+        <div className="sr-only" aria-live="polite">{error}</div>
       )}
 
       {/* Input Area */}
