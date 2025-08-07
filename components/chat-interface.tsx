@@ -1350,7 +1350,21 @@ export default function ChatInterface({
       )}
 
       {/* Input Area */}
-      <div className={`absolute bottom-0 left-0 right-0 pl-8 pr-4 ${isInputFocused ? '' : ''}`} >
+      <div className={`absolute bottom-0 left-0 right-0 pl-4 pr-4 ${isInputFocused ? '' : ''}`} >
+      {showScrollToBottom && (
+                <div className="flex justify-center md:justify-end md:mr-32 mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={scrolltobottom}
+                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                    title="Scroll to bottom"
+                  >
+                    <MoveDown className="h-4 w-4 mr-1" />
+                    Scroll to bottom
+                  </Button>
+                </div>
+              )}
         <div className="mx-auto flex w-full max-w-3xl flex-col pb-10 bg-gray-50 dark:bg-gray-900">
           {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
           {/* Context Usage Bar */}
@@ -1364,22 +1378,9 @@ export default function ChatInterface({
 
           {/* Text Input & Send Button */}
 
-          <div className="flex flex-grow items-end gap-2">
+          <div className="flex flex-grow items-center gap-2">
             <div className="flex flex-col flex-grow">
-              {showScrollToBottom && (
-                <div className="flex justify-end mb-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={scrolltobottom}
-                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
-                    title="Scroll to bottom"
-                  >
-                    <MoveDown className="h-4 w-4 mr-1" />
-                    Scroll to bottom
-                  </Button>
-                </div>
-              )}
+              
 
               <Textarea
                 ref={textareaRef}
