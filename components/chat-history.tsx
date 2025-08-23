@@ -27,9 +27,11 @@ export default function ChatHistory({
   const [editTitle, setEditTitle] = useState("")
 
   // Filter chats to only show those with at least one user message
-  const filteredChats = chats.filter(chat =>
-    chat.messages && chat.messages.some(message => message.role === 'user')
-  );
+  const filteredChats = chats
+    .filter(chat =>
+      chat.messages && chat.messages.some(message => message.role === 'user')
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Debug logging
   console.log('ChatHistory - received chats:', chats);
@@ -126,7 +128,7 @@ export default function ChatHistory({
                     if (e.key === "Enter") saveEdit(chat.id)
                     if (e.key === "Escape") cancelEdit()
                   }}
-                  placeholder={`${chat.title || "New Chat"} (${chat.messages?.length || 0})`}
+                  placeholder={`${chat.title || "New Chat"} (${chat.messages.filter(message => message.role === "user").length || 0})`}
                 />
                 <Button
                   variant="ghost"
