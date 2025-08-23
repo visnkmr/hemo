@@ -79,9 +79,21 @@ export default function ChatHistory({
     setEditingChatId(null)
   }
 
+  // Helper function to count questions (user messages) in a chat
+  const getQuestionCount = (chat: Chat): number => {
+    return chat.messages.filter(message => message.role === "user").length
+  }
+
+  // Filter out chats with no messages
+  const activeChats = chats.filter(chat => chat.messages.filter(message => message.role === "user").length > 0)
+
+  if (activeChats.length === 0) {
+    return <div className="p-4 text-center text-gray-500 dark:text-gray-400">No chat history</div>
+  }
+
   return (
     <div className="space-y-1 p-2">
-      {chats.map((chat) => (
+      {activeChats.map((chat) => (
         <div
           key={chat.id}
           className={cn(
@@ -141,7 +153,7 @@ export default function ChatHistory({
               </div>
             ) : (
               <div className="truncate">
-                <div className="font-medium truncate">{chat.title || "New Chat"}</div>
+                <div className="font-medium truncate">{chat.title || "New Chat"} ({getQuestionCount(chat)})</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   {format(new Date(chat.createdAt), "MMM d, yyyy")}
                 </div>
