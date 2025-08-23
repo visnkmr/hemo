@@ -59,21 +59,28 @@ class IndexedDBStorage {
 
   private async initDB(): Promise<void> {
     return new Promise((resolve, reject) => {
+      console.log('Initializing IndexedDB...');
       const request = indexedDB.open(this.dbConfig.name, this.dbConfig.version);
 
       request.onerror = () => {
-        console.error('IndexedDB error:', request.error);
+        console.error('IndexedDB initialization error:', request.error);
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
+        console.log('IndexedDB initialized successfully');
         resolve();
       };
 
       request.onupgradeneeded = (event) => {
+        console.log('IndexedDB upgrade needed, creating object stores...');
         const db = (event.target as IDBOpenDBRequest).result;
         this.createObjectStores(db);
+      };
+
+      request.onblocked = () => {
+        console.warn('IndexedDB initialization blocked');
       };
     });
   }
@@ -189,10 +196,17 @@ class IndexedDBStorage {
       // Save chat metadata
       const chatRequest = chatStore.put(chat);
 
-      // Save messages
+      // Save messages with proper ChatMessage structure
       const messagePromises = chat.messages.map(message => {
         return new Promise<void>((res, rej) => {
-          const msgRequest = messageStore.put(message);
+          // Ensure message has an id and chatId
+          const chatMessage: ChatMessage = {
+            ...message,
+            id: message.id || `${chat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            chatId: chat.id
+          };
+
+          const msgRequest = messageStore.put(chatMessage);
           msgRequest.onsuccess = () => res();
           msgRequest.onerror = () => rej(msgRequest.error);
         });
@@ -248,6 +262,8 @@ class IndexedDBStorage {
     return new Promise((resolve, reject) => {
       if (!this.db) return reject(new Error('Database not initialized'));
 
+      console.log('Getting all chats from IndexedDB...');
+
       const transaction = this.db.transaction(
         [this.dbConfig.stores.chats.name, this.dbConfig.stores.messages.name],
         'readonly'
@@ -270,6 +286,9 @@ class IndexedDBStorage {
         })
       ])
       .then(([chats, allMessages]) => {
+        console.log('Raw chats from DB:', chats);
+        console.log('Raw messages from DB:', allMessages);
+
         // Group messages by chatId
         const messagesByChatId = allMessages.reduce((acc, message) => {
           if (!acc[message.chatId]) acc[message.chatId] = [];
@@ -277,12 +296,15 @@ class IndexedDBStorage {
           return acc;
         }, {} as Record<string, ChatMessage[]>);
 
+        console.log('Messages grouped by chatId:', messagesByChatId);
+
         // Attach messages to chats and sort
         const chatsWithMessages = chats.map(chat => ({
           ...chat,
           messages: (messagesByChatId[chat.id] || []).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         }));
 
+        console.log('Final chats with messages:', chatsWithMessages);
         resolve(chatsWithMessages);
       })
       .catch(reject);
@@ -342,10 +364,16 @@ class IndexedDBStorage {
       try {
         const chats = JSON.parse(chatHistory);
         for (const chat of chats) {
+          // Ensure all messages have proper IDs for IndexedDB
+          const messagesWithIds = (chat.messages || []).map((message: Message) => ({
+            ...message,
+            id: message.id || `${chat.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          }));
+
           await this.saveChat({
             id: chat.id || `chat_${Date.now()}_${Math.random()}`,
             title: chat.title || 'Untitled Chat',
-            messages: chat.messages || [],
+            messages: messagesWithIds,
             createdAt: chat.createdAt || new Date().toISOString(),
             lastModelUsed: chat.lastModelUsed || '',
             branchedFrom: chat.branchedFrom || null
@@ -363,6 +391,8 @@ class IndexedDBStorage {
     return new Promise((resolve, reject) => {
       if (!this.db) return reject(new Error('Database not initialized'));
 
+      console.log('Clearing all IndexedDB data...');
+
       const transaction = this.db.transaction(
         [this.dbConfig.stores.config.name, this.dbConfig.stores.chats.name, this.dbConfig.stores.messages.name],
         'readwrite'
@@ -375,23 +405,35 @@ class IndexedDBStorage {
       const clearPromises = [
         new Promise<void>((res, rej) => {
           const request = configStore.clear();
-          request.onsuccess = () => res();
+          request.onsuccess = () => {
+            console.log('Config store cleared');
+            res();
+          };
           request.onerror = () => rej(request.error);
         }),
         new Promise<void>((res, rej) => {
           const request = chatsStore.clear();
-          request.onsuccess = () => res();
+          request.onsuccess = () => {
+            console.log('Chats store cleared');
+            res();
+          };
           request.onerror = () => rej(request.error);
         }),
         new Promise<void>((res, rej) => {
           const request = messagesStore.clear();
-          request.onsuccess = () => res();
+          request.onsuccess = () => {
+            console.log('Messages store cleared');
+            res();
+          };
           request.onerror = () => rej(request.error);
         })
       ];
 
       Promise.all(clearPromises)
-        .then(() => resolve())
+        .then(() => {
+          console.log('All IndexedDB data cleared successfully');
+          resolve();
+        })
         .catch(reject);
     });
   }

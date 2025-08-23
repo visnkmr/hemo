@@ -26,6 +26,10 @@ export default function ChatHistory({
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState("")
 
+  // Debug logging
+  console.log('ChatHistory - received chats:', chats);
+  console.log('ChatHistory - chats.length:', chats.length);
+
   if (chats.length === 0) {
     return <div className="p-4 text-center text-gray-500 dark:text-gray-400">No chat history</div>
   }

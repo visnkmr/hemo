@@ -138,7 +138,10 @@ export function useChats() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Loading chats from IndexedDB...');
       const allChats = await idb.getAllChats();
+      console.log('Loaded chats:', allChats);
+      console.log('Number of chats loaded:', allChats.length);
       setChats(allChats);
     } catch (err) {
       setError(err as Error);

@@ -131,6 +131,13 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
    // Use IndexedDB hooks
    const { value: ollamastateValue, setValue: setollamastate } = useConfigItem<number>("laststate", whichgpt)
    const { chats, loading: chatsLoading, error: chatsError, saveChat, deleteChat: deleteChatFromDB, reloadChats } = useChats()
+
+   // Debug logging for chat data
+   useEffect(() => {
+     console.log('ChatUI - chats state:', chats);
+     console.log('ChatUI - chatsLoading:', chatsLoading);
+     console.log('ChatUI - chatsError:', chatsError);
+   }, [chats, chatsLoading, chatsError]);
    const { migrateFromLocalStorage, migrating, migrationComplete, migrationStats, error: migrationError } = useMigration()
  
    // Ensure ollamastate is always a number
