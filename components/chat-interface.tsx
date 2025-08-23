@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, Edit } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -27,20 +27,63 @@ export let setcolorpertheme = "bg-white dark:bg-gray-800"
 
 // Enhanced MessageItem with expand/collapse functionality
 interface ExpandableMessageItemProps {
-  message: Message
-  isStreaming?: boolean
-  onCopy: () => void
-  onBranch: () => void
-  setdsm: any
-  setmts: any
-  isExpanded: boolean
-  onToggleExpand: () => void
-}
+    message: Message
+    isStreaming?: boolean
+    onCopy: () => void
+    onBranch: () => void
+    setdsm: any
+    setmts: any
+    isExpanded: boolean
+    onToggleExpand: () => void
+    onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
+    // Props for EditDialog
+    ollamastate: number
+    selectedModel: string
+    selectedModelInfo: any
+    allModels: any[]
+    handleSelectModel: (modelId: string) => void
+    isLoadingModels: boolean
+    vendor: string
+    setollamastate: any
+    getModelColor: any
+    getModelDisplayName: any
+    answerfromfile: boolean
+    setanswerfromfile: any
+    sendwithhistory: boolean
+    setsendwithhistory: any
+    fullfileascontext: boolean
+    setfullfileascontext: any
+    morethanonefile: boolean
+    searchcurrent: boolean
+    setsearchcurrent: any
+    contextUsage: number
+    setcolorpertheme: string
+  }
 
-function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts, isExpanded, onToggleExpand }: ExpandableMessageItemProps) {
-  const isUser = message.role === "user"
-  const [showCursor, setShowCursor] = useState(true)
-  const [isHovered, setIsHovered] = useState(false)
+function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts, isExpanded, onToggleExpand, onEdit, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: ExpandableMessageItemProps) {
+    const isUser = message.role === "user"
+    const [showCursor, setShowCursor] = useState(true)
+    const [isHovered, setIsHovered] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editContent, setEditContent] = useState(message.content)
+    const [editOllamaState, setEditOllamaState] = useState(ollamastate)
+    const [editSelectedModel, setEditSelectedModel] = useState(selectedModel)
+    const [isLoading, setIsLoading] = useState(false)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    // Handle keyboard shortcuts for editing
+    const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault()
+        if (editContent.trim() && !isLoading) {
+          const saveButton = document.querySelector(`[data-message-id="${message.id}"] .edit-save-btn`) as HTMLButtonElement
+          if (saveButton) saveButton.click()
+        }
+      }
+      if (e.key === "Escape") {
+        setIsEditing(false)
+      }
+    }
 
   // Blinking cursor effect for streaming messages
   useEffect(() => {
@@ -70,62 +113,194 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
       <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85vw] w-full")}>
-        <div
-          className={cn(
-            "gap-3 p-4 rounded-lg relative overflow-hidden w-full",
-            isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
-          )}
-        >
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {/* Expand/Collapse button for user messages */}
-              {shouldShowExpandButton && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 flex-shrink-0"
-                  onClick={onToggleExpand}
-                >
-                  {isExpanded ? (
-                    <ChevronDownIcon size={14} />
-                  ) : (
-                    <ChevronRightIconCollapse size={14} />
-                  )}
-                </Button>
-              )}
+        {/* Message Content OR Edit Form - Never both */}
+        {isEditing ? (
+          /* Edit Form - Completely replaces message bubble */
+          <div
+            className={cn(
+              "gap-3 p-4 rounded-lg relative overflow-hidden w-full border-2 border-blue-300 dark:border-blue-600",
+              isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
+            )}
+          >
+            <div className="space-y-3 w-full">
+              {/* Model Selection */}
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Bot size={14} className="mr-1" />
+                      {editOllamaState === 0 ? "Openrouter" :
+                       editOllamaState === 1 ? "Ollama" :
+                       editOllamaState === 2 ? "LM Studio" :
+                       editOllamaState === 4 ? "Groq" : "Openrouter"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setEditOllamaState(0)}>
+                      Openrouter
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditOllamaState(1)}>
+                      Ollama
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditOllamaState(2)}>
+                      LM Studio
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setEditOllamaState(4)}>
+                      Groq
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              <span className="font-medium">
-                {message.model && !isUser && (
-                  <span className="text-xs ml-2 opacity-70">({getModelDisplayName(message.model)})</span>
+                {editOllamaState === 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="max-w-[200px]">
+                        <span className="truncate">{editSelectedModel || "Select Model"}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="max-w-[300px]">
+                      {allModels.map((model) => (
+                        <DropdownMenuItem
+                          key={model.id}
+                          onClick={() => setEditSelectedModel(model.id)}
+                          className="text-sm"
+                        >
+                          {model.id}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
-              </span>
-            </div>
-
-            <div className="prose dark:prose-invert prose-sm break-words w-full overflow-hidden">
-              {message.imageUrl && (
-                <div className="mt-2">
-                  <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
-                </div>
-              )}
-              <div className="overflow-x-auto break-words hyphens-auto">
-                <Markdown>
-                  {shouldShowExpandButton && !isExpanded
-                    ? truncateText(message.content)
-                    : message.content
-                  }
-                </Markdown>
               </div>
-              <span className={`animate-pulse ${isStreaming ? (showCursor ? "" : "invisible") : "hidden"}`}>▌</span>
+
+              {/* Edit Textarea */}
+              <div className="space-y-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  placeholder="Edit your message... (Enter to save, Esc to cancel)"
+                  className="min-h-[80px] dark:bg-gray-900 border bg-gray-50 w-full"
+                  disabled={isLoading}
+                />
+                <Progress value={contextUsage} className="h-1" />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditing(false)}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="edit-save-btn"
+                  data-message-id={message.id}
+                  onClick={async () => {
+                    if (editContent.trim()) {
+                      setIsLoading(true)
+                      try {
+                        if (onEdit) {
+                          await onEdit(message.id, editContent.trim(), editOllamaState, editSelectedModel)
+                        }
+                        setIsEditing(false)
+                      } catch (error) {
+                        console.error('Edit error:', error)
+                      } finally {
+                        setIsLoading(false)
+                      }
+                    }
+                  }}
+                  disabled={isLoading || !editContent.trim()}
+                >
+                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <SendIcon className="h-3 w-3 mr-1" />}
+                  Save & Send
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Normal Message Content */
+          <div
+            className={cn(
+              "gap-3 p-4 rounded-lg relative overflow-hidden w-full",
+              isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
+            )}
+          >
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {/* Expand/Collapse button for user messages */}
+                {shouldShowExpandButton && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 flex-shrink-0"
+                    onClick={onToggleExpand}
+                  >
+                    {isExpanded ? (
+                      <ChevronDownIcon size={14} />
+                    ) : (
+                      <ChevronRightIconCollapse size={14} />
+                    )}
+                  </Button>
+                )}
 
-        {!isStreaming && (
+                <span className="font-medium">
+                  {message.model && !isUser && (
+                    <span className="text-xs ml-2 opacity-70">({getModelDisplayName(message.model)})</span>
+                  )}
+                </span>
+              </div>
+
+              <div className="prose dark:prose-invert prose-sm break-words w-full overflow-hidden">
+                {message.imageUrl && (
+                  <div className="mt-2">
+                    <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
+                  </div>
+                )}
+                <div className="overflow-x-auto break-words hyphens-auto">
+                  <Markdown>
+                    {shouldShowExpandButton && !isExpanded
+                      ? truncateText(message.content)
+                      : message.content
+                    }
+                  </Markdown>
+                </div>
+                <span className={`animate-pulse ${isStreaming ? (showCursor ? "" : "invisible") : "hidden"}`}>▌</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons - Only show when not editing and not streaming */}
+        {!isEditing && !isStreaming && (
           <div className={cn("flex gap-1 mt-2", isHovered ? "visible" : "invisible")}>
             {isUser && (
-              <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <>
+                <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => {
+                  setIsEditing(true)
+                  setEditContent(message.content)
+                  setEditOllamaState(ollamastate)
+                  setEditSelectedModel(selectedModel)
+                  // Focus textarea after state update
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.focus()
+                      textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length)
+                    }
+                  }, 100)
+                }} title="Edit message">
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </>
             )}
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
@@ -140,30 +315,280 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
   )
 }
 
+// Edit Dialog Component
+interface EditDialogProps {
+   isOpen: boolean
+   onClose: () => void
+   message: Message
+   onSave: (messageId: string, newContent: string) => void
+   ollamastate: number
+   selectedModel: string
+   selectedModelInfo: any
+   allModels: any[]
+   handleSelectModel: (modelId: string) => void
+   isLoadingModels: boolean
+   vendor: string
+   setollamastate: any
+   getModelColor: any
+   getModelDisplayName: any
+   answerfromfile: boolean
+   setanswerfromfile: any
+   sendwithhistory: boolean
+   setsendwithhistory: any
+   fullfileascontext: boolean
+   setfullfileascontext: any
+   morethanonefile: boolean
+   searchcurrent: boolean
+   setsearchcurrent: any
+   contextUsage: number
+   setcolorpertheme: string
+}
+
+function EditDialog({
+   isOpen,
+   onClose,
+   message,
+   onSave,
+   ollamastate,
+   selectedModel,
+   selectedModelInfo,
+   allModels,
+   handleSelectModel,
+   isLoadingModels,
+   vendor,
+   setollamastate,
+   getModelColor,
+   getModelDisplayName,
+   answerfromfile,
+   setanswerfromfile,
+   sendwithhistory,
+   setsendwithhistory,
+   fullfileascontext,
+   setfullfileascontext,
+   morethanonefile,
+   searchcurrent,
+   setsearchcurrent,
+   contextUsage,
+   setcolorpertheme
+}: EditDialogProps) {
+   const [editContent, setEditContent] = useState(message.content)
+   const [isLoading, setIsLoading] = useState(false)
+   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+   useEffect(() => {
+     if (isOpen && textareaRef.current) {
+       textareaRef.current.focus()
+       textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length)
+     }
+   }, [isOpen])
+
+   const handleSave = () => {
+     if (editContent.trim()) {
+       onSave(message.id, editContent.trim())
+       onClose()
+     }
+   }
+
+   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+     if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+       e.preventDefault()
+       handleSave()
+     }
+     if (e.key === "Escape") {
+       onClose()
+     }
+   }
+
+   if (!isOpen) return null
+
+   return (
+     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+         <div className="p-6">
+           <h2 className="text-lg font-semibold mb-4 dark:text-white">Edit Message</h2>
+
+           {/* Original Message Display */}
+           <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Original message:</div>
+             <div className="text-gray-700 dark:text-gray-300">{message.content}</div>
+           </div>
+
+           {/* Edit Input */}
+           <div className="mb-4">
+             <Textarea
+               ref={textareaRef}
+               value={editContent}
+               onChange={(e) => setEditContent(e.target.value)}
+               onKeyDown={handleKeyDown}
+               placeholder="Edit your message... (Enter to save, Esc to cancel)"
+               className="min-h-[120px] dark:bg-gray-900 border bg-gray-50"
+               disabled={isLoading}
+             />
+             <Progress value={contextUsage} className="h-1 mt-2" />
+           </div>
+
+           {/* Options Row - Mimic the query box */}
+           <div className="mb-4 flex flex-row gap-4 w-full flex-wrap">
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="outline">
+                   <Bot size={16} className="mr-2" />
+                   {vendor}
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent>
+                 <DropdownMenuItem onClick={() => setollamastate(0)}>
+                   Openrouter
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setollamastate(1)}>
+                   Ollama
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setollamastate(2)}>
+                   LM Studio
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setollamastate(4)}>
+                   Groq
+                 </DropdownMenuItem>
+               </DropdownMenuContent>
+             </DropdownMenu>
+
+             {ollamastate === 0 && (
+               <ModelSelectionDialog
+                 models={allModels}
+                 selectedModel={selectedModel}
+                 onSelectModel={handleSelectModel}
+                 isLoading={isLoadingModels}
+               />
+             )}
+
+             {answerfromfile && (
+               <HoverCard>
+                 <HoverCardTrigger>
+                   <Button
+                     variant="outline"
+                     size="icon"
+                     onClick={() => setfullfileascontext(!fullfileascontext)}
+                   >
+                     {fullfileascontext ? (<FileCheck className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
+                   </Button>
+                 </HoverCardTrigger>
+                 <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                   {fullfileascontext ? "Full file contents will be passed as context" : "Embeddings will be passed as context"}
+                 </HoverCardContent>
+               </HoverCard>
+             )}
+
+             <HoverCard>
+               <HoverCardTrigger>
+                 <Button
+                   variant="outline"
+                   size="icon"
+                   onClick={() => setsendwithhistory(!sendwithhistory)}
+                 >
+                   {sendwithhistory ? (<FileClock className="h-4 w-4" />) : (<BookX className="h-4 w-4" />)}
+                 </Button>
+               </HoverCardTrigger>
+               <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                 {sendwithhistory ? "Full chat history will be passed as context" : "Ignore chat history"}
+               </HoverCardContent>
+             </HoverCard>
+
+             {morethanonefile && (
+               <HoverCard>
+                 <HoverCardTrigger>
+                   <Button
+                     variant="outline"
+                     size="icon"
+                     onClick={() => setsearchcurrent(!searchcurrent)}
+                   >
+                     {searchcurrent ? (<File className="h-4 w-4" />) : (<FileStack className="h-4 w-4" />)}
+                   </Button>
+                 </HoverCardTrigger>
+                 <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                   {searchcurrent ? "Search current file" : "Search all the files"}
+                 </HoverCardContent>
+               </HoverCard>
+             )}
+
+             <HoverCard>
+               <HoverCardTrigger>
+                 <Button
+                   variant="outline"
+                   size="icon"
+                   onClick={() => setanswerfromfile(!answerfromfile)}
+                 >
+                   {answerfromfile ? (<FilePlus className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
+                 </Button>
+               </HoverCardTrigger>
+               <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                 {answerfromfile ? "answer from file" : "Answer without context"}
+               </HoverCardContent>
+             </HoverCard>
+           </div>
+
+           {/* Action Buttons */}
+           <div className="flex justify-end gap-2">
+             <Button variant="outline" onClick={onClose}>
+               Cancel
+             </Button>
+             <Button onClick={handleSave} disabled={isLoading || !editContent.trim()}>
+               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
+               Save & Send
+             </Button>
+           </div>
+         </div>
+       </div>
+     </div>
+   )
+}
+
 // Helper function to get a display name from model ID
 function getModelDisplayName(modelId: string): string {
-  // Extract the model name from the provider/model format
-  const parts = modelId.split("/")
-  return parts.length > 1 ? parts[1] : modelId
-}
+   // Extract the model name from the provider/model format
+   const parts = modelId.split("/")
+   return parts.length > 1 ? parts[1] : modelId
+ }
 
 // Question Group Component for Grok-style scrollable answers
 interface QuestionGroupProps {
-  question: Message
-  answers: Message[]
-  onCopy: (content: string) => void
-  onBranch: (messageId: string) => void
-  setdsm: any
-  setmts: any
-  isStreaming?: boolean
-  streamingMessageId?: string | null
-  isQuestionExpanded: boolean
-  onToggleQuestionExpand: () => void
-  currentAnswerIndex: number
-  onAnswerIndexChange: (index: number) => void
-}
+   question: Message
+   answers: Message[]
+   onCopy: (content: string) => void
+   onBranch: (messageId: string) => void
+   setdsm: any
+   setmts: any
+   isStreaming?: boolean
+   streamingMessageId?: string | null
+   isQuestionExpanded: boolean
+   onToggleQuestionExpand: () => void
+   currentAnswerIndex: number
+   onAnswerIndexChange: (index: number) => void
+   onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
+   // Props for EditDialog
+   ollamastate: number
+   selectedModel: string
+   selectedModelInfo: any
+   allModels: any[]
+   handleSelectModel: (modelId: string) => void
+   isLoadingModels: boolean
+   vendor: string
+   setollamastate: any
+   getModelColor: any
+   getModelDisplayName: any
+   answerfromfile: boolean
+   setanswerfromfile: any
+   sendwithhistory: boolean
+   setsendwithhistory: any
+   fullfileascontext: boolean
+   setfullfileascontext: any
+   morethanonefile: boolean
+   searchcurrent: boolean
+   setsearchcurrent: any
+   contextUsage: number
+   setcolorpertheme: string
+ }
 
-function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
+function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange, onEdit, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: QuestionGroupProps) {
   const handlePrevious = () => {
     const newIndex = Math.max(0, currentAnswerIndex - 1)
     onAnswerIndexChange(newIndex)
@@ -201,6 +626,28 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
         setmts={setmts}
         isExpanded={isQuestionExpanded}
         onToggleExpand={onToggleQuestionExpand}
+        onEdit={onEdit}
+        ollamastate={ollamastate}
+        selectedModel={selectedModel}
+        selectedModelInfo={selectedModelInfo}
+        allModels={allModels}
+        handleSelectModel={handleSelectModel}
+        isLoadingModels={isLoadingModels}
+        vendor={vendor}
+        setollamastate={setollamastate}
+        getModelColor={getModelColor}
+        getModelDisplayName={getModelDisplayName}
+        answerfromfile={answerfromfile}
+        setanswerfromfile={setanswerfromfile}
+        sendwithhistory={sendwithhistory}
+        setsendwithhistory={setsendwithhistory}
+        fullfileascontext={fullfileascontext}
+        setfullfileascontext={setfullfileascontext}
+        morethanonefile={morethanonefile}
+        searchcurrent={searchcurrent}
+        setsearchcurrent={setsearchcurrent}
+        contextUsage={contextUsage}
+        setcolorpertheme={setcolorpertheme}
       />
 
       {/* Answer Group with Navigation */}
@@ -909,6 +1356,136 @@ export default function ChatInterface({
     }
   };
 
+  const handleEditMessage = async (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => {
+    if (!newContent.trim()) return;
+
+    // Use provided edit state or fall back to global state
+    const currentOllamaState = editOllamaState ?? ollamastate;
+    const currentSelectedModel = editSelectedModel ?? selectedModel;
+
+    // Find the message to edit
+    const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId);
+    if (messageIndex === -1) return;
+
+    const originalMessage = chat.messages[messageIndex];
+    if (originalMessage.role !== 'user') return;
+
+    // Find the next assistant message (the response to edit)
+    const assistantMessageIndex = messageIndex + 1;
+    const hasAssistantResponse = assistantMessageIndex < chat.messages.length &&
+                                chat.messages[assistantMessageIndex].role === 'assistant';
+
+    // Create updated messages array
+    const updatedMessages = [...chat.messages];
+
+    // Update the user message
+    updatedMessages[messageIndex] = {
+      ...originalMessage,
+      content: newContent.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    // Remove the old assistant response if it exists
+    if (hasAssistantResponse) {
+      updatedMessages.splice(assistantMessageIndex, 1);
+    }
+
+    // Update the chat state
+    let updatedChat = {
+      ...chat,
+      messages: updatedMessages,
+      lastModelUsed: currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name,
+    };
+
+    updateChat(updatedChat);
+
+    // Create a new assistant message for the response
+    const newAssistantMessageId = (Date.now() + 1).toString();
+    const newAssistantMessage: Message = {
+      id: newAssistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+      model: currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name,
+    };
+
+    // Add the new assistant message
+    updatedChat = {
+      ...updatedChat,
+      messages: [...updatedMessages, newAssistantMessage],
+    };
+
+    updateChat(updatedChat);
+    setStreamingMessageId(newAssistantMessageId);
+
+    // Scroll to bottom if we were already at the bottom when starting to stream
+    if (isAtBottom) {
+      setTimeout(scrolltobottom, 100);
+    }
+
+    // Call the API with the edited message
+    try {
+      let apiUrl = "";
+      if (currentOllamaState === 0) {
+        apiUrl = "https://openrouter.ai/api";
+      } else if (currentOllamaState === 4) {
+        apiUrl = "https://api.groq.com/openai";
+      } else if (currentOllamaState === 1 || currentOllamaState === 2) {
+        apiUrl = lmstudio_url;
+      }
+
+      const modelToSend = currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name;
+      const messagesToSend = updatedMessages.slice(0, -1).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      let accumulatedContent = "";
+      let context = "";
+
+      for await (const contentChunk of sendMessageStream({
+        url: apiUrl,
+        notollama: currentOllamaState,
+        model: modelToSend,
+        messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
+        lmstudio_url: lmstudio_url,
+        context: answerfromfile ? context : ""
+      })) {
+        accumulatedContent += contentChunk;
+
+        // Update the last message (assistant's) with new content
+        const currentMessages = [...updatedChat.messages];
+        currentMessages[currentMessages.length - 1] = {
+          ...currentMessages[currentMessages.length - 1],
+          content: accumulatedContent,
+        };
+
+        updatedChat = {
+          ...updatedChat,
+          messages: currentMessages,
+        };
+        updateChat(updatedChat);
+      }
+    } catch (err) {
+      console.error("Error sending edited message:", err);
+      const errMsg = err instanceof Error ? err.message : "An error occurred";
+
+      // Replace the assistant placeholder with an error message
+      const currentMessages = [...updatedChat.messages];
+      currentMessages[currentMessages.length - 1] = {
+        ...currentMessages[currentMessages.length - 1],
+        content: `Error: ${errMsg}`,
+      };
+
+      updateChat({
+        ...updatedChat,
+        messages: currentMessages,
+      });
+    } finally {
+      setStreamingMessageId(null);
+    }
+  };
+
   const generateImage = async (prompt: string) => {
     setIsLoading(true);
     setError(null);
@@ -1291,6 +1868,28 @@ export default function ChatInterface({
                         setdsm={setdsm}
                         isExpanded={expandedMessages.has(group.message.id)}
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
+                        onEdit={handleEditMessage}
+                        ollamastate={ollamastate}
+                        selectedModel={selectedModel}
+                        selectedModelInfo={selectedModelInfo}
+                        allModels={allModels}
+                        handleSelectModel={handleSelectModel}
+                        isLoadingModels={isLoadingModels}
+                        vendor={vendor}
+                        setollamastate={setollamastate}
+                        getModelColor={getModelColor}
+                        getModelDisplayName={getModelDisplayName}
+                        answerfromfile={answerfromfile}
+                        setanswerfromfile={setanswerfromfile}
+                        sendwithhistory={sendwithhistory}
+                        setsendwithhistory={setsendwithhistory}
+                        fullfileascontext={fullfileascontext}
+                        setfullfileascontext={setfullfileascontext}
+                        morethanonefile={morethanonefile}
+                        searchcurrent={searchcurrent}
+                        setsearchcurrent={setsearchcurrent}
+                        contextUsage={contextUsage}
+                        setcolorpertheme={setcolorpertheme}
                       />
                     ) : (
                       <MessageItem
@@ -1320,6 +1919,28 @@ export default function ChatInterface({
                           onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
                           currentAnswerIndex={currentIndex}
                           onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
+                          onEdit={handleEditMessage}
+                          ollamastate={ollamastate}
+                          selectedModel={selectedModel}
+                          selectedModelInfo={selectedModelInfo}
+                          allModels={allModels}
+                          handleSelectModel={handleSelectModel}
+                          isLoadingModels={isLoadingModels}
+                          vendor={vendor}
+                          setollamastate={setollamastate}
+                          getModelColor={getModelColor}
+                          getModelDisplayName={getModelDisplayName}
+                          answerfromfile={answerfromfile}
+                          setanswerfromfile={setanswerfromfile}
+                          sendwithhistory={sendwithhistory}
+                          setsendwithhistory={setsendwithhistory}
+                          fullfileascontext={fullfileascontext}
+                          setfullfileascontext={setfullfileascontext}
+                          morethanonefile={morethanonefile}
+                          searchcurrent={searchcurrent}
+                          setsearchcurrent={setsearchcurrent}
+                          contextUsage={contextUsage}
+                          setcolorpertheme={setcolorpertheme}
                         />
                       );
                     })()
