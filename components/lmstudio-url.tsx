@@ -5,6 +5,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Button } from "../components/ui/button"
 import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
+import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface LMUrlInputProps {
   lmurl: string
@@ -14,14 +15,25 @@ interface LMUrlInputProps {
 
 export default function LMStudioURL({ lmurl, setlmurl, ollamastate }: LMUrlInputProps) {
   // const [showKey, setShowKey] = useState(false)
-  const [inputValue, setInputValue] = useState(lmurl)
-  useEffect(()=>{
-    setInputValue(lmurl)
-  },[lmurl])
 
-  const handleSave = () => {
-    setlmurl(inputValue)
-    localStorage.setItem("lmstudio_url", inputValue)
+  // Use IndexedDB hook instead of localStorage
+  const { value: storedUrl, setValue: saveUrl, loading, error } = useConfigItem<string>("lmstudio_url", "")
+
+  const [inputValue, setInputValue] = useState(storedUrl || lmurl)
+
+  // Update input value when storedUrl or lmurl changes
+  useEffect(() => {
+    const valueToUse = storedUrl || lmurl
+    setInputValue(valueToUse)
+  }, [storedUrl, lmurl])
+
+  const handleSave = async () => {
+    try {
+      setlmurl(inputValue)
+      await saveUrl(inputValue)
+    } catch (err) {
+      console.error("Failed to save URL:", err)
+    }
   }
 const [label,setlabel]=useState("")
   useEffect(()=>{

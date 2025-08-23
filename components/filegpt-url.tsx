@@ -5,6 +5,7 @@ import { Input } from "./ui/input"
 import { Label } from "./ui/label"
 import { Button } from "./ui/button"
 import { SaveIcon } from "lucide-react"
+import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface FileGPTUrlInputProps {
   filegpturl: string
@@ -12,15 +13,24 @@ interface FileGPTUrlInputProps {
 }
 
 export default function FileGPTUrl({ filegpturl, setFilegpturl }: FileGPTUrlInputProps) {
-  const [inputValue, setInputValue] = useState(filegpturl)
+  // Use IndexedDB hook instead of localStorage
+  const { value: storedUrl, setValue: saveUrl, loading, error } = useConfigItem<string>("filegpt_url", "")
 
+  const [inputValue, setInputValue] = useState(storedUrl || filegpturl)
+
+  // Update input value when storedUrl or filegpturl changes
   useEffect(() => {
-    setInputValue(filegpturl)
-  }, [filegpturl])
+    const valueToUse = storedUrl || filegpturl
+    setInputValue(valueToUse)
+  }, [storedUrl, filegpturl])
 
-  const handleSave = () => {
-    setFilegpturl(inputValue)
-    localStorage.setItem("filegpt_url", inputValue)
+  const handleSave = async () => {
+    try {
+      setFilegpturl(inputValue)
+      await saveUrl(inputValue)
+    } catch (err) {
+      console.error("Failed to save FileGPT URL:", err)
+    }
   }
 
   return (

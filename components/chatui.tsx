@@ -16,6 +16,7 @@ import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
+import { useChats, useConfigItem, useMigration, idb } from "../hooks/use-indexeddb"
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -117,20 +118,26 @@ interface gptargs {
 //   });
 // }
 export default function ChatUI({ message, fgptendpoint = "localhost", setasollama = false, whichgpt = 0 }: gptargs) {
-  // const [apiKey, setApiKey] = useState<string>("")
-  const [lmurl, setlmurl] = useState<string>("")
-  const [model_name, set_model_name] = useState<string>("")
-  const [filegpturl, setFilegpturl] = useState<string>("")
-  const [selectedModel, setSelectedModel] = useState<string>("")
-  const [selectedModelInfo, setSelectedModelInfo] = useState<any>("")
-  const [chats, setChats] = useState<Chat[]>([])
-  const [currentChatId, setCurrentChatId] = useState<string>("")
-  const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [ollamastate, setollamastate] = useState(whichgpt)
+   // const [apiKey, setApiKey] = useState<string>("")
+   const [lmurl, setlmurl] = useState<string>("")
+   const [model_name, set_model_name] = useState<string>("")
+   const [filegpturl, setFilegpturl] = useState<string>("")
+   const [selectedModel, setSelectedModel] = useState<string>("")
+   const [selectedModelInfo, setSelectedModelInfo] = useState<any>("")
+   const [currentChatId, setCurrentChatId] = useState<string>("")
+   const [sidebarVisible, setSidebarVisible] = useState(true)
 
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
-  const [allModels, setAllModels] = useState<any[]>([])
-  const [isLoadingModels, setIsLoadingModels] = useState(false)
+   // Use IndexedDB hooks
+   const { value: ollamastateValue, setValue: setollamastate } = useConfigItem<number>("laststate", whichgpt)
+   const { chats, loading: chatsLoading, error: chatsError, saveChat, deleteChat: deleteChatFromDB, reloadChats } = useChats()
+   const { migrateFromLocalStorage, migrating } = useMigration()
+ 
+   // Ensure ollamastate is always a number
+   const ollamastate = ollamastateValue ?? whichgpt
+
+   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+   const [allModels, setAllModels] = useState<any[]>([])
+   const [isLoadingModels, setIsLoadingModels] = useState(false)
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
   const isMobile = useIsMobile();
@@ -147,79 +154,71 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   //     fileloader(filegpturl,filePaths as string[])
   //   }},[filePaths])
-  // Load API key and chats from localStorage on initial render
+  // Load configuration from IndexedDB on initial render
   useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const [storedlmurl, storedFilegpturl, selmodel, selmodelinfo] = await Promise.all([
+          idb.get("lmstudio_url"),
+          idb.get("filegpt_url"),
+          idb.get("or_model"),
+          idb.get("or_model_info")
+        ])
 
-    const storedlmurl = localStorage.getItem("lmstudio_url")
-    if (storedlmurl) {
-      setlmurl(storedlmurl)
+        if (storedlmurl) {
+          setlmurl(storedlmurl)
+        }
+
+        if (storedFilegpturl) {
+          setFilegpturl(storedFilegpturl)
+        }
+
+        if (selmodel) {
+          setSelectedModel(selmodel)
+        }
+
+        if (selmodelinfo) {
+          setSelectedModelInfo(selmodelinfo)
+        }
+
+        console.log("checking here for ollamastate val")
+      } catch (error) {
+        console.error("Error loading config:", error)
+      }
     }
 
-    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : "lmstudio_model_name")
-    if (storedlmurl && stored_lm_model_name) {
-      set_model_name(stored_lm_model_name)
-      setSelectedModel(model_name)
-    }
-
-    const storedFilegpturl = localStorage.getItem("filegpt_url")
-    if (storedFilegpturl) {
-      setFilegpturl(storedFilegpturl)
-    }
-    console.log("checking here for ollamastate val")
-    {
-      // const storedApiKey = localStorage.getItem(ollamastate==4?"groq_api_key":"openrouter_api_key")
-      // if (storedApiKey) {
-      //   setApiKey(storedApiKey)
-      // }
-      const selmodel = localStorage.getItem("or_model")
-      const selmodelinfo = localStorage.getItem("or_model_info")
-      if (selmodel)
-        setSelectedModel(selmodel)
-      setSelectedModelInfo(selmodelinfo)
-    }
-
-    // localStorage.setItem("laststate",ollamastate.toString())
-  }, []);
+    loadConfig()
+  }, [])
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
   // console.log(model_name)
 
-  //Chat history loader
+  //Chat history loader and migration
   useEffect(() => {
     console.log("checking here for ollamastate val 1")
-    const lastState = localStorage.getItem("laststate");
-    setollamastate(lastState ? parseInt(lastState, 10) : 0);
 
-
-
-
-    const storedChats = localStorage.getItem("chat_history")
-    if (storedChats) {
+    // Run migration from localStorage to IndexedDB on first load
+    const runMigration = async () => {
       try {
-        const parsedChats = JSON.parse(storedChats)
-        setChats(parsedChats)
-
-        // Set current chat to the most recent one if it exists
-        if (parsedChats.length > 0) {
-          setCurrentChatId(parsedChats[0].id)
-        } else {
-          createNewChat()
-        }
+        await migrateFromLocalStorage()
+        console.log("Migration from localStorage to IndexedDB completed")
       } catch (error) {
-        console.error("Failed to parse stored chats:", error)
-        createNewChat()
+        console.error("Migration failed:", error)
       }
-    } else {
+    }
+
+    runMigration()
+  }, [migrateFromLocalStorage])
+
+  // Set initial chat when chats are loaded
+  useEffect(() => {
+    if (!chatsLoading && chats.length > 0 && !currentChatId) {
+      setCurrentChatId(chats[0].id)
+    } else if (!chatsLoading && chats.length === 0) {
       createNewChat()
     }
-  }, [])
+  }, [chats, chatsLoading, currentChatId])
 
-  // Save chats to localStorage whenever they change
-  useEffect(() => {
-    if (chats.length > 0) {
-      localStorage.setItem("chat_history", JSON.stringify(chats))
-    }
-  }, [chats])
 
   // Fetch models when API key is set
   useEffect(() => {
@@ -269,7 +268,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     fetchModels()
   }, [ollamastate])
 
-  const createNewChat = (chattitle = "New Chat") => {
+  const createNewChat = async (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
     const newChat: Chat = {
       id: newChatId,
@@ -280,36 +279,51 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       branchedFrom: null,
     }
 
-    setChats((prevChats) => [newChat, ...prevChats])
-    setCurrentChatId(newChatId)
-  }
-
-  const updateChat = (updatedChat: Chat) => {
-    setChats((prevChats) => prevChats.map((chat) => (chat.id === updatedChat.id ? updatedChat : chat)))
-  }
-  const renameChat = (id: string, newTitle: string) => {
-    setChats(chats.map((chat) => (chat.id === id ? { ...chat, title: newTitle } : chat)))
-  }
-  const deleteChat = (chatId: string) => {
-    setChats((prevChats) => prevChats.filter((chat) => chat.id !== chatId))
-
-    if (currentChatId === chatId) {
-      if (chats.length > 1) {
-        // Set current chat to the next available one
-        const nextChat = chats.find((chat) => chat.id !== chatId)
-        if (nextChat) {
-          setCurrentChatId(nextChat.id)
-        } else {
-          createNewChat()
-        }
-      } else {
-        createNewChat()
-      }
+    try {
+      await saveChat(newChat)
+      setCurrentChatId(newChatId)
+    } catch (error) {
+      console.error("Failed to create new chat:", error)
     }
   }
 
-  const handleBranchConversation = (branchPoint: BranchPoint) => {
-    const newChatId = Date.now().toString()
+  const updateChat = async (updatedChat: Chat) => {
+    try {
+      await saveChat(updatedChat)
+    } catch (error) {
+      console.error("Failed to update chat:", error)
+    }
+  }
+  const renameChat = async (id: string, newTitle: string) => {
+    const chatToUpdate = chats.find((chat) => chat.id === id)
+    if (chatToUpdate) {
+      const updatedChat = { ...chatToUpdate, title: newTitle }
+      try {
+        await saveChat(updatedChat)
+      } catch (error) {
+        console.error("Failed to rename chat:", error)
+      }
+    }
+  }
+  const deleteChat = async (chatId: string) => {
+    try {
+      await deleteChatFromDB(chatId)
+
+      if (currentChatId === chatId) {
+        const remainingChats = chats.filter((chat) => chat.id !== chatId)
+        if (remainingChats.length > 0) {
+          // Set current chat to the next available one
+          setCurrentChatId(remainingChats[0].id)
+        } else {
+          await createNewChat()
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete chat:", error)
+    }
+  }
+
+  const handleBranchConversation = async (branchPoint: BranchPoint) => {
     const originalChat = chats.find((chat) => chat.id === branchPoint.originalChatId)
 
     if (!originalChat) return
@@ -319,7 +333,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     const branchTitle = lastUserMessage ? `Branch: ${lastUserMessage.content.slice(0, 20)}...` : "New Branch"
 
     const newChat: Chat = {
-      id: newChatId,
+      id: Date.now().toString(),
       title: branchTitle,
       messages: branchPoint.messages,
       createdAt: new Date().toISOString(),
@@ -331,16 +345,25 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       },
     }
 
-    setChats((prevChats) => [newChat, ...prevChats])
-    setCurrentChatId(newChatId)
+    try {
+      await saveChat(newChat)
+      setCurrentChatId(newChat.id)
+    } catch (error) {
+      console.error("Failed to branch conversation:", error)
+    }
   }
 
-  const handleSelectModel = (modelId: string) => {
+  const handleSelectModel = async (modelId: string) => {
     setSelectedModel(modelId)
-    localStorage.setItem("or_model", modelId);
     const modelInfo = allModels.find((model: any) => model.id === modelId)
     setSelectedModelInfo(modelInfo || null)
-    localStorage.setItem("or_model_info", modelInfo || null);
+
+    try {
+      await idb.set("or_model", modelId)
+      await idb.set("or_model_info", modelInfo || null)
+    } catch (error) {
+      console.error("Failed to save model selection:", error)
+    }
   }
 
 

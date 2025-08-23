@@ -5,6 +5,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Button } from "../components/ui/button"
 import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
+import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface LMmodelnameProps {
   model_name: string
@@ -14,18 +15,26 @@ interface LMmodelnameProps {
 
 export default function LMStudioModelName({ model_name, set_model_name,ollamastate }: LMmodelnameProps) {
   // const [showKey, setShowKey] = useState(false)
-  const [inputValue, setInputValue] = useState(model_name)
-  useEffect(()=>{
-      setInputValue(model_name)
-    },[model_name])
-     useEffect(()=>{
-    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_model_name":"lmstudio_model_name")
-      if (storedApiKey) {
-        setInputValue(storedApiKey)
-      }},[ollamastate])
-  const handleSave = () => {
-    set_model_name(inputValue)
-    localStorage.setItem(ollamastate==4?"groq_model_name":"lmstudio_model_name", inputValue)
+  const keyName = ollamastate === 4 ? "groq_model_name" : "lmstudio_model_name"
+
+  // Use IndexedDB hook instead of localStorage
+  const { value: storedModelName, setValue: saveModelName, loading, error } = useConfigItem<string>(keyName, "")
+
+  const [inputValue, setInputValue] = useState(storedModelName || model_name)
+
+  // Update input value when storedModelName or model_name changes
+  useEffect(() => {
+    const valueToUse = storedModelName || model_name
+    setInputValue(valueToUse)
+  }, [storedModelName, model_name])
+
+  const handleSave = async () => {
+    try {
+      set_model_name(inputValue)
+      await saveModelName(inputValue)
+    } catch (err) {
+      console.error("Failed to save model name:", err)
+    }
   }
   const [label,setlabel]=useState("")
   useEffect(()=>{

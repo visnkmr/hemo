@@ -5,6 +5,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Button } from "../components/ui/button"
 import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
+import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface ApiKeyInputProps {
   // apiKey: string
@@ -14,18 +15,26 @@ interface ApiKeyInputProps {
 
 export default function ApiKeyInput({  ollamastate }: ApiKeyInputProps) {
   const [showKey, setShowKey] = useState(false)
-  const [inputValue, setInputValue] = useState("")
-  useEffect(()=>{
-    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_api_key":"openrouter_api_key")
-    console.log(storedApiKey)
-      if (storedApiKey) {
-        setInputValue(storedApiKey)
-        console.log("inputvalue--------------->"+inputValue)
-        // setInputValue(storedApiKey)
-      }},[ollamastate])
-  const handleSave = () => {
-    // setApiKey(inputValue)
-    localStorage.setItem(ollamastate==4?"groq_api_key":"openrouter_api_key", inputValue)
+  const keyName = ollamastate === 4 ? "groq_api_key" : "openrouter_api_key"
+
+  // Use IndexedDB hook instead of localStorage
+  const { value: storedApiKey, setValue: saveApiKey, loading, error } = useConfigItem<string>(keyName, "")
+
+  const [inputValue, setInputValue] = useState(storedApiKey || "")
+
+  // Update input value when storedApiKey changes
+  useEffect(() => {
+    if (storedApiKey) {
+      setInputValue(storedApiKey)
+    }
+  }, [storedApiKey])
+
+  const handleSave = async () => {
+    try {
+      await saveApiKey(inputValue)
+    } catch (err) {
+      console.error("Failed to save API key:", err)
+    }
   }
 
   return (
