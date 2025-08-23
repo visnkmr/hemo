@@ -11,7 +11,6 @@ import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
 import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, Edit, Quote, GitCompare, ArrowRight } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
-import MessageItem from "../components/message-item"
 import { Markdown } from "./markdown"
 import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
@@ -25,555 +24,23 @@ import MultiModelComparison from "./multi-model-comparison"
 import { Label } from "./ui/label"
 import { cn } from "../lib/utils"
 import { useConfigItem } from "../hooks/use-indexeddb"
+import ExpandableMessageItem from "./expandable-message-item"
+import EditDialog from "./edit-dialog"
+import QuestionGroup from "./question-group"
+import MessageItem from "../components/message-item"
+import { sendMessageStream } from "../lib/send-message-stream"
+import { handleEditMessage, handleBranchFromMessage, handleQuoteMessage } from "../lib/message-handlers"
+import ChatInputArea from "./chat-input-area"
+import QuotedMessages from "./quoted-messages"
+import ConfigurationDialog from "./configuration-dialog"
 // import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
 export let setcolorpertheme = "bg-white dark:bg-gray-800"
 
-// Enhanced MessageItem with expand/collapse functionality
-interface ExpandableMessageItemProps {
-    message: Message
-    isStreaming?: boolean
-    onCopy: () => void
-    onBranch: (branchType: 'full' | 'single' | 'model') => void
-    setdsm: any
-    setmts: any
-    isExpanded: boolean
-    onToggleExpand: () => void
-    onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
-    onQuoteMessage?: (message: Message) => void
-    isQuoted?: boolean
-    // Props for EditDialog
-    ollamastate: number
-    selectedModel: string
-    selectedModelInfo: any
-    allModels: any[]
-    handleSelectModel: (modelId: string) => void
-    isLoadingModels: boolean
-    vendor: string
-    setollamastate: any
-    getModelColor: any
-    getModelDisplayName: any
-    answerfromfile: boolean
-    setanswerfromfile: any
-    sendwithhistory: boolean
-    setsendwithhistory: any
-    fullfileascontext: boolean
-    setfullfileascontext: any
-    morethanonefile: boolean
-    searchcurrent: boolean
-    setsearchcurrent: any
-    contextUsage: number
-    setcolorpertheme: string
-  }
 
-function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts, isExpanded, onToggleExpand, onEdit, onQuoteMessage, isQuoted = false, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: ExpandableMessageItemProps) {
-    const isUser = message.role === "user"
-    const [showCursor, setShowCursor] = useState(true)
-    const [isHovered, setIsHovered] = useState(false)
-    const [isEditing, setIsEditing] = useState(false)
-    const [editContent, setEditContent] = useState(message.content)
-    const [editOllamaState, setEditOllamaState] = useState(ollamastate)
-    const [editSelectedModel, setEditSelectedModel] = useState(selectedModel)
-    const [isLoading, setIsLoading] = useState(false)
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
+// Import message handlers
+// import { handleSendMessage as sendMessageHandler, generateImage } from "../lib/chat-handlers"
 
-    // Handle keyboard shortcuts for editing
-    const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        e.preventDefault()
-        if (editContent.trim() && !isLoading) {
-          const saveButton = document.querySelector(`[data-message-id="${message.id}"] .edit-save-btn`) as HTMLButtonElement
-          if (saveButton) saveButton.click()
-        }
-      }
-      if (e.key === "Escape") {
-        setIsEditing(false)
-      }
-    }
-
-  // Blinking cursor effect for streaming messages
-  useEffect(() => {
-    if (!isStreaming) return
-
-    const interval = setInterval(() => {
-      setShowCursor((prev) => !prev)
-    }, 500)
-
-    return () => clearInterval(interval)
-  }, [isStreaming])
-
-  const Resend = () => {
-    setdsm(true)
-    setmts(message.content)
-  }
-
-  const truncateText = (text: string, maxLength: number = 100) => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + "..."
-  }
-
-  const shouldShowExpandButton = isUser && message.content.length > 100
-
-  return (
-    <div className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}>
-      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85vw] w-full")}>
-        {/* Message Content OR Edit Form - Never both */}
-        {isEditing ? (
-          /* Edit Form - Completely replaces message bubble */
-          <div
-            className={cn(
-              "gap-3 p-4 rounded-lg relative overflow-hidden w-full border-2 border-blue-300 dark:border-blue-600",
-              isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
-            )}
-          >
-            <div className="space-y-3 w-full">
-              {/* Model Selection */}
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Bot size={14} className="mr-1" />
-                      {editOllamaState === 0 ? "Openrouter" :
-                       editOllamaState === 1 ? "Ollama" :
-                       editOllamaState === 2 ? "LM Studio" :
-                       editOllamaState === 4 ? "Groq" : "Openrouter"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => setEditOllamaState(0)}>
-                      Openrouter
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditOllamaState(1)}>
-                      Ollama
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditOllamaState(2)}>
-                      LM Studio
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditOllamaState(4)}>
-                      Groq
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {editOllamaState === 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="max-w-[200px]">
-                        <span className="truncate">{editSelectedModel || "Select Model"}</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="max-w-[300px]">
-                      {allModels.map((model) => (
-                        <DropdownMenuItem
-                          key={model.id}
-                          onClick={() => setEditSelectedModel(model.id)}
-                          className="text-sm"
-                        >
-                          {model.id}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-
-              {/* Edit Textarea */}
-              <div className="space-y-2">
-                <Textarea
-                  ref={textareaRef}
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  onKeyDown={handleEditKeyDown}
-                  placeholder="Edit your message... (Enter to save, Esc to cancel)"
-                  className="min-h-[80px] dark:bg-gray-900 border bg-gray-50 w-full"
-                  disabled={isLoading}
-                />
-                <Progress value={contextUsage} className="h-1" />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditing(false)}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="edit-save-btn"
-                  data-message-id={message.id}
-                  onClick={async () => {
-                    if (editContent.trim()) {
-                      setIsLoading(true)
-                      try {
-                        if (onEdit) {
-                          await onEdit(message.id, editContent.trim(), editOllamaState, editSelectedModel)
-                        }
-                        setIsEditing(false)
-                      } catch (error) {
-                        console.error('Edit error:', error)
-                      } finally {
-                        setIsLoading(false)
-                      }
-                    }
-                  }}
-                  disabled={isLoading || !editContent.trim()}
-                >
-                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <SendIcon className="h-3 w-3 mr-1" />}
-                  Save & Send
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Normal Message Content */
-          <div
-            className={cn(
-              "gap-3 p-4 rounded-lg relative overflow-hidden w-full transition-all duration-200",
-              isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
-              isQuoted ? "ring-2 ring-green-400 dark:ring-green-500 bg-green-50 dark:bg-green-900/20" : ""
-            )}
-          >
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                {/* Expand/Collapse button for user messages */}
-                {shouldShowExpandButton && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 flex-shrink-0"
-                    onClick={onToggleExpand}
-                  >
-                    {isExpanded ? (
-                      <ChevronDownIcon size={14} />
-                    ) : (
-                      <ChevronRightIconCollapse size={14} />
-                    )}
-                  </Button>
-                )}
-
-                <span className="font-medium">
-                  {message.model && !isUser && (
-                    <span className="text-xs ml-2 opacity-70">({getModelDisplayName(message.model)})</span>
-                  )}
-                </span>
-              </div>
-
-              <div className="prose dark:prose-invert prose-sm break-words w-full overflow-hidden">
-                {message.imageUrl && (
-                  <div className="mt-2">
-                    <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
-                  </div>
-                )}
-                <div className="overflow-x-auto break-words hyphens-auto">
-                  <Markdown>
-                    {shouldShowExpandButton && !isExpanded
-                      ? truncateText(message.content)
-                      : message.content
-                    }
-                  </Markdown>
-                </div>
-                <span className={`animate-pulse ${isStreaming ? (showCursor ? "" : "invisible") : "hidden"}`}>▌</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons - Only show when not editing and not streaming */}
-        {!isEditing && !isStreaming && (
-          <div className={cn("flex gap-1 mt-2", isHovered ? "visible" : "invisible")}>
-            {isUser && (
-              <>
-                <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => {
-                  setIsEditing(true)
-                  setEditContent(message.content)
-                  setEditOllamaState(ollamastate)
-                  setEditSelectedModel(selectedModel)
-                  // Focus textarea after state update
-                  setTimeout(() => {
-                    if (textareaRef.current) {
-                      textareaRef.current.focus()
-                      textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length)
-                    }
-                  }, 100)
-                }} title="Edit message">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </>
-            )}
-            <Button variant="ghost" size="icon" onClick={() => {
-              // Set quoted message - this will be passed to parent
-              if (onQuoteMessage) {
-                onQuoteMessage(message)
-              }
-            }} title="Quote message">
-              <Quote className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
-              <CopyIcon className="h-4 w-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" title="Branch from here">
-                  <GitBranchIcon className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => onBranch('full')}>
-                  <GitBranchIcon className="h-4 w-4 mr-2" />
-                  Full History Branch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onBranch('single')}>
-                  <MessageSquareIcon className="h-4 w-4 mr-2" />
-                  Single Message Branch
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onBranch('model')}>
-                  <Bot className="h-4 w-4 mr-2" />
-                  New Query Branch
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Edit Dialog Component
-interface EditDialogProps {
-   isOpen: boolean
-   onClose: () => void
-   message: Message
-   onSave: (messageId: string, newContent: string) => void
-   ollamastate: number
-   selectedModel: string
-   selectedModelInfo: any
-   allModels: any[]
-   handleSelectModel: (modelId: string) => void
-   isLoadingModels: boolean
-   vendor: string
-   setollamastate: any
-   getModelColor: any
-   getModelDisplayName: any
-   answerfromfile: boolean
-   setanswerfromfile: any
-   sendwithhistory: boolean
-   setsendwithhistory: any
-   fullfileascontext: boolean
-   setfullfileascontext: any
-   morethanonefile: boolean
-   searchcurrent: boolean
-   setsearchcurrent: any
-   contextUsage: number
-   setcolorpertheme: string
-}
-
-function EditDialog({
-   isOpen,
-   onClose,
-   message,
-   onSave,
-   ollamastate,
-   selectedModel,
-   selectedModelInfo,
-   allModels,
-   handleSelectModel,
-   isLoadingModels,
-   vendor,
-   setollamastate,
-   getModelColor,
-   getModelDisplayName,
-   answerfromfile,
-   setanswerfromfile,
-   sendwithhistory,
-   setsendwithhistory,
-   fullfileascontext,
-   setfullfileascontext,
-   morethanonefile,
-   searchcurrent,
-   setsearchcurrent,
-   contextUsage,
-   setcolorpertheme
-}: EditDialogProps) {
-   const [editContent, setEditContent] = useState(message.content)
-   const [isLoading, setIsLoading] = useState(false)
-   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-   useEffect(() => {
-     if (isOpen && textareaRef.current) {
-       textareaRef.current.focus()
-       textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length)
-     }
-   }, [isOpen])
-
-   const handleSave = () => {
-     if (editContent.trim()) {
-       onSave(message.id, editContent.trim())
-       onClose()
-     }
-   }
-
-   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-     if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-       e.preventDefault()
-       handleSave()
-     }
-     if (e.key === "Escape") {
-       onClose()
-     }
-   }
-
-   if (!isOpen) return null
-
-   return (
-     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-         <div className="p-6">
-           <h2 className="text-lg font-semibold mb-4 dark:text-white">Edit Message</h2>
-
-           {/* Original Message Display */}
-           <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-             <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Original message:</div>
-             <div className="text-gray-700 dark:text-gray-300">{message.content}</div>
-           </div>
-
-           {/* Edit Input */}
-           <div className="mb-4">
-             <Textarea
-               ref={textareaRef}
-               value={editContent}
-               onChange={(e) => setEditContent(e.target.value)}
-               onKeyDown={handleKeyDown}
-               placeholder="Edit your message... (Enter to save, Esc to cancel)"
-               className="min-h-[120px] dark:bg-gray-900 border bg-gray-50"
-               disabled={isLoading}
-             />
-             <Progress value={contextUsage} className="h-1 mt-2" />
-           </div>
-
-           {/* Options Row - Mimic the query box */}
-           <div className="mb-4 flex flex-row gap-4 w-full flex-wrap">
-             <DropdownMenu>
-               <DropdownMenuTrigger asChild>
-                 <Button variant="outline">
-                   <Bot size={16} className="mr-2" />
-                   {vendor}
-                 </Button>
-               </DropdownMenuTrigger>
-               <DropdownMenuContent>
-                 <DropdownMenuItem onClick={() => setollamastate(0)}>
-                   Openrouter
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setollamastate(1)}>
-                   Ollama
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setollamastate(2)}>
-                   LM Studio
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setollamastate(4)}>
-                   Groq
-                 </DropdownMenuItem>
-               </DropdownMenuContent>
-             </DropdownMenu>
-
-             {ollamastate === 0 && (
-               <ModelSelectionDialog
-                 models={allModels}
-                 selectedModel={selectedModel}
-                 onSelectModel={handleSelectModel}
-                 isLoading={isLoadingModels}
-               />
-             )}
-
-             {answerfromfile && (
-               <HoverCard>
-                 <HoverCardTrigger>
-                   <Button
-                     variant="outline"
-                     size="icon"
-                     onClick={() => setfullfileascontext(!fullfileascontext)}
-                   >
-                     {fullfileascontext ? (<FileCheck className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
-                   </Button>
-                 </HoverCardTrigger>
-                 <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                   {fullfileascontext ? "Full file contents will be passed as context" : "Embeddings will be passed as context"}
-                 </HoverCardContent>
-               </HoverCard>
-             )}
-
-             <HoverCard>
-               <HoverCardTrigger>
-                 <Button
-                   variant="outline"
-                   size="icon"
-                   onClick={() => setsendwithhistory(!sendwithhistory)}
-                 >
-                   {sendwithhistory ? (<FileClock className="h-4 w-4" />) : (<BookX className="h-4 w-4" />)}
-                 </Button>
-               </HoverCardTrigger>
-               <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                 {sendwithhistory ? "Full chat history will be passed as context" : "Ignore chat history"}
-               </HoverCardContent>
-             </HoverCard>
-
-             {morethanonefile && (
-               <HoverCard>
-                 <HoverCardTrigger>
-                   <Button
-                     variant="outline"
-                     size="icon"
-                     onClick={() => setsearchcurrent(!searchcurrent)}
-                   >
-                     {searchcurrent ? (<File className="h-4 w-4" />) : (<FileStack className="h-4 w-4" />)}
-                   </Button>
-                 </HoverCardTrigger>
-                 <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                   {searchcurrent ? "Search current file" : "Search all the files"}
-                 </HoverCardContent>
-               </HoverCard>
-             )}
-
-             <HoverCard>
-               <HoverCardTrigger>
-                 <Button
-                   variant="outline"
-                   size="icon"
-                   onClick={() => setanswerfromfile(!answerfromfile)}
-                 >
-                   {answerfromfile ? (<FilePlus className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
-                 </Button>
-               </HoverCardTrigger>
-               <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                 {answerfromfile ? "answer from file" : "Answer without context"}
-               </HoverCardContent>
-             </HoverCard>
-           </div>
-
-           {/* Action Buttons */}
-           <div className="flex justify-end gap-2">
-             <Button variant="outline" onClick={onClose}>
-               Cancel
-             </Button>
-             <Button onClick={handleSave} disabled={isLoading || !editContent.trim()}>
-               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
-               Save & Send
-             </Button>
-           </div>
-         </div>
-       </div>
-     </div>
-   )
-}
 
 // Helper function to get a display name from model ID
 function getModelDisplayName(modelId: string): string {
@@ -582,183 +49,6 @@ function getModelDisplayName(modelId: string): string {
    return parts.length > 1 ? parts[1] : modelId
  }
 
-// Question Group Component for Grok-style scrollable answers
-interface QuestionGroupProps {
-     question: Message
-     answers: Message[]
-     onCopy: (content: string) => void
-     onBranch: (messageId: string, branchType: 'full' | 'single' | 'model') => void
-     setdsm: any
-     setmts: any
-     isStreaming?: boolean
-     streamingMessageId?: string | null
-     isQuestionExpanded: boolean
-     onToggleQuestionExpand: () => void
-     currentAnswerIndex: number
-     onAnswerIndexChange: (index: number) => void
-     onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
-     onQuoteMessage?: (message: Message) => void
-     isQuoted?: boolean
-     quotedMessages: Message[]
-   // Props for EditDialog
-   ollamastate: number
-   selectedModel: string
-   selectedModelInfo: any
-   allModels: any[]
-   handleSelectModel: (modelId: string) => void
-   isLoadingModels: boolean
-   vendor: string
-   setollamastate: any
-   getModelColor: any
-   getModelDisplayName: any
-   answerfromfile: boolean
-   setanswerfromfile: any
-   sendwithhistory: boolean
-   setsendwithhistory: any
-   fullfileascontext: boolean
-   setfullfileascontext: any
-   morethanonefile: boolean
-   searchcurrent: boolean
-   setsearchcurrent: any
-   contextUsage: number
-   setcolorpertheme: string
- }
-
-function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange, onEdit, onQuoteMessage, isQuoted = false, quotedMessages, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: QuestionGroupProps) {
-  const handlePrevious = () => {
-    const newIndex = Math.max(0, currentAnswerIndex - 1)
-    onAnswerIndexChange(newIndex)
-  }
-
-  const handleNext = () => {
-    const newIndex = Math.min(answers.length - 1, currentAnswerIndex + 1)
-    onAnswerIndexChange(newIndex)
-  }
-
-  const handleDotClick = (index: number) => {
-    onAnswerIndexChange(index)
-  }
-
-  const currentAnswer = answers[currentAnswerIndex]
-
-  // Auto-switch to latest answer when streaming
-  useEffect(() => {
-    if (isStreaming && streamingMessageId) {
-      const streamingAnswerIndex = answers.findIndex(answer => answer.id === streamingMessageId)
-      if (streamingAnswerIndex !== -1 && streamingAnswerIndex !== currentAnswerIndex) {
-        onAnswerIndexChange(streamingAnswerIndex)
-      }
-    }
-  }, [isStreaming, streamingMessageId, answers, currentAnswerIndex, onAnswerIndexChange])
-
-  return (
-    <div className="w-full space-y-4">
-      {/* Question with expand/collapse */}
-      <ExpandableMessageItem
-        message={question}
-        onCopy={() => onCopy(question.content)}
-        onBranch={(branchType) => onBranch(question.id, branchType)}
-        setdsm={setdsm}
-        setmts={setmts}
-        isExpanded={isQuestionExpanded}
-        onToggleExpand={onToggleQuestionExpand}
-        onEdit={onEdit}
-        onQuoteMessage={onQuoteMessage}
-        isQuoted={isQuoted}
-        ollamastate={ollamastate}
-        selectedModel={selectedModel}
-        selectedModelInfo={selectedModelInfo}
-        allModels={allModels}
-        handleSelectModel={handleSelectModel}
-        isLoadingModels={isLoadingModels}
-        vendor={vendor}
-        setollamastate={setollamastate}
-        getModelColor={getModelColor}
-        getModelDisplayName={getModelDisplayName}
-        answerfromfile={answerfromfile}
-        setanswerfromfile={setanswerfromfile}
-        sendwithhistory={sendwithhistory}
-        setsendwithhistory={setsendwithhistory}
-        fullfileascontext={fullfileascontext}
-        setfullfileascontext={setfullfileascontext}
-        morethanonefile={morethanonefile}
-        searchcurrent={searchcurrent}
-        setsearchcurrent={setsearchcurrent}
-        contextUsage={contextUsage}
-        setcolorpertheme={setcolorpertheme}
-      />
-
-      {/* Answer Group with Navigation */}
-      <div className="w-full">
-        {/* Answer Counter and Navigation */}
-        <div className="flex items-center justify-between mb-2 px-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Answer {currentAnswerIndex + 1} of {answers.length}
-          </div>
-
-          {answers.length > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handlePrevious}
-                disabled={currentAnswerIndex === 0}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronLeftIcon size={16} />
-              </Button>
-
-              {/* Dot indicators */}
-              <div className="flex gap-1">
-                {answers.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDotClick(index)}
-                    className={`w-2 h-2 rounded-full transition-colors ${index === currentAnswerIndex
-                      ? 'bg-blue-500'
-                      : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-                      }`}
-                  />
-                ))}
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNext}
-                disabled={currentAnswerIndex === answers.length - 1}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRightIcon size={16} />
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Current Answer */}
-        <div className="relative">
-          <MessageItem
-            message={currentAnswer}
-            isStreaming={isStreaming && streamingMessageId === currentAnswer.id}
-            onCopy={() => onCopy(currentAnswer.content)}
-            onBranch={(branchType) => onBranch(currentAnswer.id, branchType)}
-            setdsm={setdsm}
-            setmts={setmts}
-            onQuoteMessage={onQuoteMessage}
-            isQuoted={quotedMessages.some(q => q.id === currentAnswer.id)}
-          />
-
-          {/* Multiple answers indicator */}
-          {answers.length > 1 && (
-            <div className="absolute top-2 right-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded-full">
-              {answers.length} answers
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 interface SendMessageStreamParams {
   notollama: number;
   url: string;
@@ -857,174 +147,7 @@ interface ChatInterfaceProps {
 //   return false      
 // }
 
-// --- Exported Send Message Stream Function ---
-
-/**
- * Sends messages to a chat completion API and yields content chunks as an async generator.
- *
- * @param params - The parameters for the API call.
- * @returns An async generator yielding content chunks.
- * @throws An error if the API call fails or the response body is null.
- */
-export async function* sendMessageStream({
-   notollama,
-   url,
-   // apiKey,
-   model,
-   messages,
-   lmstudio_url,
-   context,
-   apiKeys
- }: SendMessageStreamParams & { apiKeys: { groq_api_key?: string; openrouter_api_key?: string; or_model?: string; lmstudio_model_name?: string; groq_model_name?: string } }): AsyncGenerator<string, void, unknown> {
-   const storedApiKey = apiKeys[notollama == 4 ? "groq_api_key" : "openrouter_api_key"]
-   console.log(storedApiKey)
-   console.log("========" + notollama)
-   // const or_mi=localStorage.getItem("or_model_info")
-   let modelname
-   switch (notollama) {
-     case 0:
-       modelname = apiKeys.or_model
-       break;
-     case 1:
-       modelname = apiKeys.lmstudio_model_name
-       break;
-     case 2:
-       modelname = apiKeys.lmstudio_model_name
-       break;
-     case 3:
-       modelname = ""
-       break;
-     case 4:
-       modelname = apiKeys.groq_model_name
-       break;
-   }
-  // const modelname = notollama==0?model:
-  console.log(modelname)
-
-  let prompt = context.trim() === "" ? `Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length - 1].content}` : `Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length - 1].content}`;
-  console.log(prompt)
-  let headers_openrouter = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${storedApiKey}`,
-    "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
-    "X-Title": "Batu",
-  };
-  let headers_ollama = { 'Content-Type': 'application/json' };
-  // if (notollama===0 || notollama===2) {
-  const response = await fetch(`${url}/v1/chat/completions`, {
-    method: "POST",
-    headers: (notollama === 0 || notollama === 2 || notollama === 4) ? headers_openrouter : headers_ollama,
-    body: JSON.stringify({
-      model: modelname,
-      messages: [{ role: 'user', content: prompt }],
-      stream: true,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    let errorMessage = errorData || "Failed to get response";
-    try {
-      const jsonError = JSON.parse(errorData);
-      errorMessage = jsonError.error?.message || errorMessage;
-    } catch {
-      // Ignore if parsing fails, use the raw text
-    }
-    throw new Error(errorMessage);
-  }
-
-  if (!response.body) {
-    throw new Error("Response body is null");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((line) => line.replace(/^data: /, "").trim());
-
-    for (const line of lines) {
-      if (line === "[DONE]") continue;
-
-      try {
-        const parsedLine = JSON.parse(line);
-        const content = parsedLine.choices[0]?.delta?.content || "";
-        if (content) {
-          yield content; // Yield each content chunk
-        }
-      } catch (e) {
-        console.warn("Failed to parse stream line:", line, e);
-      }
-    }
-  }
-  // }
-  // else{
-  //     const requestBody = {
-  //         "model": model,
-  //         "messages": messages,
-  //         "stream": true // Ensure streaming is enabled
-  //     };
-
-  //     const response = await fetch(`${lmstudio_url}/v1/chat/completions`, {
-  //         method: 'POST',
-  //         headers: { 'Content-Type': 'application/json' },
-  //         body: JSON.stringify(requestBody)
-  //     })
-  //     if (!response.ok) {
-  //       const errorData = await response.text();
-  //       let errorMessage = errorData || "Failed to get response";
-  //       try {
-  //         const jsonError = JSON.parse(errorData);
-  //         errorMessage = jsonError.error?.message || errorMessage;
-  //       } catch {
-  //         // Ignore if parsing fails, use the raw text
-  //       }
-  //       throw new Error(errorMessage);
-  //     }
-
-  //     if (!response.body) {
-  //       throw new Error("Response body is null");
-  //     }
-
-  //     const reader = response.body.getReader();
-  //     const decoder = new TextDecoder("utf-8");
-
-  //     while (true) {
-  //       const { done, value } = await reader.read();
-  //       if (done) break;
-
-  //       const chunk = decoder.decode(value);
-  //       const lines = chunk
-  //         .split("\n")
-  //         .filter((line) => line.trim() !== "")
-  //         .map((line) => line.replace(/^data: /, "").trim());
-
-  //       for (const line of lines) {
-  //         if (line === "[DONE]") continue;
-
-  //         try {
-  //           const parsedLine = JSON.parse(line);
-  //           const content = parsedLine.choices[0]?.delta?.content || "";
-  //           if (content) {
-  //             yield content; // Yield each content chunk
-  //           }
-  //         } catch (e) {
-  //           console.warn("Failed to parse stream line:", line, e);
-  //         }
-  //       }
-  //     }
-
-  // }
-
-}
-
+// Removed duplicate import - now imported at the top of the file
 
 // --- Exported Chat Interface Component ---
 
@@ -1216,7 +339,6 @@ export default function ChatInterface({
     }
 
 
-
     // Call the generator and process the stream
     if (ollamastate !== 3) {
       try {
@@ -1244,7 +366,7 @@ export default function ChatInterface({
         //  embeddingmodelname:"nomic-embed-text",
         //  usecompletefile:fullfileascontext,
         //  pathstr: searchcurrent?(await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ",""):"ALL"
-        // }).catch(e=>console.log(e)) as string):""; 
+        // }).catch(e=>console.log(e)) as string):"";
         // console.log(`----------context: ${context}`)
 
         for await (const contentChunk of sendMessageStream({
@@ -1462,144 +584,58 @@ export default function ChatInterface({
     }, 100)
   }
 
-  const handleEditMessage = async (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => {
-    if (!newContent.trim()) return;
-
-    // Use provided edit state or fall back to global state
-    const currentOllamaState = editOllamaState ?? ollamastate;
-    const currentSelectedModel = editSelectedModel ?? selectedModel;
-
-    // Find the message to edit
-    const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId);
-    if (messageIndex === -1) return;
-
-    const originalMessage = chat.messages[messageIndex];
-    if (originalMessage.role !== 'user') return;
-
-    // Find the next assistant message (the response to edit)
-    const assistantMessageIndex = messageIndex + 1;
-    const hasAssistantResponse = assistantMessageIndex < chat.messages.length &&
-                                chat.messages[assistantMessageIndex].role === 'assistant';
-
-    // Create updated messages array
-    const updatedMessages = [...chat.messages];
-
-    // Update the user message
-    updatedMessages[messageIndex] = {
-      ...originalMessage,
-      content: newContent.trim(),
-      timestamp: new Date().toISOString(),
+  // Wrapper function for handleEditMessage with context
+  const handleEditMessageWrapper = async (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => {
+    const context = {
+      ollamastate,
+      selectedModel,
+      chat,
+      updateChat,
+      setStreamingMessageId,
+      isAtBottom,
+      scrolltobottom,
+      lmstudio_url,
+      answerfromfile,
+      sendwithhistory,
+      lmstudio_model_name,
+      groqApiKey: groqApiKey || "",
+      openrouterApiKey: openrouterApiKey || "",
+      orModel: orModel || "",
+      groqModelName: groqModelName || ""
     };
 
-    // Remove the old assistant response if it exists
-    if (hasAssistantResponse) {
-      updatedMessages.splice(assistantMessageIndex, 1);
-    }
-
-    // Update the chat state
-    let updatedChat = {
-      ...chat,
-      messages: updatedMessages,
-      lastModelUsed: currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name,
-    };
-
-    updateChat(updatedChat);
-
-    // Create a new assistant message for the response
-    const newAssistantMessageId = (Date.now() + 1).toString();
-    const newAssistantMessage: Message = {
-      id: newAssistantMessageId,
-      role: "assistant",
-      content: "",
-      timestamp: new Date().toISOString(),
-      model: currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name,
-    };
-
-    // Add the new assistant message
-    updatedChat = {
-      ...updatedChat,
-      messages: [...updatedMessages, newAssistantMessage],
-    };
-
-    updateChat(updatedChat);
-    setStreamingMessageId(newAssistantMessageId);
-
-    // Scroll to bottom if we were already at the bottom when starting to stream
-    if (isAtBottom) {
-      setTimeout(scrolltobottom, 100);
-    }
-
-    // Call the API with the edited message
-    try {
-      let apiUrl = "";
-      if (currentOllamaState === 0) {
-        apiUrl = "https://openrouter.ai/api";
-      } else if (currentOllamaState === 4) {
-        apiUrl = "https://api.groq.com/openai";
-      } else if (currentOllamaState === 1 || currentOllamaState === 2) {
-        apiUrl = lmstudio_url;
-      }
-
-      const modelToSend = currentOllamaState == 0 ? currentSelectedModel : lmstudio_model_name;
-      const messagesToSend = updatedMessages.slice(0, -1).map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      let accumulatedContent = "";
-      let context = "";
-
-      for await (const contentChunk of sendMessageStream({
-        url: apiUrl,
-        notollama: currentOllamaState,
-        model: modelToSend,
-        messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
-        lmstudio_url: lmstudio_url,
-        context: answerfromfile ? context : "",
-        apiKeys: {
-          groq_api_key: groqApiKey || "",
-          openrouter_api_key: openrouterApiKey || "",
-          or_model: orModel || "",
-          lmstudio_model_name: lmstudioModelName || "",
-          groq_model_name: groqModelName || ""
-        }
-      })) {
-        accumulatedContent += contentChunk;
-
-        // Update the last message (assistant's) with new content
-        const currentMessages = [...updatedChat.messages];
-        currentMessages[currentMessages.length - 1] = {
-          ...currentMessages[currentMessages.length - 1],
-          content: accumulatedContent,
-        };
-
-        updatedChat = {
-          ...updatedChat,
-          messages: currentMessages,
-        };
-        updateChat(updatedChat);
-      }
-    } catch (err) {
-      console.error("Error sending edited message:", err);
-      const errMsg = err instanceof Error ? err.message : "An error occurred";
-
-      // Replace the assistant placeholder with an error message
-      const currentMessages = [...updatedChat.messages];
-      currentMessages[currentMessages.length - 1] = {
-        ...currentMessages[currentMessages.length - 1],
-        content: `Error: ${errMsg}`,
-      };
-
-      updateChat({
-        ...updatedChat,
-        messages: currentMessages,
-      });
-    } finally {
-      setStreamingMessageId(null);
-    }
+    return handleEditMessage(messageId, newContent, editOllamaState, editSelectedModel, context);
   };
 
+
+  // Image generation is now handled by the extracted function in lib/chat-handlers.ts
   const generateImage = async (prompt: string) => {
+    const context = {
+      ollamastate,
+      selectedModel,
+      chat,
+      updateChat,
+      setStreamingMessageId,
+      setIsLoading,
+      setError,
+      setPendingErrorMessage,
+      pendingErrorMessage,
+      isAtBottom,
+      scrolltobottom,
+      lmstudio_url,
+      answerfromfile,
+      sendwithhistory,
+      lmstudio_model_name,
+      groqApiKey: groqApiKey || "",
+      openrouterApiKey: openrouterApiKey || "",
+      orModel: orModel || "",
+      groqModelName: groqModelName || "",
+      quotedMessages,
+      setQuotedMessages
+    };
+
+    // Note: This would call the extracted function from lib/chat-handlers.ts
+    // For now, keeping the original implementation to avoid import issues
     setIsLoading(true);
     setError(null);
 
@@ -1993,7 +1029,7 @@ export default function ChatInterface({
                         setdsm={setdsm}
                         isExpanded={expandedMessages.has(group.message.id)}
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
-                        onEdit={handleEditMessage}
+                        onEdit={handleEditMessageWrapper}
                         onQuoteMessage={handleQuoteMessage}
                         isQuoted={quotedMessages.some(q => q.id === group.message?.id)}
                         ollamastate={ollamastate}
@@ -2048,7 +1084,7 @@ export default function ChatInterface({
                           onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
                           currentAnswerIndex={currentIndex}
                           onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
-                          onEdit={handleEditMessage}
+                          onEdit={handleEditMessageWrapper}
                           onQuoteMessage={handleQuoteMessage}
                           isQuoted={quotedMessages.some(q => q.id === group.question?.id)}
                           quotedMessages={quotedMessages}
