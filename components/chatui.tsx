@@ -435,14 +435,26 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
   }
 
-  const handleBranchConversation = async (branchPoint: BranchPoint) => {
+  const handleBranchConversation = async (branchPoint: BranchPoint, branchType: 'full' | 'single' | 'model' = 'full') => {
     const originalChat = chats.find((chat) => chat.id === branchPoint.originalChatId)
 
     if (!originalChat) return
 
-    // Create a title based on the last user message in the branch
+    // Create a title based on the branch type and content
+    let branchTitle = "New Branch"
     const lastUserMessage = [...branchPoint.messages].reverse().find((msg) => msg.role === "user")
-    const branchTitle = lastUserMessage ? `Branch: ${lastUserMessage.content.slice(0, 20)}...` : "New Branch"
+
+    switch (branchType) {
+      case 'full':
+        branchTitle = lastUserMessage ? `Branch: ${lastUserMessage.content.slice(0, 20)}...` : "Full History Branch"
+        break
+      case 'single':
+        branchTitle = lastUserMessage ? `Single Message: ${lastUserMessage.content.slice(0, 20)}...` : "Single Message Branch"
+        break
+      case 'model':
+        branchTitle = lastUserMessage ? `New Query: ${lastUserMessage.content.slice(0, 20)}...` : "New Query Branch"
+        break
+    }
 
     const newChat: Chat = {
       id: Date.now().toString(),

@@ -1,7 +1,7 @@
 "use client"
 
 import type { Message } from "../lib/types"
-import { CopyIcon, GitBranchIcon, RefreshCw, Quote } from "lucide-react"
+import { CopyIcon, GitBranchIcon, RefreshCw, Quote, MessageSquareIcon, Bot } from "lucide-react"
 import { cn } from "../lib/utils"
 
 // import ReactMarkdown from "react-markdown"
@@ -10,17 +10,18 @@ import { Markdown } from "./markdown"
 // import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useEffect, useState } from "react"
 import { Button } from "../components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu"
 
 interface MessageItemProps {
-   message: Message
-   isStreaming?: boolean
-   onCopy: () => void
-   onBranch: () => void
-   setdsm: any
-   setmts: any
-   onQuoteMessage?: (message: Message) => void
-   isQuoted?: boolean
- }
+    message: Message
+    isStreaming?: boolean
+    onCopy: () => void
+    onBranch: (branchType: 'full' | 'single' | 'model') => void
+    setdsm: any
+    setmts: any
+    onQuoteMessage?: (message: Message) => void
+    isQuoted?: boolean
+  }
 
 export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts, onQuoteMessage, isQuoted = false }: MessageItemProps) {
   const isUser = message.role === "user"
@@ -134,9 +135,27 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onBranch} title="Branch from here">
-              <GitBranchIcon className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title="Branch from here">
+                  <GitBranchIcon className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => onBranch('full')}>
+                  <GitBranchIcon className="h-4 w-4 mr-2" />
+                  Full History Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBranch('single')}>
+                  <MessageSquareIcon className="h-4 w-4 mr-2" />
+                  Single Message Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBranch('model')}>
+                  <Bot className="h-4 w-4 mr-2" />
+                  New Query Branch
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>

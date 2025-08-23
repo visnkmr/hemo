@@ -34,7 +34,7 @@ interface ExpandableMessageItemProps {
     message: Message
     isStreaming?: boolean
     onCopy: () => void
-    onBranch: () => void
+    onBranch: (branchType: 'full' | 'single' | 'model') => void
     setdsm: any
     setmts: any
     isExpanded: boolean
@@ -320,9 +320,27 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onBranch} title="Branch from here">
-              <GitBranchIcon className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title="Branch from here">
+                  <GitBranchIcon className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => onBranch('full')}>
+                  <GitBranchIcon className="h-4 w-4 mr-2" />
+                  Full History Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBranch('single')}>
+                  <MessageSquareIcon className="h-4 w-4 mr-2" />
+                  Single Message Branch
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onBranch('model')}>
+                  <Bot className="h-4 w-4 mr-2" />
+                  New Query Branch
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
@@ -569,7 +587,7 @@ interface QuestionGroupProps {
      question: Message
      answers: Message[]
      onCopy: (content: string) => void
-     onBranch: (messageId: string) => void
+     onBranch: (messageId: string, branchType: 'full' | 'single' | 'model') => void
      setdsm: any
      setmts: any
      isStreaming?: boolean
@@ -639,7 +657,7 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
       <ExpandableMessageItem
         message={question}
         onCopy={() => onCopy(question.content)}
-        onBranch={() => onBranch(question.id)}
+        onBranch={(branchType) => onBranch(question.id, branchType)}
         setdsm={setdsm}
         setmts={setmts}
         isExpanded={isQuestionExpanded}
@@ -723,7 +741,7 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
             message={currentAnswer}
             isStreaming={isStreaming && streamingMessageId === currentAnswer.id}
             onCopy={() => onCopy(currentAnswer.content)}
-            onBranch={() => onBranch(currentAnswer.id)}
+            onBranch={(branchType) => onBranch(currentAnswer.id, branchType)}
             setdsm={setdsm}
             setmts={setmts}
             onQuoteMessage={onQuoteMessage}
@@ -760,7 +778,7 @@ interface ChatInterfaceProps {
   // apiKey: string;
   selectedModel: string; // Keep selectedModel for overall component state
   selectedModelInfo: any;
-  onBranchConversation: (branchPoint: BranchPoint) => void;
+  onBranchConversation: (branchPoint: BranchPoint, branchType: 'full' | 'single' | 'model') => void;
   lmstudio_url: string;
   lmstudio_model_name: string;
   filegpt_url: string;
@@ -1390,16 +1408,38 @@ export default function ChatInterface({
     });
   };
 
-  const handleBranchFromMessage = (messageId: string) => {
+  const handleBranchFromMessage = (messageId: string, branchType: 'full' | 'single' | 'model' = 'full') => {
     const messageIndex = chat.messages.findIndex((msg) => msg.id === messageId);
     if (messageIndex >= 0) {
+      let messagesToInclude = chat.messages.slice(0, messageIndex + 1);
+
+      // Handle different branch types
+      if (branchType === 'single') {
+        // Single message branch - only include the specific message
+        messagesToInclude = [chat.messages[messageIndex]];
+      } else if (branchType === 'model') {
+        // New query branch - create a new query based on the message
+        const branchedMessage = chat.messages[messageIndex];
+        const newQuery = branchedMessage.role === 'user'
+          ? `Please provide a different response to: ${branchedMessage.content}`
+          : `Please respond to: ${branchedMessage.content}`;
+        messagesToInclude = [{
+          id: Date.now().toString(),
+          role: 'user',
+          content: newQuery,
+          timestamp: new Date().toISOString(),
+          model: selectedModel
+        }];
+      }
+      // For 'full' branch type, use all messages up to the branch point (default behavior)
+
       const branchPoint: BranchPoint = {
         originalChatId: chat.id,
-        messages: chat.messages.slice(0, messageIndex + 1),
+        messages: messagesToInclude,
         branchedFromMessageId: messageId,
         timestamp: new Date().toISOString(),
       };
-      onBranchConversation(branchPoint);
+      onBranchConversation(branchPoint, branchType);
     }
   };
 
@@ -1852,10 +1892,10 @@ export default function ChatInterface({
   const { value: groqModelName } = useConfigItem<string>("groq_model_name", "")
 
   useEffect(() => {
-    if (lastStateValue !== undefined) {
+    if (lastStateValue !== undefined && lastStateValue !== ollamastate) {
       setollamastate(lastStateValue);
     }
-  }, [lastStateValue])
+  }, [lastStateValue]) // Removed ollamastate from dependencies to prevent infinite loop
 
   useEffect(() => {
     switch (ollamastate) {
@@ -1875,9 +1915,12 @@ export default function ChatInterface({
       default:
         break;
     }
-    setLastState(ollamastate)
+    // Only update local storage if the value actually changed
+    if (lastStateValue !== ollamastate) {
+      setLastState(ollamastate)
+    }
 
-  }, [ollamastate, setLastState])
+  }, [ollamastate, setLastState, lastStateValue])
 
   return (
     <div className="">
@@ -2173,25 +2216,22 @@ export default function ChatInterface({
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => {
-                  setvendor("Openrouter")
+                  // Set ollamastate first, vendor will be updated by useEffect
                   setollamastate(0);
                 }}>
                   Openrouter
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setvendor("Ollama")
                   setollamastate(1);
                 }}>
                   Ollama
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setvendor("LM Studio")
                   setollamastate(2);
                 }}>
                   LM Studio
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setvendor("Groq")
                   setollamastate(4);
                 }}>
                   Groq
