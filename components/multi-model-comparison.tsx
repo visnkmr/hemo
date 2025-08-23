@@ -48,17 +48,16 @@ interface MultiModelComparisonProps {
   getModelColor: any;
 }
 
-// Available models for comparison
-const AVAILABLE_MODELS = [
-  { id: "openrouter-1", name: "GPT-4", provider: "OpenRouter", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" },
-  { id: "openrouter-2", name: "GPT-3.5 Turbo", provider: "OpenRouter", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
-  { id: "openrouter-3", name: "Claude-3", provider: "OpenRouter", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
-  { id: "openrouter-4", name: "Gemini Pro", provider: "OpenRouter", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
-  { id: "groq-1", name: "Llama-3 70B", provider: "Groq", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" },
-  { id: "groq-2", name: "Mixtral 8x7B", provider: "Groq", color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300" },
-  { id: "ollama-1", name: "Llama-2 7B", provider: "Ollama", color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300" },
-  { id: "lmstudio-1", name: "Local Model", provider: "LM Studio", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" }
-]
+// Model interface for type safety
+interface AvailableModel {
+  id: string
+  name: string
+  provider: string
+  color?: string
+  context_length?: number
+  pricing?: { prompt: number; completion: number }
+  created?: number
+}
 
 export default function MultiModelComparison({
   setlmurl,
@@ -78,13 +77,126 @@ export default function MultiModelComparison({
 }: MultiModelComparisonProps) {
   const [input, setInput] = useState("")
   const [isInputFocused, setIsInputFocused] = useState(false)
-  const [selectedModels, setSelectedModels] = useState<string[]>(["openrouter-1", "openrouter-3", "groq-1"])
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [chats, setChats] = useState<MultiModelChat[]>([])
   const [currentChat, setCurrentChat] = useState<MultiModelChat | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [contextUsage, setContextUsage] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [showDialog, setShowDialog] = useState(false)
+  const [availableModels, setAvailableModels] = useState<any[]>([])
+  const [isLoadingAvailableModels, setIsLoadingAvailableModels] = useState(false)
+
+  // Function to fetch models from different providers
+  const fetchAvailableModels = async () => {
+    setIsLoadingAvailableModels(true)
+    const allFetchedModels: any[] = []
+
+    try {
+      // Fetch OpenRouter models
+      try {
+        const openRouterResponse = await fetch("https://openrouter.ai/api/v1/models")
+        if (openRouterResponse.ok) {
+          const openRouterData = await openRouterResponse.json()
+          const openRouterModels = openRouterData.data
+            ?.filter((model: any) => model?.id && model?.pricing?.prompt !== undefined)
+            .slice(0, 10) // Limit to top 10 models for performance
+            .map((model: any) => ({
+              ...model,
+              provider: 'OpenRouter',
+              color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+            })) || []
+          allFetchedModels.push(...openRouterModels)
+        }
+      } catch (error) {
+        console.error('Failed to fetch OpenRouter models:', error)
+      }
+
+      // Fetch Ollama models if URL is available
+      if (lmstudio_url && ollamastate === 1) {
+        try {
+          const ollamaResponse = await fetch(`${lmstudio_url}/api/tags`)
+          if (ollamaResponse.ok) {
+            const ollamaData = await ollamaResponse.json()
+            const ollamaModels = ollamaData.models?.map((model: any) => ({
+              id: model.name,
+              name: model.name,
+              provider: 'Ollama',
+              color: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
+              context_length: 4096,
+              pricing: { prompt: 0, completion: 0 },
+              created: Date.now()
+            })) || []
+            allFetchedModels.push(...ollamaModels)
+          }
+        } catch (error) {
+          console.error('Failed to fetch Ollama models:', error)
+        }
+      }
+
+      // Fetch LM Studio models if URL is available
+      if (lmstudio_url && ollamastate === 2) {
+        try {
+          const lmStudioResponse = await fetch(`${lmstudio_url}/v1/models`)
+          if (lmStudioResponse.ok) {
+            const lmStudioData = await lmStudioResponse.json()
+            const lmStudioModels = lmStudioData.data?.map((model: any) => ({
+              id: model.id,
+              name: model.id,
+              provider: 'LM Studio',
+              color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+              context_length: 4096,
+              pricing: { prompt: 0, completion: 0 },
+              created: Date.now()
+            })) || []
+            allFetchedModels.push(...lmStudioModels)
+          }
+        } catch (error) {
+          console.error('Failed to fetch LM Studio models:', error)
+        }
+      }
+
+      // Fetch Groq models if needed
+      try {
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/models", {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('groq_api_key') || ''}`
+          }
+        })
+        if (groqResponse.ok) {
+          const groqData = await groqResponse.json()
+          const groqModels = groqData.data
+            ?.filter((model: any) => model.id.includes('llama'))
+            .map((model: any) => ({
+              id: model.id,
+              name: model.id,
+              provider: 'Groq',
+              color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
+              context_length: 8192,
+              pricing: { prompt: 0, completion: 0 },
+              created: Date.now()
+            })) || []
+          allFetchedModels.push(...groqModels)
+        }
+      } catch (error) {
+        console.error('Failed to fetch Groq models:', error)
+      }
+
+      setAvailableModels(allFetchedModels)
+
+      // Auto-select first few models if none selected
+      if (selectedModels.length === 0 && allFetchedModels.length > 0) {
+        const initialSelection = allFetchedModels.slice(0, Math.min(3, allFetchedModels.length)).map(m => m.id)
+        setSelectedModels(initialSelection)
+      }
+
+    } catch (error) {
+      console.error('Error fetching available models:', error)
+      setAvailableModels([])
+    } finally {
+      setIsLoadingAvailableModels(false)
+    }
+  }
 
   // Initialize with stored chats or create default
   useEffect(() => {
@@ -117,6 +229,11 @@ export default function MultiModelComparison({
     loadChats()
   }, [])
 
+  // Fetch available models when component mounts or dependencies change
+  useEffect(() => {
+    fetchAvailableModels()
+  }, [lmstudio_url, ollamastate])
+
   const handleModelToggle = (modelId: string) => {
     setSelectedModels(prev =>
       prev.includes(modelId)
@@ -125,7 +242,7 @@ export default function MultiModelComparison({
     )
   }
 
-  const generateResponse = async (query: string, model: typeof AVAILABLE_MODELS[0]): Promise<ModelResponse> => {
+  const generateResponse = async (query: string, model: AvailableModel): Promise<ModelResponse> => {
     const startTime = Date.now()
     const response: ModelResponse = {
       id: `${model.id}-${Date.now()}`,
@@ -191,7 +308,7 @@ export default function MultiModelComparison({
 
     // Generate responses from all selected models in parallel
     const modelPromises = selectedModels.map(modelId => {
-      const model = AVAILABLE_MODELS.find(m => m.id === modelId)
+      const model = availableModels.find(m => m.id === modelId)
       if (model) {
         return generateResponse(query, model)
       }
@@ -235,7 +352,7 @@ export default function MultiModelComparison({
   }
 
   const getModelById = (modelId: string) => {
-    return AVAILABLE_MODELS.find(m => m.id === modelId)
+    return availableModels.find(m => m.id === modelId)
   }
 
   return (
@@ -254,27 +371,47 @@ export default function MultiModelComparison({
           {/* Model Selection */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full justify-between">
-                <span>Select Models ({selectedModels.length})</span>
+              <Button variant="outline" className="w-full justify-between" disabled={isLoadingAvailableModels}>
+                <span>
+                  {isLoadingAvailableModels
+                    ? "Loading models..."
+                    : `Select Models (${selectedModels.length}/${availableModels.length})`
+                  }
+                </span>
                 <Bot className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-64">
-              {AVAILABLE_MODELS.map((model) => (
-                <DropdownMenuCheckboxItem
-                  key={model.id}
-                  checked={selectedModels.includes(model.id)}
-                  onCheckedChange={() => handleModelToggle(model.id)}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-3 h-3 rounded-full", model.color)} />
-                    <div>
-                      <div className="font-medium">{model.name}</div>
-                      <div className="text-xs text-gray-500">{model.provider}</div>
+            <DropdownMenuContent className="w-80 max-h-64 overflow-y-auto">
+              {isLoadingAvailableModels ? (
+                <div className="p-4 text-center text-sm text-gray-500">
+                  Loading available models...
+                </div>
+              ) : availableModels.length === 0 ? (
+                <div className="p-4 text-center text-sm text-gray-500">
+                  No models available. Please configure your API keys and URLs.
+                </div>
+              ) : (
+                availableModels.map((model) => (
+                  <DropdownMenuCheckboxItem
+                    key={model.id}
+                    checked={selectedModels.includes(model.id)}
+                    onCheckedChange={() => handleModelToggle(model.id)}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <div className={cn("w-3 h-3 rounded-full", model.color)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{model.name}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <span>{model.provider}</span>
+                          {model.context_length && (
+                            <span>• {model.context_length.toLocaleString()} ctx</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuCheckboxItem>
-              ))}
+                  </DropdownMenuCheckboxItem>
+                ))
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

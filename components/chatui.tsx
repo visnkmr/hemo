@@ -262,53 +262,123 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   }, [chats, chatsLoading, currentChatId])
 
 
-  // Fetch models when API key is set
-  useEffect(() => {
-    if (ollamastate !== 0) return
+  // Function to fetch local models from LM Studio/Ollama
+  const fetchLocalModels = async (url: string, provider: 'lmstudio' | 'ollama') => {
+    try {
+      const modelsEndpoint = provider === 'ollama' ? `${url}/api/tags` : `${url}/v1/models`
 
+      const response = await fetch(modelsEndpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${provider} models`)
+      }
+
+      const data = await response.json()
+      let models: any[] = []
+
+      if (provider === 'ollama') {
+        // Ollama format: { models: [{ name: "llama2", size: 123, ... }] }
+        models = data.models?.map((model: any) => ({
+          id: model.name,
+          name: model.name,
+          provider: 'Ollama',
+          context_length: model.details?.parameter_size ? parseInt(model.details.parameter_size) * 1000 : 4096,
+          pricing: { prompt: 0, completion: 0 },
+          created: Date.now(),
+          description: `${model.size ? (model.size / 1e9).toFixed(1) + 'GB' : 'Unknown size'}`
+        })) || []
+      } else if (provider === 'lmstudio') {
+        // LM Studio format: { data: [{ id: "model-name", object: "model", ... }] }
+        models = data.data?.map((model: any) => ({
+          id: model.id,
+          name: model.id,
+          provider: 'LM Studio',
+          context_length: 4096, // Default for LM Studio
+          pricing: { prompt: 0, completion: 0 },
+          created: Date.now(),
+          description: 'Local model'
+        })) || []
+      }
+
+      return models
+    } catch (error) {
+      console.error(`Error fetching ${provider} models:`, error)
+      return []
+    }
+  }
+
+  // Fetch models based on provider
+  useEffect(() => {
     const fetchModels = async () => {
       setIsLoadingModels(true)
+
       try {
-        const response = await fetch("https://openrouter.ai/api/v1/models", {
-          headers: {
-            // Authorization: `Bearer ${apiKey}`,
-          },
-        })
+        let models: any[] = []
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch models")
+        if (ollamastate === 0) {
+          // Fetch OpenRouter models
+          const response = await fetch("https://openrouter.ai/api/v1/models", {
+            headers: {
+              // Authorization: `Bearer ${apiKey}`,
+            },
+          })
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch OpenRouter models")
+          }
+
+          const data = await response.json()
+          const openRouterModels = data.data
+
+          // Filter out models with missing required fields and sort by creation date
+          models = openRouterModels
+            .filter((model: any) => model?.id && model?.pricing?.prompt !== undefined && model?.pricing?.completion !== undefined)
+            .sort((a: any, b: any) => b.created - a.created)
+
+          console.log("Loaded OpenRouter models:", models.length)
+
+        } else if (ollamastate === 1 && lmurl) {
+          // Fetch Ollama models
+          models = await fetchLocalModels(lmurl, 'ollama')
+          console.log("Loaded Ollama models:", models.length)
+
+        } else if (ollamastate === 2 && lmurl) {
+          // Fetch LM Studio models
+          models = await fetchLocalModels(lmurl, 'lmstudio')
+          console.log("Loaded LM Studio models:", models.length)
         }
-        console.log("loaded models")
-        const data = await response.json()
-        const models = data.data
-        
-        // Filter out models with missing required fields and sort by creation date
-        const validModels = models
-          .filter((model: any) => model?.id && model?.pricing?.prompt !== undefined && model?.pricing?.completion !== undefined)
-          .sort((a: any, b: any) => b.created - a.created);
-        
-        console.log("All valid models:", validModels.length)
-        setAllModels(validModels)
 
-        // // Filter for free models (where pricing is 0)
-        // const freeModels = data.data.filter((model: any) => {
-        //   return Number.parseFloat(model.pricing?.prompt) <= 0 && Number.parseFloat(model.pricing?.completion) <= 0
-        // })
+        setAllModels(models)
 
-        // Set the first model as selected if none is selected
-        // if (freeModels.length > 0 && !selectedModel) {
-        //   setSelectedModel(freeModels[0].id)
-        //   setSelectedModelInfo(freeModels[0])
-        // }
+        // Auto-select first model if none selected and models are available
+        if (models.length > 0 && !selectedModel) {
+          const firstModel = models[0]
+          setSelectedModel(firstModel.id)
+          setSelectedModelInfo(firstModel)
+        }
+
       } catch (err) {
         console.error("Error fetching models:", err)
+        setAllModels([])
       } finally {
         setIsLoadingModels(false)
       }
     }
 
-    fetchModels()
-  }, [ollamastate])
+    // Only fetch if we have the necessary conditions
+    if (ollamastate === 0 || (ollamastate === 1 && lmurl) || (ollamastate === 2 && lmurl)) {
+      fetchModels()
+    } else {
+      // Clear models when conditions not met
+      setAllModels([])
+      setIsLoadingModels(false)
+    }
+  }, [ollamastate, lmurl])
 
   const createNewChat = async (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
@@ -506,7 +576,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             </div>) : null}
             {ollamastate == 4 && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
+                <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} lmstudio_url={lmurl} />
               </div>
             )}
             {(ollamastate !== 0 && ollamastate !== 4) ? (
@@ -516,7 +586,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 </div>
                 {ollamastate !== 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
+                    <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} lmstudio_url={lmurl} />
                   </div>
                 )}
                 {ollamastate === 3 && (
