@@ -17,6 +17,7 @@ import { Markdown } from "./markdown"
 import LMStudioURL from "./lmstudio-url"
 import { cn } from "../lib/utils"
 import { multiModelStorage, type MultiModelChat, type MultiModelMessage } from "../lib/multi-model-storage"
+import { useConfigItem } from "../hooks/use-indexeddb"
 
 // Local interface for model responses
 interface ModelResponse {
@@ -87,6 +88,9 @@ export default function MultiModelComparison({
   const [availableModels, setAvailableModels] = useState<any[]>([])
   const [isLoadingAvailableModels, setIsLoadingAvailableModels] = useState(false)
   const [modelSelectionCards, setModelSelectionCards] = useState<Array<{id: string, provider: number, model: string}>>([{id: '1', provider: 0, model: ''}])
+
+  // Get API keys from IndexedDB
+  const { value: groqApiKey } = useConfigItem<string>("groq_api_key", "")
 
   // Function to fetch models from different providers
   const fetchAvailableModels = async () => {
@@ -161,7 +165,7 @@ export default function MultiModelComparison({
       try {
         const groqResponse = await fetch("https://api.groq.com/openai/v1/models", {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('groq_api_key') || ''}`
+            'Authorization': `Bearer ${groqApiKey || ''}`
           }
         })
         if (groqResponse.ok) {

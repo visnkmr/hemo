@@ -24,6 +24,7 @@ import MultiModelComparison from "./multi-model-comparison"
 // import { invoke } from "@tauri-apps/api/tauri";
 import { Label } from "./ui/label"
 import { cn } from "../lib/utils"
+import { useConfigItem } from "../hooks/use-indexeddb"
 // import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
 export let setcolorpertheme = "bg-white dark:bg-gray-800"
@@ -848,36 +849,37 @@ interface ChatInterfaceProps {
  * @throws An error if the API call fails or the response body is null.
  */
 export async function* sendMessageStream({
-  notollama,
-  url,
-  // apiKey,
-  model,
-  messages,
-  lmstudio_url,
-  context
-}: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
-  const storedApiKey = localStorage.getItem(notollama == 4 ? "groq_api_key" : "openrouter_api_key")
-  console.log(storedApiKey)
-  console.log("========" + notollama)
-  // const or_mi=localStorage.getItem("or_model_info")
-  let modelname
-  switch (notollama) {
-    case 0:
-      modelname = localStorage.getItem("or_model")
-      break;
-    case 1:
-      modelname = localStorage.getItem("lmstudio_model_name")
-      break;
-    case 2:
-      modelname = localStorage.getItem("lmstudio_model_name")
-      break;
-    case 3:
-      modelname = ""
-      break;
-    case 4:
-      modelname = localStorage.getItem("groq_model_name")
-      break;
-  }
+   notollama,
+   url,
+   // apiKey,
+   model,
+   messages,
+   lmstudio_url,
+   context,
+   apiKeys
+ }: SendMessageStreamParams & { apiKeys: { groq_api_key?: string; openrouter_api_key?: string; or_model?: string; lmstudio_model_name?: string; groq_model_name?: string } }): AsyncGenerator<string, void, unknown> {
+   const storedApiKey = apiKeys[notollama == 4 ? "groq_api_key" : "openrouter_api_key"]
+   console.log(storedApiKey)
+   console.log("========" + notollama)
+   // const or_mi=localStorage.getItem("or_model_info")
+   let modelname
+   switch (notollama) {
+     case 0:
+       modelname = apiKeys.or_model
+       break;
+     case 1:
+       modelname = apiKeys.lmstudio_model_name
+       break;
+     case 2:
+       modelname = apiKeys.lmstudio_model_name
+       break;
+     case 3:
+       modelname = ""
+       break;
+     case 4:
+       modelname = apiKeys.groq_model_name
+       break;
+   }
   // const modelname = notollama==0?model:
   console.log(modelname)
 
@@ -1234,7 +1236,14 @@ export default function ChatInterface({
           model: modelToSend,
           messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
           lmstudio_url: lmstudio_url,
-          context: answerfromfile ? context : ""
+          context: answerfromfile ? context : "",
+          apiKeys: {
+            groq_api_key: groqApiKey || "",
+            openrouter_api_key: openrouterApiKey || "",
+            or_model: orModel || "",
+            lmstudio_model_name: lmstudioModelName || "",
+            groq_model_name: groqModelName || ""
+          }
         })) {
           accumulatedContent += contentChunk;
 
@@ -1506,7 +1515,14 @@ export default function ChatInterface({
         model: modelToSend,
         messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
         lmstudio_url: lmstudio_url,
-        context: answerfromfile ? context : ""
+        context: answerfromfile ? context : "",
+        apiKeys: {
+          groq_api_key: groqApiKey || "",
+          openrouter_api_key: openrouterApiKey || "",
+          or_model: orModel || "",
+          lmstudio_model_name: lmstudioModelName || "",
+          groq_model_name: groqModelName || ""
+        }
       })) {
         accumulatedContent += contentChunk;
 
@@ -1585,7 +1601,7 @@ export default function ChatInterface({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("openrouter_api_key")}`,
+          Authorization: `Bearer ${openrouterApiKey || ""}`,
         },
         body: JSON.stringify({
           prompt: prompt,
@@ -1828,12 +1844,20 @@ export default function ChatInterface({
   // },[])
   const [vendor, setvendor] = useState("Openrouter")
   // const [label,setlabel]=useState("")
-  useEffect(() => {
-    const lastState = localStorage.getItem("laststate");
-    setollamastate(lastState ? parseInt(lastState, 10) : 0);
-  }, [])
-  useEffect(() => {
+  const { value: lastStateValue, setValue: setLastState } = useConfigItem<number>("laststate", 0)
+  const { value: groqApiKey } = useConfigItem<string>("groq_api_key", "")
+  const { value: openrouterApiKey } = useConfigItem<string>("openrouter_api_key", "")
+  const { value: orModel } = useConfigItem<string>("or_model", "")
+  const { value: lmstudioModelName } = useConfigItem<string>("lmstudio_model_name", "")
+  const { value: groqModelName } = useConfigItem<string>("groq_model_name", "")
 
+  useEffect(() => {
+    if (lastStateValue !== undefined) {
+      setollamastate(lastStateValue);
+    }
+  }, [lastStateValue])
+
+  useEffect(() => {
     switch (ollamastate) {
       case 0:
         setvendor("Openrouter")
@@ -1851,9 +1875,9 @@ export default function ChatInterface({
       default:
         break;
     }
-    localStorage.setItem("laststate", ollamastate.toString())
+    setLastState(ollamastate)
 
-  }, [ollamastate])
+  }, [ollamastate, setLastState])
 
   return (
     <div className="">

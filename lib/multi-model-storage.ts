@@ -23,29 +23,31 @@ interface MultiModelChat {
   updatedAt: string
 }
 
+import { idb } from './indexeddb-storage'
+
 const STORAGE_KEY = 'multi-model-comparison-chats'
 
 class MultiModelStorage {
-  private getStoredChats(): MultiModelChat[] {
+  private async getStoredChats(): Promise<MultiModelChat[]> {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      return stored ? JSON.parse(stored) : []
+      const stored = await idb.get(STORAGE_KEY)
+      return stored ? stored : []
     } catch (error) {
       console.error('Failed to load chats from storage:', error)
       return []
     }
   }
 
-  private saveChats(chats: MultiModelChat[]): void {
+  private async saveChats(chats: MultiModelChat[]): Promise<void> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(chats))
+      await idb.set(STORAGE_KEY, chats)
     } catch (error) {
       console.error('Failed to save chats to storage:', error)
     }
   }
 
   async createChat(title: string = 'Multi-Model Comparison'): Promise<MultiModelChat> {
-    const chats = this.getStoredChats()
+    const chats = await this.getStoredChats()
     const chat: MultiModelChat = {
       id: Date.now().toString(),
       title,
@@ -55,34 +57,34 @@ class MultiModelStorage {
     }
 
     chats.push(chat)
-    this.saveChats(chats)
+    await this.saveChats(chats)
     return chat
   }
 
   async getChat(chatId: string): Promise<MultiModelChat | null> {
-    const chats = this.getStoredChats()
+    const chats = await this.getStoredChats()
     return chats.find(chat => chat.id === chatId) || null
   }
 
   async getAllChats(): Promise<MultiModelChat[]> {
-    const chats = this.getStoredChats()
+    const chats = await this.getStoredChats()
     return chats.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }
 
   async updateChat(chat: MultiModelChat): Promise<void> {
-    const chats = this.getStoredChats()
+    const chats = await this.getStoredChats()
     const index = chats.findIndex(c => c.id === chat.id)
     if (index !== -1) {
       chat.updatedAt = new Date().toISOString()
       chats[index] = chat
-      this.saveChats(chats)
+      await this.saveChats(chats)
     }
   }
 
   async deleteChat(chatId: string): Promise<void> {
-    const chats = this.getStoredChats()
+    const chats = await this.getStoredChats()
     const filteredChats = chats.filter(chat => chat.id !== chatId)
-    this.saveChats(filteredChats)
+    await this.saveChats(filteredChats)
   }
 
   async addMessage(chatId: string, message: MultiModelMessage): Promise<void> {
@@ -113,7 +115,7 @@ class MultiModelStorage {
   }
 
   async clearAllChats(): Promise<void> {
-    localStorage.removeItem(STORAGE_KEY)
+    await idb.remove(STORAGE_KEY)
   }
 
   // Export chat data for backup/sharing
@@ -126,7 +128,7 @@ class MultiModelStorage {
   async importChat(chatData: string): Promise<MultiModelChat | null> {
     try {
       const chat: MultiModelChat = JSON.parse(chatData)
-      const chats = this.getStoredChats()
+      const chats = await this.getStoredChats()
 
       // Ensure the chat has a unique ID
       chat.id = Date.now().toString()
@@ -134,7 +136,7 @@ class MultiModelStorage {
       chat.updatedAt = new Date().toISOString()
 
       chats.push(chat)
-      this.saveChats(chats)
+      await this.saveChats(chats)
       return chat
     } catch (error) {
       console.error('Failed to import chat:', error)
