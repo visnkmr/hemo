@@ -543,8 +543,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   return (
     <div className="absolute min-h-svh flex flex-col inset-0 w-screen bg-gray-50 dark:bg-gray-900">
-      {(
-        <div style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
+      <div style={{ height: 'var(--100vh, 100vh)' }} className="relative overflow-hidden">
           <div className="absolute top-4 left-4 z-50 p-2 rounded-md  dark:text-white  dark:bg-gray-900 bg-gray-10 ">
             <div className="flex flex-row gap-4 ">
               <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
@@ -574,28 +573,19 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             {(ollamastate == 0 || ollamastate == 4) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <ApiKeyInput ollamastate={ollamastate} />
             </div>) : null}
-            {ollamastate == 4 && (
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} lmstudio_url={lmurl} />
-              </div>
-            )}
+            {ollamastate == 4 && null}
             {(ollamastate !== 0 && ollamastate !== 4) ? (
               <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
                 </div>
-                {ollamastate !== 3 && (
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} lmstudio_url={lmurl} />
-                  </div>
-                )}
                 {ollamastate === 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                     <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
                   </div>
                 )}
               </>
-            ) : <></>}
+            ) : null}
 
 
             <div className="flex-1 overflow-y-auto pb-16 ">
@@ -610,9 +600,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
 
           </div>
-
         </div>
-      )}
       {/* <SidebarMenu/> */}
       {/* <div className={` ${!collapsed?"absolute bottom-0 left-0 p-4 z-50 w-48":"hidden"}`}> */}
       {/* <Button onClick={createNewChat} className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-900 dark:text-white text-black border border-gray-200 dark:border-gray-700">

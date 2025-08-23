@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Separator } from "../components/ui/separator"
 import { Badge } from "../components/ui/badge"
 import type { Message, FileItem } from "../lib/types"
-import { SendIcon, Loader2, Bot, CopyIcon, RefreshCw, Quote, GitCompare, CheckCircle, XCircle, Clock, Zap } from "lucide-react"
+import { SendIcon, Loader2, Bot, CopyIcon, RefreshCw, Quote, GitCompare, CheckCircle, XCircle, Clock, Zap, Plus, ChevronDown } from "lucide-react"
 import { Markdown } from "./markdown"
 import LMStudioURL from "./lmstudio-url"
 import { cn } from "../lib/utils"
@@ -86,6 +86,7 @@ export default function MultiModelComparison({
   const [showDialog, setShowDialog] = useState(false)
   const [availableModels, setAvailableModels] = useState<any[]>([])
   const [isLoadingAvailableModels, setIsLoadingAvailableModels] = useState(false)
+  const [modelSelectionCards, setModelSelectionCards] = useState<Array<{id: string, provider: number, model: string}>>([{id: '1', provider: 0, model: ''}])
 
   // Function to fetch models from different providers
   const fetchAvailableModels = async () => {
@@ -242,6 +243,39 @@ export default function MultiModelComparison({
     )
   }
 
+  const addModelSelectionCard = () => {
+    const newId = (modelSelectionCards.length + 1).toString()
+    setModelSelectionCards(prev => [...prev, {id: newId, provider: 0, model: ''}])
+  }
+
+  const removeModelSelectionCard = (cardId: string) => {
+    if (modelSelectionCards.length > 1) {
+      setModelSelectionCards(prev => prev.filter(card => card.id !== cardId))
+    }
+  }
+
+  const updateCardProvider = (cardId: string, provider: number) => {
+    setModelSelectionCards(prev =>
+      prev.map(card => card.id === cardId ? {...card, provider, model: ''} : card)
+    )
+  }
+
+  const updateCardModel = (cardId: string, model: string) => {
+    setModelSelectionCards(prev =>
+      prev.map(card => card.id === cardId ? {...card, model} : card)
+    )
+  }
+
+  const getProviderName = (provider: number) => {
+    switch (provider) {
+      case 0: return "Openrouter"
+      case 1: return "Ollama"
+      case 2: return "LM Studio"
+      case 4: return "Groq"
+      default: return "Openrouter"
+    }
+  }
+
   const generateResponse = async (query: string, model: AvailableModel): Promise<ModelResponse> => {
     const startTime = Date.now()
     const response: ModelResponse = {
@@ -278,7 +312,7 @@ export default function MultiModelComparison({
   }
 
   const handleSendMessage = async () => {
-    if (!input.trim() || selectedModels.length === 0 || isLoading) return
+    if (!input.trim() || modelSelectionCards.length === 0 || isLoading) return
 
     setIsLoading(true)
     const query = input.trim()
@@ -306,13 +340,30 @@ export default function MultiModelComparison({
     // Save to storage in background
     multiModelStorage.updateChat(updatedChat).catch(console.error)
 
-    // Generate responses from all selected models in parallel
-    const modelPromises = selectedModels.map(modelId => {
-      const model = availableModels.find(m => m.id === modelId)
-      if (model) {
-        return generateResponse(query, model)
+    // Generate responses from all selected models in cards
+    const modelPromises = modelSelectionCards.map(card => {
+      if (!card.model.trim()) return Promise.resolve(null)
+
+      // Create a temporary model object for local providers
+      let model: AvailableModel
+      if (card.provider === 1 || card.provider === 2) {
+        // Local providers - create a basic model object
+        model = {
+          id: card.model,
+          name: card.model,
+          provider: card.provider === 1 ? 'Ollama' : 'LM Studio',
+          context_length: 4096,
+          pricing: { prompt: 0, completion: 0 },
+          created: Date.now()
+        }
+      } else {
+        // Remote providers - find from available models
+        const foundModel = availableModels.find(m => m.id === card.model)
+        if (!foundModel) return Promise.resolve(null)
+        model = foundModel
       }
-      return Promise.resolve(null)
+
+      return generateResponse(query, model)
     }).filter(Boolean)
 
     const responses = await Promise.all(modelPromises)
@@ -368,52 +419,133 @@ export default function MultiModelComparison({
             </h2>
           </div>
 
-          {/* Model Selection */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full justify-between" disabled={isLoadingAvailableModels}>
-                <span>
-                  {isLoadingAvailableModels
-                    ? "Loading models..."
-                    : `Select Models (${selectedModels.length}/${availableModels.length})`
-                  }
-                </span>
-                <Bot className="h-4 w-4" />
+          {/* Model Selection Cards */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Model Selection ({modelSelectionCards.length})
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addModelSelectionCard}
+                className="h-8 px-2"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80 max-h-64 overflow-y-auto">
-              {isLoadingAvailableModels ? (
-                <div className="p-4 text-center text-sm text-gray-500">
-                  Loading available models...
-                </div>
-              ) : availableModels.length === 0 ? (
-                <div className="p-4 text-center text-sm text-gray-500">
-                  No models available. Please configure your API keys and URLs.
-                </div>
-              ) : (
-                availableModels.map((model) => (
-                  <DropdownMenuCheckboxItem
-                    key={model.id}
-                    checked={selectedModels.includes(model.id)}
-                    onCheckedChange={() => handleModelToggle(model.id)}
-                  >
-                    <div className="flex items-center gap-2 w-full">
-                      <div className={cn("w-3 h-3 rounded-full", model.color)} />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{model.name}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <span>{model.provider}</span>
-                          {model.context_length && (
-                            <span>• {model.context_length.toLocaleString()} ctx</span>
-                          )}
-                        </div>
+            </div>
+
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {modelSelectionCards.map((card, index) => (
+                <Card key={card.id} className="relative">
+                  <CardContent className="p-3">
+                    <div className="space-y-2">
+                      {/* Provider Selection */}
+                      <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Bot size={14} className="mr-1" />
+                              {getProviderName(card.provider)}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => updateCardProvider(card.id, 0)}>
+                              Openrouter
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateCardProvider(card.id, 1)}>
+                              Ollama
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateCardProvider(card.id, 2)}>
+                              LM Studio
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateCardProvider(card.id, 4)}>
+                              Groq
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Remove Card Button */}
+                        {modelSelectionCards.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeModelSelectionCard(card.id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            ×
+                          </Button>
+                        )}
                       </div>
+
+                      {/* Model Selection */}
+                      {card.provider === 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between text-left font-normal"
+                              disabled={isLoadingAvailableModels}
+                            >
+                              <span className="truncate">
+                                {isLoadingAvailableModels
+                                  ? "Loading models..."
+                                  : card.model || "Select Model"
+                                }
+                              </span>
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
+                            {isLoadingAvailableModels ? (
+                              <div className="p-4 text-center text-sm text-gray-500">
+                                Loading models...
+                              </div>
+                            ) : availableModels.length === 0 ? (
+                              <div className="p-4 text-center text-sm text-gray-500">
+                                No models available
+                              </div>
+                            ) : (
+                              availableModels.map((model) => (
+                                <DropdownMenuItem
+                                  key={model.id}
+                                  onClick={() => updateCardModel(card.id, model.id)}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{model.name}</span>
+                                    {model.context_length && (
+                                      <span className="text-xs text-gray-500">
+                                        {model.context_length.toLocaleString()} ctx
+                                      </span>
+                                    )}
+                                  </div>
+                                </DropdownMenuItem>
+                              ))
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+
+                      {/* Local Model Selection for Ollama/LM Studio */}
+                      {(card.provider === 1 || card.provider === 2) && (
+                        <div className="flex-1">
+                          <Input
+                            type="text"
+                            value={card.model}
+                            onChange={(e) => updateCardModel(card.id, e.target.value)}
+                            placeholder={`${getProviderName(card.provider)} model name`}
+                            className="h-9"
+                          />
+                        </div>
+                      )}
                     </div>
-                  </DropdownMenuCheckboxItem>
-                ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Selected Models Preview */}
@@ -690,7 +822,7 @@ export default function MultiModelComparison({
                 />
                 <Button
                   onClick={handleSendMessage}
-                  disabled={isLoading || !input.trim() || selectedModels.length === 0}
+                  disabled={isLoading || !input.trim() || modelSelectionCards.filter(card => card.model.trim()).length === 0}
                   className="px-6"
                 >
                   {isLoading ? (
@@ -707,20 +839,17 @@ export default function MultiModelComparison({
               {/* Selected Models Summary */}
               <div className="flex items-center justify-between text-sm">
                 <div className="text-gray-500 dark:text-gray-400">
-                  Comparing across {selectedModels.length} model{selectedModels.length !== 1 ? 's' : ''}
+                  Comparing across {modelSelectionCards.filter(card => card.model.trim()).length} model{modelSelectionCards.filter(card => card.model.trim()).length !== 1 ? 's' : ''}
                 </div>
                 <div className="flex items-center gap-2">
-                  {selectedModels.slice(0, 3).map(modelId => {
-                    const model = getModelById(modelId)
-                    return model ? (
-                      <Badge key={modelId} variant="secondary" className={cn("text-xs", model.color)}>
-                        {model.name}
-                      </Badge>
-                    ) : null
-                  })}
-                  {selectedModels.length > 3 && (
+                  {modelSelectionCards.filter(card => card.model.trim()).slice(0, 3).map(card => (
+                    <Badge key={card.id} variant="secondary" className="text-xs">
+                      {card.model}
+                    </Badge>
+                  ))}
+                  {modelSelectionCards.filter(card => card.model.trim()).length > 3 && (
                     <Badge variant="secondary" className="text-xs">
-                      +{selectedModels.length - 3} more
+                      +{modelSelectionCards.filter(card => card.model.trim()).length - 3} more
                     </Badge>
                   )}
                 </div>

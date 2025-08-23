@@ -15,6 +15,7 @@ import MessageItem from "../components/message-item"
 import { Markdown } from "./markdown"
 import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
+import LMStudioModelName from "./localmodelname"
 import QuestionsSidebar from "./questions-sidebar"
 import ModelSelectionDialog from "./model-selection-dialog"
 import { useIsMobile } from "../hooks/use-mobile"
@@ -2037,6 +2038,8 @@ export default function ChatInterface({
 
       {/* Input Area */}
       <div className={`absolute bottom-0 left-0 right-0 pl-4 pr-4 ${isInputFocused ? '' : ''}`} >
+
+        
       {showScrollToBottom && (
                 <div className="flex justify-center md:justify-end md:mr-32 mb-2">
                   <Button
@@ -2182,6 +2185,17 @@ export default function ChatInterface({
                 isLoading={isLoadingModels}
               />
             ) : null}
+            {/* Local Model Selection for ollamaastate 1 and 2 */}
+        {(ollamastate === 1 || ollamastate === 2) && (
+          
+                  <LMStudioModelName
+                    model_name={ollamastate === 1 ? lmstudio_model_name : lmstudio_model_name}
+                    set_model_name={ollamastate === 1 ? setlmmodel : setlmmodel}
+                    ollamastate={ollamastate}
+                    lmstudio_url={lmstudio_url}
+                  />
+               
+        )}
             {ollamastate === 3 && (
               <div className="flex items-center gap-2">
                 {/* <FileUploader/> */}

@@ -5,7 +5,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Button } from "../components/ui/button"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
-import { EyeIcon, EyeOffIcon, SaveIcon, ChevronDownIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, SaveIcon, ChevronDownIcon, Bot } from "lucide-react"
 import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface LMmodelnameProps {
@@ -167,79 +167,77 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
   }
 
   return (
-    <div className="space-y-2 text-black dark:text-white">
-      {( lmstudio_url && (ollamastate === 1 || ollamastate === 2))?(<><Label htmlFor="model-selection">{label} Model Name</Label>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          {useDropdown && availableModels.length > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between text-left font-normal"
-                  disabled={isLoadingModels}
-                >
-                  <span className="truncate">
-                    {isLoadingModels
-                      ? "Loading models..."
-                      : inputValue || "Select a model"
-                    }
-                  </span>
-                  <ChevronDownIcon className="h-4 w-4 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
-                {availableModels.map((model) => (
-                  <DropdownMenuItem
-                    key={model.id}
-                    onClick={() => handleModelSelect(model.name)}
-                    className="cursor-pointer"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{model.name}</span>
-                      {model.size && (
-                        <span className="text-xs text-gray-500">
-                          {(model.size / 1e9).toFixed(1)} GB
-                        </span>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Input
-              id="model-selection"
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`${label} model name`}
-              className="pr-10"
-            />
-          )}
-        </div>
-        {!useDropdown && (
-          <Button onClick={handleSave} disabled={!inputValue || inputValue === model_name} size="icon">
-            <SaveIcon className="h-4 w-4" />
+    <div className="flex items-center gap-2">
+      {/* <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Bot size={14} className="mr-1" />
+            {label}
           </Button>
-        )}
-      </div></>):(<Label htmlFor="model-selection">No {label} instance found </Label>)
-}
-      {useDropdown && (
-        <div className="text-xs text-gray-500">
-          {availableModels.length} models available • Click dropdown to select
-        </div>
-      )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={() => {
+            // Handle provider change - this would need to be passed as a prop
+            console.log('Provider change requested')
+          }}>
+            {label}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu> */}
 
-      {/* Debug info - remove in production availableModels.length > 0 &&*/}
-      {/* <div className="text-xs text-red-500 mt-1 p-1 bg-red-50 rounded">
-        <strong>Debug Info:</strong><br />
-        useDropdown: {useDropdown ? 'true' : 'false'}<br />
-        availableModels: {availableModels.length}<br />
-        lmstudio_url: {lmstudio_url || 'none'}<br />
-        ollamastate: {ollamastate}<br />
-        isLoadingModels: {isLoadingModels ? 'true' : 'false'}
-      </div> */}
+      <div className="flex-1">
+        {useDropdown && availableModels.length > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-between text-left font-normal"
+                disabled={isLoadingModels}
+              >
+                <span className="truncate">
+                  {isLoadingModels
+                    ? "Loading models..."
+                    : inputValue || "Select a model"
+                  }
+                </span>
+                <ChevronDownIcon className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-full max-h-60 overflow-y-auto">
+              {availableModels.map((model) => (
+                <DropdownMenuItem
+                  key={model.id}
+                  onClick={() => handleModelSelect(model.name)}
+                  className="cursor-pointer"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">{model.name}</span>
+                    {model.size && (
+                      <span className="text-xs text-gray-500">
+                        {(model.size / 1e9).toFixed(1)} GB
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={`${label} model name`}
+            className="h-9"
+          />
+        )}
+      </div>
+
+      {!useDropdown && (
+        <Button onClick={handleSave} disabled={!inputValue || inputValue === model_name} size="sm">
+          <SaveIcon className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   )
 }
