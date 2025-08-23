@@ -275,8 +275,35 @@ export function useMigration() {
     chatHistory: number;
   } | null>(null);
 
-  const migrateFromLocalStorage = useCallback(async () => {
+  const migrateFromLocalStorage = useCallback(async (forceMigration = false) => {
     try {
+      // If not forcing migration, check if it should run
+      if (!forceMigration) {
+        const existingChats = await idb.getAllChats();
+
+        // Check if there's existing configuration in IndexedDB
+        const configKeys = [
+          'groq_api_key', 'openrouter_api_key', 'groq_model_name', 'lmstudio_model_name',
+          'lmstudio_url', 'filegpt_url', 'laststate', 'or_model', 'or_model_info'
+        ];
+        const configPromises = configKeys.map(key => idb.get(key));
+        const configValues = await Promise.all(configPromises);
+        const hasIndexedDBConfig = configValues.some(value => value !== null);
+
+        // Check if there's localStorage data to migrate
+        const localStorageKeys = [
+          'groq_api_key', 'openrouter_api_key', 'groq_model_name', 'lmstudio_model_name',
+          'lmstudio_url', 'filegpt_url', 'laststate', 'or_model', 'or_model_info', 'chat_history'
+        ];
+        const hasLocalStorageData = localStorageKeys.some(key => localStorage.getItem(key) !== null);
+
+        // Skip migration if conditions aren't met
+        if (existingChats.length > 0 || hasIndexedDBConfig || !hasLocalStorageData) {
+          console.log('Migration skipped - conditions not met');
+          return;
+        }
+      }
+
       setMigrating(true);
       setError(null);
       setMigrationComplete(false);

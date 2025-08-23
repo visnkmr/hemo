@@ -205,17 +205,8 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   useEffect(() => {
     console.log("checking here for ollamastate val 1")
 
-    // Run migration from localStorage to IndexedDB on first load
-    const runMigration = async () => {
-      try {
-        await migrateFromLocalStorage()
-        console.log("Migration from localStorage to IndexedDB completed")
-      } catch (error) {
-        console.error("Migration failed:", error)
-      }
-    }
-
-    runMigration()
+    // Run migration check - the hook will decide if migration is actually needed
+    migrateFromLocalStorage()
   }, [migrateFromLocalStorage])
 
   // Reload configuration data after migration completes
