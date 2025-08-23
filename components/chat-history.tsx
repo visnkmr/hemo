@@ -115,6 +115,7 @@ export default function ChatHistory({
                     if (e.key === "Enter") saveEdit(chat.id)
                     if (e.key === "Escape") cancelEdit()
                   }}
+                  placeholder={`${chat.title || "New Chat"} (${chat.messages?.length || 0})`}
                 />
                 <Button
                   variant="ghost"
@@ -141,7 +142,12 @@ export default function ChatHistory({
               </div>
             ) : (
               <div className="truncate">
-                <div className="font-medium truncate">{chat.title || "New Chat"}</div>
+                <div className="font-medium truncate">
+                  {chat.title || "New Chat"}
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                    ({chat.messages?.length || 0})
+                  </span>
+                </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   {format(new Date(chat.createdAt), "MMM d, yyyy")}
                 </div>
