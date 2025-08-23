@@ -17,6 +17,7 @@ import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
 import { useChats, useConfigItem, useMigration, idb } from "../hooks/use-indexeddb"
+import MigrationStatus from "./migration-status"
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -130,7 +131,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
    // Use IndexedDB hooks
    const { value: ollamastateValue, setValue: setollamastate } = useConfigItem<number>("laststate", whichgpt)
    const { chats, loading: chatsLoading, error: chatsError, saveChat, deleteChat: deleteChatFromDB, reloadChats } = useChats()
-   const { migrateFromLocalStorage, migrating } = useMigration()
+   const { migrateFromLocalStorage, migrating, migrationComplete, migrationStats, error: migrationError } = useMigration()
  
    // Ensure ollamastate is always a number
    const ollamastate = ollamastateValue ?? whichgpt
@@ -209,6 +210,49 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
     runMigration()
   }, [migrateFromLocalStorage])
+
+  // Reload configuration data after migration completes
+  useEffect(() => {
+    if (migrationComplete) {
+      console.log("Migration completed, reloading configuration data")
+
+      // Reload all configuration items
+      const reloadConfig = async () => {
+        try {
+          const [storedlmurl, storedFilegpturl, selmodel, selmodelinfo] = await Promise.all([
+            idb.get("lmstudio_url"),
+            idb.get("filegpt_url"),
+            idb.get("or_model"),
+            idb.get("or_model_info")
+          ])
+
+          if (storedlmurl && storedlmurl !== lmurl) {
+            setlmurl(storedlmurl)
+          }
+
+          if (storedFilegpturl && storedFilegpturl !== filegpturl) {
+            setFilegpturl(storedFilegpturl)
+          }
+
+          if (selmodel && selmodel !== selectedModel) {
+            setSelectedModel(selmodel)
+          }
+
+          if (selmodelinfo && selmodelinfo !== selectedModelInfo) {
+            setSelectedModelInfo(selmodelinfo)
+          }
+
+          // Reload chats to ensure any migrated chat history is displayed
+          reloadChats()
+        } catch (error) {
+          console.error("Error reloading config after migration:", error)
+        }
+      }
+
+      // Small delay to ensure migration is fully committed
+      setTimeout(reloadConfig, 100)
+    }
+  }, [migrationComplete, migrationStats])
 
   // Set initial chat when chats are loaded
   useEffect(() => {
@@ -553,6 +597,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
       {/* Export Dialog */}
       <ExportDialog isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} chat={currentChat} />
+
+      {/* Migration Status Notification */}
+      <MigrationStatus
+        isMigrating={migrating}
+        migrationComplete={migrationComplete}
+        migrationStats={migrationStats}
+        error={migrationError}
+      />
 
       <Toaster />
     </div>

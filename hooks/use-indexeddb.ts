@@ -265,13 +265,53 @@ export function useChat(chatId: string | null) {
 // Hook for data migration
 export function useMigration() {
   const [migrating, setMigrating] = useState(false);
+  const [migrationComplete, setMigrationComplete] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [migrationStats, setMigrationStats] = useState<{
+    configItems: number;
+    chatHistory: number;
+  } | null>(null);
 
   const migrateFromLocalStorage = useCallback(async () => {
     try {
       setMigrating(true);
       setError(null);
+      setMigrationComplete(false);
+
+      // Check what data exists in localStorage before migration
+      const keys = [
+        'groq_api_key', 'openrouter_api_key', 'groq_model_name', 'lmstudio_model_name',
+        'lmstudio_url', 'filegpt_url', 'laststate', 'or_model', 'or_model_info'
+      ];
+
+      let configCount = 0;
+      let hasChatHistory = false;
+
+      for (const key of keys) {
+        if (localStorage.getItem(key) !== null) {
+          configCount++;
+        }
+      }
+
+      if (localStorage.getItem('chat_history') !== null) {
+        hasChatHistory = true;
+      }
+
+      // Perform migration
       await idb.migrateFromLocalStorage();
+
+      setMigrationComplete(true);
+      setMigrationStats({
+        configItems: configCount,
+        chatHistory: hasChatHistory ? 1 : 0
+      });
+
+      // Auto-clear migration status after 3 seconds
+      setTimeout(() => {
+        setMigrationComplete(false);
+        setMigrationStats(null);
+      }, 3000);
+
     } catch (err) {
       setError(err as Error);
       console.error('Error during migration:', err);
@@ -284,6 +324,8 @@ export function useMigration() {
   return {
     migrateFromLocalStorage,
     migrating,
+    migrationComplete,
+    migrationStats,
     error
   };
 }
