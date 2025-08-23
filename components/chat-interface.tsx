@@ -562,21 +562,22 @@ function getModelDisplayName(modelId: string): string {
 
 // Question Group Component for Grok-style scrollable answers
 interface QuestionGroupProps {
-    question: Message
-    answers: Message[]
-    onCopy: (content: string) => void
-    onBranch: (messageId: string) => void
-    setdsm: any
-    setmts: any
-    isStreaming?: boolean
-    streamingMessageId?: string | null
-    isQuestionExpanded: boolean
-    onToggleQuestionExpand: () => void
-    currentAnswerIndex: number
-    onAnswerIndexChange: (index: number) => void
-    onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
-    onQuoteMessage?: (message: Message) => void
-    isQuoted?: boolean
+     question: Message
+     answers: Message[]
+     onCopy: (content: string) => void
+     onBranch: (messageId: string) => void
+     setdsm: any
+     setmts: any
+     isStreaming?: boolean
+     streamingMessageId?: string | null
+     isQuestionExpanded: boolean
+     onToggleQuestionExpand: () => void
+     currentAnswerIndex: number
+     onAnswerIndexChange: (index: number) => void
+     onEdit?: (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => void
+     onQuoteMessage?: (message: Message) => void
+     isQuoted?: boolean
+     quotedMessages: Message[]
    // Props for EditDialog
    ollamastate: number
    selectedModel: string
@@ -601,7 +602,7 @@ interface QuestionGroupProps {
    setcolorpertheme: string
  }
 
-function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange, onEdit, onQuoteMessage, isQuoted = false, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: QuestionGroupProps) {
+function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange, onEdit, onQuoteMessage, isQuoted = false, quotedMessages, ollamastate, selectedModel, selectedModelInfo, allModels, handleSelectModel, isLoadingModels, vendor, setollamastate, getModelColor, getModelDisplayName, answerfromfile, setanswerfromfile, sendwithhistory, setsendwithhistory, fullfileascontext, setfullfileascontext, morethanonefile, searchcurrent, setsearchcurrent, contextUsage, setcolorpertheme }: QuestionGroupProps) {
   const handlePrevious = () => {
     const newIndex = Math.max(0, currentAnswerIndex - 1)
     onAnswerIndexChange(newIndex)
@@ -721,6 +722,8 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
             onBranch={() => onBranch(currentAnswer.id)}
             setdsm={setdsm}
             setmts={setmts}
+            onQuoteMessage={onQuoteMessage}
+            isQuoted={quotedMessages.some(q => q.id === currentAnswer.id)}
           />
 
           {/* Multiple answers indicator */}
@@ -1950,6 +1953,8 @@ export default function ChatInterface({
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
                         setmts={setmts}
                         setdsm={setdsm}
+                        onQuoteMessage={handleQuoteMessage}
+                        isQuoted={quotedMessages.some(q => q.id === group.message?.id)}
                       />
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
@@ -1973,6 +1978,7 @@ export default function ChatInterface({
                           onEdit={handleEditMessage}
                           onQuoteMessage={handleQuoteMessage}
                           isQuoted={quotedMessages.some(q => q.id === group.question?.id)}
+                          quotedMessages={quotedMessages}
                           ollamastate={ollamastate}
                           selectedModel={selectedModel}
                           selectedModelInfo={selectedModelInfo}
