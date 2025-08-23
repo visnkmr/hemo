@@ -26,11 +26,18 @@ export default function ChatHistory({
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState("")
 
+  // Filter chats to only show those with at least one user message
+  const filteredChats = chats.filter(chat =>
+    chat.messages && chat.messages.some(message => message.role === 'user')
+  );
+
   // Debug logging
   console.log('ChatHistory - received chats:', chats);
+  console.log('ChatHistory - filtered chats:', filteredChats);
   console.log('ChatHistory - chats.length:', chats.length);
+  console.log('ChatHistory - filteredChats.length:', filteredChats.length);
 
-  if (chats.length === 0) {
+  if (filteredChats.length === 0) {
     return <div className="p-4 text-center text-gray-500 dark:text-gray-400">No chat history</div>
   }
 
@@ -85,7 +92,7 @@ export default function ChatHistory({
 
   return (
     <div className="space-y-1 p-2">
-      {chats.map((chat) => (
+      {filteredChats.map((chat) => (
         <div
           key={chat.id}
           className={cn(
