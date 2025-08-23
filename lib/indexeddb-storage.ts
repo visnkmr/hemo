@@ -54,7 +54,10 @@ class IndexedDBStorage {
   };
 
   constructor() {
-    this.initDB();
+    // Only initialize IndexedDB in browser environment
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      this.initDB();
+    }
   }
 
   private async initDB(): Promise<void> {
@@ -121,6 +124,9 @@ class IndexedDBStorage {
   }
 
   private ensureDB(): Promise<void> {
+    if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+      return Promise.reject(new Error('IndexedDB is not available in this environment'));
+    }
     return this.db ? Promise.resolve() : this.initDB();
   }
 

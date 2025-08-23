@@ -14,6 +14,14 @@ export function useConfigItem<T>(key: string, defaultValue: T | null = null) {
     try {
       setLoading(true);
       setError(null);
+
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+        console.log(`IndexedDB not available in this environment, using default value for ${key}`);
+        setValue(defaultValue);
+        return;
+      }
+
       const storedValue = await idb.get(key);
       setValue(storedValue !== null ? storedValue : defaultValue);
     } catch (err) {
@@ -138,6 +146,14 @@ export function useChats() {
     try {
       setLoading(true);
       setError(null);
+
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+        console.log('IndexedDB not available in this environment, skipping chat loading');
+        setChats([]);
+        return;
+      }
+
       console.log('Loading chats from IndexedDB...');
       const allChats = await idb.getAllChats();
       console.log('Loaded chats:', allChats);
@@ -368,6 +384,13 @@ export function useStorageInit() {
   useEffect(() => {
     const initializeStorage = async () => {
       try {
+        // Check if we're in a browser environment
+        if (typeof window === 'undefined' || typeof indexedDB === 'undefined') {
+          console.log('IndexedDB not available in this environment, skipping storage initialization');
+          setInitialized(false);
+          return;
+        }
+
         // Test basic IndexedDB functionality
         await idb.set('test_key', 'test_value');
         await idb.get('test_key');

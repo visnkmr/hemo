@@ -1,13 +1,14 @@
 "use client"
 
 import React, { useState, useRef, type KeyboardEvent, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Textarea } from "../components/ui/textarea"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, Edit, Quote } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, Edit, Quote, GitCompare, ArrowRight } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -17,10 +18,11 @@ import LMStudioURL from "./lmstudio-url"
 import QuestionsSidebar from "./questions-sidebar"
 import ModelSelectionDialog from "./model-selection-dialog"
 import { useIsMobile } from "../hooks/use-mobile"
+import MultiModelComparison from "./multi-model-comparison"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
 import { Label } from "./ui/label"
-import { cn } from "@/lib/utils"
+import { cn } from "../lib/utils"
 // import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
 export let setcolorpertheme = "bg-white dark:bg-gray-800"
@@ -1031,9 +1033,11 @@ export default function ChatInterface({
   handleSelectModel,
   isLoadingModels
 }: ChatInterfaceProps) {
-  // const [filePaths, setFilePaths] = useState([message?message.path:""]);
+   const router = useRouter()
 
-  const [input, setInput] = useState("")
+   // const [filePaths, setFilePaths] = useState([message?message.path:""]);
+
+   const [input, setInput] = useState("")
   const [isInputFocused, setIsInputFocused] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [dsm, setdsm] = useState(directsendmessage)
@@ -1849,6 +1853,7 @@ export default function ChatInterface({
     localStorage.setItem("laststate", ollamastate.toString())
 
   }, [ollamastate])
+
   return (
     <div className="">
       {/* Dialog for URL and Model Name */}
@@ -2024,6 +2029,7 @@ export default function ChatInterface({
 
 
 
+
       {/* Error Display (kept minimal for accessibility) */}
       {error && (
         <div className="sr-only" aria-live="polite">{error}</div>
@@ -2098,7 +2104,7 @@ export default function ChatInterface({
               )}
             </div>
           )}
-
+      
           {/* <div className="max-w-3xl justify-center p-4 absolute bottom-0 w-full bg-gray-50 dark:bg-gray-900"> */}
           {/* Context Usage Bar */}
           {/* <div className="mb-2">
@@ -2197,6 +2203,15 @@ export default function ChatInterface({
 
             <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => router.push('/multi-model')}
+              className="rounded-full shadow-md bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+              title="Multi-Model Comparison"
+            >
+              <GitCompare className="h-4 w-4" />
             </Button>
             {answerfromfile ? (<HoverCard>
               <HoverCardTrigger>
