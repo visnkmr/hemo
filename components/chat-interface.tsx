@@ -1242,7 +1242,7 @@ export default function ChatInterface({
             </div>
 
           </div>
-          <div className="mt-4 flex flex-row gap-4 w-full">
+          <div className="mt-4 flex flex-row gap-4 ">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -1284,9 +1284,7 @@ export default function ChatInterface({
                 onSelectModel={handleSelectModel}
                 isLoading={isLoadingModels}
               />
-            ) : null}
-            {/* Local Model Selection for ollamaastate 1 and 2 */}
-        {(ollamastate === 1 || ollamastate === 2) && (
+            ) : ((ollamastate === 1 || ollamastate === 2)? (
           
                   <LMStudioModelName
                     model_name={ollamastate === 1 ? lmstudio_model_name : lmstudio_model_name}
@@ -1295,7 +1293,7 @@ export default function ChatInterface({
                     lmstudio_url={lmstudio_url}
                   />
                
-        )}
+        ):null)}
             {ollamastate === 3 && (
               <div className="flex items-center gap-2">
                 {/* <FileUploader/> */}
@@ -1318,7 +1316,7 @@ export default function ChatInterface({
             <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
             </Button>
-            <Button
+            {/* <Button
               variant="outline"
               size="icon"
               onClick={() => router.push('/multi-model')}
@@ -1326,7 +1324,7 @@ export default function ChatInterface({
               title="Multi-Model Comparison"
             >
               <GitCompare className="h-4 w-4" />
-            </Button>
+            </Button> */}
             {answerfromfile ? (<HoverCard>
               <HoverCardTrigger>
                 <Button
