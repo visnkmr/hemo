@@ -561,7 +561,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
                 {<MenuIcon size={20} />}
               </Button>
-              <Button variant={"outline"} onClick={() => createNewChat} className=" w-full flex items-center justify-center gap-2">
+              <Button variant={"outline"} onClick={() => createNewChat()} className=" w-full flex items-center justify-center gap-2">
                 <PlusIcon size={16} />
                 New Chat
               </Button>
