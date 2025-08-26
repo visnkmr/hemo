@@ -135,8 +135,8 @@ function ChatInputArea({
         ) : null}
         {(ollamastate === 1 || ollamastate === 2) && (
           <LMStudioModelName
-            model_name={ollamastate === 1 ? lmstudio_model_name : lmstudio_model_name}
-            set_model_name={ollamastate === 1 ? setlmmodel : setlmmodel}
+            model_name={lmstudio_model_name}
+            set_model_name={setlmmodel}
             ollamastate={ollamastate}
             lmstudio_url={lmstudio_url}
           />

@@ -34,8 +34,6 @@ export async function* sendMessageStream({
        modelname = apiKeys.or_model
        break;
      case 1:
-       modelname = apiKeys.lmstudio_model_name
-       break;
      case 2:
        modelname = apiKeys.lmstudio_model_name
        break;

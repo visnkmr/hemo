@@ -16,7 +16,7 @@ import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
-import { useChats, useConfigItem, useMigration, idb } from "../hooks/use-indexeddb"
+import { useChats, useConfigItem, useMigration } from "../hooks/use-indexeddb"
 import MigrationStatus from "./migration-status"
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
@@ -120,16 +120,30 @@ interface gptargs {
 // }
 export default function ChatUI({ message, fgptendpoint = "localhost", setasollama = false, whichgpt = 0 }: gptargs) {
    // const [apiKey, setApiKey] = useState<string>("")
-   const [lmurl, setlmurl] = useState<string>("")
-   const [model_name, set_model_name] = useState<string>("")
-   const [filegpturl, setFilegpturl] = useState<string>("")
+  //  const [model_name, set_model_name] = 
    const [selectedModel, setSelectedModel] = useState<string>("")
    const [selectedModelInfo, setSelectedModelInfo] = useState<any>("")
    const [currentChatId, setCurrentChatId] = useState<string>("")
+
+   // Wrapper functions for URL setters
+   const setlmurl = (url: string) => {
+     // This will be handled by the LMStudioURL component using its own useConfigItem
+     console.log("URL update requested:", url)
+   }
+
+   const setFilegpturl = (url: string) => {
+     // This will be handled by the FileGPTUrl component using its own useConfigItem
+     console.log("FileGPT URL update requested:", url)
+   }
    const [sidebarVisible, setSidebarVisible] = useState(true)
 
    // Use IndexedDB hooks
    const { value: ollamastateValue, setValue: setollamastate } = useConfigItem<number>("laststate", whichgpt)
+   const { value: lmstudioUrl } = useConfigItem<string>("lmstudio_url", "")
+   const { value: filegptUrl } = useConfigItem<string>("filegpt_url", "")
+   const { value: orModel, setValue: setOrModel } = useConfigItem<string>("or_model", "")
+   const { value: orModelInfo, setValue: setOrModelInfo } = useConfigItem<string>("or_model_info", "")
+   const { value: model_name, setValue: set_model_name } = useConfigItem<string>("lmstudio_model_name", "")
    const { chats, loading: chatsLoading, error: chatsError, saveChat, deleteChat: deleteChatFromDB, reloadChats } = useChats()
 
    // Debug logging for chat data
@@ -153,6 +167,25 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   useEffect(() => {
     setCollapsed(true)
   }, [currentChatId])
+
+  // Sync selectedModel with the appropriate hook based on ollamastate
+  useEffect(() => {
+    if (ollamastate === 0) {
+      // OpenRouter - use orModel
+      if (orModel && orModel !== selectedModel) {
+        setSelectedModel(orModel)
+      }
+      if (orModelInfo && orModelInfo !== selectedModelInfo) {
+        setSelectedModelInfo(orModelInfo)
+      }
+    } else if (ollamastate === 1 || ollamastate === 2 || ollamastate === 4) {
+      // Ollama/LM Studio/Groq - use lmstudioModelName
+      if (model_name && model_name !== selectedModel) {
+        setSelectedModel(model_name)
+        handleSelectModel(model_name)
+      }
+    }
+  }, [ollamastate, orModel, orModelInfo, model_name, selectedModel, selectedModelInfo])
   // useEffect(()=>{const storedApiKey = localStorage.getItem("openrouter_api_key")
   //     if (storedApiKey) {
   //       setApiKey(storedApiKey)
@@ -162,41 +195,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   //     fileloader(filegpturl,filePaths as string[])
   //   }},[filePaths])
-  // Load configuration from IndexedDB on initial render
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const [storedlmurl, storedFilegpturl, selmodel, selmodelinfo] = await Promise.all([
-          idb.get("lmstudio_url"),
-          idb.get("filegpt_url"),
-          idb.get("or_model"),
-          idb.get("or_model_info")
-        ])
-
-        if (storedlmurl) {
-          setlmurl(storedlmurl)
-        }
-
-        if (storedFilegpturl) {
-          setFilegpturl(storedFilegpturl)
-        }
-
-        if (selmodel) {
-          setSelectedModel(selmodel)
-        }
-
-        if (selmodelinfo) {
-          setSelectedModelInfo(selmodelinfo)
-        }
-
-        console.log("checking here for ollamastate val")
-      } catch (error) {
-        console.error("Error loading config:", error)
-      }
-    }
-
-    loadConfig()
-  }, [])
+  // Configuration is now loaded automatically by useConfigItem hooks
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
   // console.log(model_name)
@@ -212,45 +211,12 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   // Reload configuration data after migration completes
   useEffect(() => {
     if (migrationComplete) {
-      console.log("Migration completed, reloading configuration data")
+      console.log("Migration completed, reloading chats")
 
-      // Reload all configuration items
-      const reloadConfig = async () => {
-        try {
-          const [storedlmurl, storedFilegpturl, selmodel, selmodelinfo] = await Promise.all([
-            idb.get("lmstudio_url"),
-            idb.get("filegpt_url"),
-            idb.get("or_model"),
-            idb.get("or_model_info")
-          ])
-
-          if (storedlmurl && storedlmurl !== lmurl) {
-            setlmurl(storedlmurl)
-          }
-
-          if (storedFilegpturl && storedFilegpturl !== filegpturl) {
-            setFilegpturl(storedFilegpturl)
-          }
-
-          if (selmodel && selmodel !== selectedModel) {
-            setSelectedModel(selmodel)
-          }
-
-          if (selmodelinfo && selmodelinfo !== selectedModelInfo) {
-            setSelectedModelInfo(selmodelinfo)
-          }
-
-          // Reload chats to ensure any migrated chat history is displayed
-          reloadChats()
-        } catch (error) {
-          console.error("Error reloading config after migration:", error)
-        }
-      }
-
-      // Small delay to ensure migration is fully committed
-      setTimeout(reloadConfig, 100)
+      // Reload chats to ensure any migrated chat history is displayed
+      reloadChats()
     }
-  }, [migrationComplete, migrationStats])
+  }, [migrationComplete])
 
   // Set initial chat when chats are loaded
   useEffect(() => {
@@ -342,14 +308,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
           console.log("Loaded OpenRouter models:", models.length)
 
-        } else if (ollamastate === 1 && lmurl) {
+        } else if (ollamastate === 1 && lmstudioUrl) {
           // Fetch Ollama models
-          models = await fetchLocalModels(lmurl, 'ollama')
+          models = await fetchLocalModels(lmstudioUrl, 'ollama')
           console.log("Loaded Ollama models:", models.length)
 
-        } else if (ollamastate === 2 && lmurl) {
+        } else if (ollamastate === 2 && lmstudioUrl) {
           // Fetch LM Studio models
-          models = await fetchLocalModels(lmurl, 'lmstudio')
+          models = await fetchLocalModels(lmstudioUrl, 'lmstudio')
           console.log("Loaded LM Studio models:", models.length)
         }
 
@@ -371,14 +337,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
 
     // Only fetch if we have the necessary conditions
-    if (ollamastate === 0 || (ollamastate === 1 && lmurl) || (ollamastate === 2 && lmurl)) {
+    if (ollamastate === 0 || (ollamastate === 1 && lmstudioUrl) || (ollamastate === 2 && lmstudioUrl)) {
       fetchModels()
     } else {
       // Clear models when conditions not met
       setAllModels([])
       setIsLoadingModels(false)
     }
-  }, [ollamastate, lmurl])
+  }, [ollamastate, lmstudioUrl])
 
   const createNewChat = async (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
@@ -476,15 +442,20 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       console.error("Failed to branch conversation:", error)
     }
   }
-
   const handleSelectModel = async (modelId: string) => {
     setSelectedModel(modelId)
     const modelInfo = allModels.find((model: any) => model.id === modelId)
     setSelectedModelInfo(modelInfo || null)
 
     try {
-      await idb.set("or_model", modelId)
-      await idb.set("or_model_info", modelInfo || null)
+      if (ollamastate === 0) {
+        // OpenRouter - save to or_model
+        await setOrModel(modelId)
+        await setOrModelInfo(modelInfo || null)
+      } else if (ollamastate === 1 || ollamastate === 2 || ollamastate === 4) {
+        // Ollama/LM Studio/Groq - save to lmstudio_model_name
+        await set_model_name(modelId)
+      }
     } catch (error) {
       console.error("Failed to save model selection:", error)
     }
@@ -589,11 +560,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             {(ollamastate !== 0 && ollamastate !== 4) ? (
               <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
+                  <LMStudioURL ollamastate={ollamastate} lmurl={lmstudioUrl || ""} setlmurl={setlmurl} />
                 </div>
                 {ollamastate === 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
+                    <FileGPTUrl filegpturl={filegptUrl || ""} setFilegpturl={setFilegpturl} />
                   </div>
                 )}
               </>
@@ -636,11 +607,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             // filePaths={filePaths}
             setollamastate={setollamastate}
             ollamastate={ollamastate}
-            lmstudio_model_name={model_name}
+            lmstudio_model_name={model_name as string}
             setlmmodel={set_model_name}
-            lmstudio_url={lmurl}
+            lmstudio_url={lmstudioUrl || ""}
             setlmurl={setlmurl}
-            filegpt_url={filegpturl}
+            filegpt_url={filegptUrl || ""}
             message={message}
             chat={currentChat}
             updateChat={updateChat}
