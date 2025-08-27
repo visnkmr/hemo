@@ -8,28 +8,25 @@ import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
 import { useConfigItem } from "../hooks/use-indexeddb"
 
 interface LMUrlInputProps {
-  lmurl: string
-  ollamastate:number
-  setlmurl: (key: string) => void
+   // Removed props since component now manages its own state
 }
 
-export default function LMStudioURL({ lmurl, setlmurl, ollamastate }: LMUrlInputProps) {
-  // const [showKey, setShowKey] = useState(false)
+export default function LMStudioURL({}: LMUrlInputProps) {
+   // Use IndexedDB hooks for both URL and state
+   const { value: storedUrl, setValue: saveUrl, loading, error } = useConfigItem<string>("lmstudio_url", "")
+   const { value: ollamastate } = useConfigItem<number>("laststate", 0)
 
-  // Use IndexedDB hook instead of localStorage
-  const { value: storedUrl, setValue: saveUrl, loading, error } = useConfigItem<string>("lmstudio_url", "")
+   const [inputValue, setInputValue] = useState(storedUrl || "")
 
-  const [inputValue, setInputValue] = useState(storedUrl || lmurl)
-
-  // Update input value when storedUrl or lmurl changes
-  useEffect(() => {
-    const valueToUse = storedUrl || lmurl
-    setInputValue(valueToUse)
-  }, [storedUrl, lmurl])
+   // Update input value when storedUrl changes
+   useEffect(() => {
+     if (storedUrl) {
+       setInputValue(storedUrl)
+     }
+   }, [storedUrl])
 
   const handleSave = async () => {
     try {
-      setlmurl(inputValue)
       await saveUrl(inputValue)
     } catch (err) {
       console.error("Failed to save URL:", err)
@@ -70,7 +67,7 @@ const [label,setlabel]=useState("")
             className="pr-10"
           />
         </div>
-        <Button onClick={handleSave} disabled={!inputValue || inputValue === lmurl} size="icon">
+        <Button onClick={handleSave} disabled={!inputValue || inputValue === storedUrl} size="icon">
           <SaveIcon className="h-4 w-4" />
         </Button>
       </div>

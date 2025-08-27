@@ -1,3 +1,5 @@
+import { useConfigItem } from "@/hooks/use-indexeddb";
+
 interface SendMessageStreamParams {
   notollama: number;
   url: string;
@@ -15,35 +17,52 @@ interface SendMessageStreamParams {
  * @throws An error if the API call fails or the response body is null.
  */
 export async function* sendMessageStream({
-   notollama,
-   url,
    // apiKey,
-   model,
    messages,
-   lmstudio_url,
-   context,
-   apiKeys
- }: SendMessageStreamParams & { apiKeys: { groq_api_key?: string; openrouter_api_key?: string; or_model?: string; lmstudio_model_name?: string; groq_model_name?: string } }): AsyncGenerator<string, void, unknown> {
-   const storedApiKey = apiKeys[notollama == 4 ? "groq_api_key" : "openrouter_api_key"]
-   console.log(storedApiKey)
-   console.log("========" + notollama)
-   // const or_mi=localStorage.getItem("or_model_info")
-   let modelname
-   switch (notollama) {
-     case 0:
-       modelname = apiKeys.or_model
-       break;
-     case 1:
-     case 2:
-       modelname = apiKeys.lmstudio_model_name
-       break;
-     case 3:
-       modelname = ""
-       break;
-     case 4:
-       modelname = apiKeys.groq_model_name
-       break;
-   }
+   context
+ }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
+   const { value: ollamastate} = useConfigItem<number>("laststate", 0)
+     let whichkey=""
+     switch(ollamastate){
+       case 0:
+         whichkey="or_model"
+         break;
+       case 1:
+       case 2:
+         whichkey="lmstudio_model_name"
+         break;
+       case 4:
+         whichkey="groq_model_name"
+         break;
+       
+     }
+     const {value:modelname} = useConfigItem<string>(whichkey, "")
+     let whichapikey=""
+     switch(ollamastate){
+       case 0:
+         whichapikey="openrouter_api_key"
+         break;
+       case 4:
+         whichapikey="groq_api_key"
+         break;
+       
+     }
+     
+     const {value:storedApiKey} = useConfigItem<string>(whichapikey, "")
+     let whichurl=""
+     switch(ollamastate){
+       case 0:
+        whichurl = "https://openrouter.ai/api";
+         break;
+       case 1:
+       case 2:
+         whichurl=useConfigItem<string>("lmstudio_url", "").value!
+         break;
+       case 4:
+         whichurl="https://api.groq.com/openai";
+         break;
+       
+     }
   // const modelname = notollama==0?model:
   console.log(modelname)
 
@@ -57,9 +76,9 @@ export async function* sendMessageStream({
   };
   let headers_ollama = { 'Content-Type': 'application/json' };
   // if (notollama===0 || notollama===2) {
-  const response = await fetch(`${url}/v1/chat/completions`, {
+  const response = await fetch(`${whichurl}/v1/chat/completions`, {
     method: "POST",
-    headers: (notollama === 0 || notollama === 2 || notollama === 4) ? headers_openrouter : headers_ollama,
+    headers: (ollamastate === 0 || ollamastate === 2 || ollamastate === 4) ? headers_openrouter : headers_ollama,
     body: JSON.stringify({
       model: modelname,
       messages: [{ role: 'user', content: prompt }],

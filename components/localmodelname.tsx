@@ -23,14 +23,29 @@ interface AvailableModel {
   details?: any
 }
 
-export default function LMStudioModelName({ model_name, set_model_name, ollamastate, lmstudio_url }: LMmodelnameProps) {
+export default function LMStudioModelName( ) {
   // const [showKey, setShowKey] = useState(false)
-  const keyName = ollamastate === 4 ? "groq_model_name" : "lmstudio_model_name"
 
   // Use IndexedDB hook instead of localStorage
-  const { value: storedModelName, setValue: saveModelName, loading, error } = useConfigItem<string>(keyName, "")
-
-  const [inputValue, setInputValue] = useState(storedModelName || model_name)
+  // const { value: storedModelName, setValue: saveModelName} = useConfigItem<string>("lmstudio_model_name", "")
+  // const [model_name, set_model_name] = useState(storedModelName || "")
+  const { value: ollamastate} = useConfigItem<number>("laststate", 0)
+  let whichkey=""
+  switch(ollamastate){
+    case 0:
+      whichkey="or_model"
+      break;
+    case 1:
+    case 2:
+      whichkey="lmstudio_model_name"
+      break;
+    case 4:
+      whichkey="groq_model_name"
+      break;
+    
+  }
+  const {value:inputValue, setValue:setInputValue} = useConfigItem<string>(whichkey, "")
+  const {value:lmstudio_url} = useConfigItem<string>("lmstudio_url", "")
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [useDropdown, setUseDropdown] = useState(false)
@@ -93,9 +108,7 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
         if (!inputValue && models.length > 0) {
           const firstModel = models[0].name
           console.log('Auto-selecting first model:', firstModel)
-          setInputValue(firstModel)
-          set_model_name(firstModel)
-          await saveModelName(firstModel)
+          await setInputValue(firstModel)
         }
       } else {
         console.log('No models found, setting dropdown to false')
@@ -110,14 +123,14 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
   }
 
   // Update input value when storedModelName or model_name changes
-  useEffect(() => {
-    const valueToUse = storedModelName || model_name
-    setInputValue(valueToUse)
-  }, [storedModelName, model_name])
+  // useEffect(() => {
+  //   const valueToUse = inputValue
+  //   await setInputValue(valueToUse!)
+  // }, [inputValue])
 
   // Fetch models when URL is available
   useEffect(() => {
-    console.log('LMStudioModelName - URL:', lmstudio_url, 'State:', ollamastate)
+    // console.log('LMStudioModelName - URL:', lmstudio_url, 'State:', ollamastate)
 
     if (lmstudio_url && (ollamastate === 1 || ollamastate === 2)) {
       const provider = ollamastate === 1 ? 'ollama' : 'lmstudio'
@@ -132,8 +145,8 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
 
   const handleSave = async () => {
     try {
-      set_model_name(inputValue)
-      await saveModelName(inputValue)
+      await setInputValue(inputValue!)
+      // await saveModelName(inputValue)
     } catch (err) {
       console.error("Failed to save model name:", err)
     }
@@ -161,9 +174,7 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
   },[ollamastate])
 
   const handleModelSelect = async (modelName: string) => {
-    setInputValue(modelName)
-    set_model_name(modelName)
-    await saveModelName(modelName)
+    await setInputValue(modelName)
   }
 
   return (
@@ -225,7 +236,7 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
         ) : (
           <Input
             type="text"
-            value={inputValue}
+            value={inputValue!}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={`${label} model name`}
             className="h-9"
@@ -233,11 +244,11 @@ export default function LMStudioModelName({ model_name, set_model_name, ollamast
         )}
       </div>
 
-      {!useDropdown && (
-        <Button onClick={handleSave} disabled={!inputValue || inputValue === model_name} size="sm">
+      {/* {!useDropdown && (
+        <Button onClick={handleSave} disabled={!inputValue || isLoadingModels} size="sm">
           <SaveIcon className="h-4 w-4" />
         </Button>
-      )}
+      )} */}
     </div>
   )
 }

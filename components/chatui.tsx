@@ -560,11 +560,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             {(ollamastate !== 0 && ollamastate !== 4) ? (
               <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <LMStudioURL ollamastate={ollamastate} lmurl={lmstudioUrl || ""} setlmurl={setlmurl} />
+                  <LMStudioURL />
                 </div>
                 {ollamastate === 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <FileGPTUrl filegpturl={filegptUrl || ""} setFilegpturl={setFilegpturl} />
+                    <FileGPTUrl />
                   </div>
                 )}
               </>
@@ -602,20 +602,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
         {currentChat && (
           <ChatInterface
-            // fileloader={fileloader}
-            // filegpturl={filegpturl}
-            // filePaths={filePaths}
-            setollamastate={setollamastate}
-            ollamastate={ollamastate}
-            lmstudio_model_name={model_name as string}
-            setlmmodel={set_model_name}
-            lmstudio_url={lmstudioUrl || ""}
-            setlmurl={setlmurl}
-            filegpt_url={filegptUrl || ""}
             message={message}
             chat={currentChat}
             updateChat={updateChat}
-            // apiKey={apiKey}
             selectedModel={selectedModel}
             selectedModelInfo={selectedModelInfo}
             onBranchConversation={handleBranchConversation}

@@ -60,29 +60,22 @@ interface SendMessageStreamParams {
 }
 
 interface ChatInterfaceProps {
-  setlmurl: any;
-  setlmmodel: any;
-  ollamastate: number;
-  chat: Chat;
-  updateChat: (chat: Chat) => void;
-  // apiKey: string;
-  selectedModel: string; // Keep selectedModel for overall component state
-  selectedModelInfo: any;
-  onBranchConversation: (branchPoint: BranchPoint, branchType: 'full' | 'single' | 'model') => void;
-  lmstudio_url: string;
-  lmstudio_model_name: string;
-  filegpt_url: string;
-  message?: FileItem;
-  directsendmessage?: boolean;
-  messagetosend?: string;
-  sidebarVisible: any;
-  setSidebarVisible: any;
-  getModelColor: any;
-  getModelDisplayName: any;
-  setollamastate: any;
-  allModels: any[];
-  handleSelectModel: (modelId: string) => void;
-  isLoadingModels: boolean;
+   chat: Chat;
+   updateChat: (chat: Chat) => void;
+   // apiKey: string;
+   selectedModel: string; // Keep selectedModel for overall component state
+   selectedModelInfo: any;
+   onBranchConversation: (branchPoint: BranchPoint, branchType: 'full' | 'single' | 'model') => void;
+   message?: FileItem;
+   directsendmessage?: boolean;
+   messagetosend?: string;
+   sidebarVisible: any;
+   setSidebarVisible: any;
+   getModelColor: any;
+   getModelDisplayName: any;
+   allModels: any[];
+   handleSelectModel: (modelId: string) => void;
+   isLoadingModels: boolean;
 }
 
 // async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,lmstudio_model_name: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
@@ -152,30 +145,22 @@ interface ChatInterfaceProps {
 // --- Exported Chat Interface Component ---
 
 export default function ChatInterface({
-  ollamastate,
-  chat,
-  updateChat,
-  // apiKey,
-  lmstudio_url,
-  setlmmodel,
-  setlmurl,
-  lmstudio_model_name,
-  filegpt_url,
-  message,
-  selectedModel,
-  selectedModelInfo,
-  onBranchConversation,
-  directsendmessage = false,
-  messagetosend = "",
-
-  sidebarVisible,
-  setSidebarVisible,
-  getModelDisplayName,
-  getModelColor,
-  setollamastate,
-  allModels,
-  handleSelectModel,
-  isLoadingModels
+   chat,
+   updateChat,
+   // apiKey,
+   message,
+   selectedModel,
+   selectedModelInfo,
+   onBranchConversation,
+   directsendmessage = false,
+   messagetosend = "",
+   sidebarVisible,
+   setSidebarVisible,
+   getModelDisplayName,
+   getModelColor,
+   allModels,
+   handleSelectModel,
+   isLoadingModels
 }: ChatInterfaceProps) {
    const router = useRouter()
 
@@ -260,8 +245,8 @@ export default function ChatInterface({
     setError(null);
 
     // Check if using LM Studio or Ollama and if URL and model are provided
-    if (ollamastate === 1 || ollamastate === 2) {
-      if (!lmstudio_url || !lmstudio_model_name) {
+    if (lastStateValue === 1 || lastStateValue === 2) {
+      if (!lmstudioUrl || !lmstudioModelName) {
         setShowDialog(true);
         setIsLoading(false);
         return;
@@ -293,7 +278,7 @@ export default function ChatInterface({
       role: "user",
       content: finalMessageContent,
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      model: lastStateValue == 0 ? selectedModel! : lmstudioModelName,
     };
     // If there is a leftover pending error message from a previous failure, flush it into the chat
     if (pendingErrorMessage) {
@@ -302,12 +287,12 @@ export default function ChatInterface({
         role: "assistant",
         content: pendingErrorMessage,
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
       }
       const flushed = {
         ...chat,
         messages: [...chat.messages, errorAsAssistant],
-        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
       }
       updateChat(flushed)
       setPendingErrorMessage(null)
@@ -318,7 +303,7 @@ export default function ChatInterface({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
     };
 
     setStreamingMessageId(assistantMessageId);
@@ -329,7 +314,7 @@ export default function ChatInterface({
       ...chat,
       messages: [...initialMessages, userMessage, assistantMessage],
       title: initialMessages.length === 0 ? messageContent.slice(0, 30) : chat.title,
-      lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
     };
     updateChat(currentChatState);
 
@@ -340,20 +325,20 @@ export default function ChatInterface({
 
 
     // Call the generator and process the stream
-    if (ollamastate !== 3) {
+    if (lastStateValue !== 3) {
       try {
         // Determine API URL and model
         let apiUrl = "";
-        if (ollamastate === 0) {
+        if (lastStateValue === 0) {
           apiUrl = "https://openrouter.ai/api";
-        } else if (ollamastate === 4) {
+        } else if (lastStateValue === 4) {
           apiUrl = "https://api.groq.com/openai";
-        } else if (ollamastate === 1 || ollamastate === 2) {
-          apiUrl = lmstudio_url;
-        } else if (ollamastate === 3) {
-          apiUrl = filegpt_url;
+        } else if (lastStateValue === 1 || lastStateValue === 2) {
+          apiUrl = lmstudioUrl;
+        } else if (lastStateValue === 3) {
+          apiUrl = filegptUrl;
         }
-        const modelToSend = ollamastate == 0 ? selectedModel : lmstudio_model_name;
+        const modelToSend = lastStateValue == 0 ? selectedModel : lmstudioModelName;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
           role: msg.role,
           content: msg.content,
@@ -371,11 +356,11 @@ export default function ChatInterface({
 
         for await (const contentChunk of sendMessageStream({
           url: apiUrl,
-          notollama: ollamastate,
-          // apiKey: ollamastate,
+          notollama: lastStateValue,
+          // apiKey: lastStateValue,
           model: modelToSend,
           messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
-          lmstudio_url: lmstudio_url,
+          lmstudio_url: lmstudioUrl,
           context: answerfromfile ? context : "",
           apiKeys: {
             groq_api_key: groqApiKey || "",
@@ -410,12 +395,12 @@ export default function ChatInterface({
           role: "assistant",
           content: `Error: ${errMsg}`,
           timestamp: new Date().toISOString(),
-          model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+          model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
         };
         updateChat({
           ...chat,
           messages: [...initialMessages, userMessage, errorAssistantMessage],
-          lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+          lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
         });
         // In case UI batching prevents immediate update, keep a pending copy to flush on next send
         setPendingErrorMessage(`Error: ${errMsg}`);
@@ -587,17 +572,17 @@ export default function ChatInterface({
   // Wrapper function for handleEditMessage with context
   const handleEditMessageWrapper = async (messageId: string, newContent: string, editOllamaState?: number, editSelectedModel?: string) => {
     const context = {
-      ollamastate,
+      ollamastate: lastStateValue,
       selectedModel,
       chat,
       updateChat,
       setStreamingMessageId,
       isAtBottom,
       scrolltobottom,
-      lmstudio_url,
+      lmstudio_url: lmstudioUrl,
       answerfromfile,
       sendwithhistory,
-      lmstudio_model_name,
+      lmstudio_model_name: lmstudioModelName,
       groqApiKey: groqApiKey || "",
       openrouterApiKey: openrouterApiKey || "",
       orModel: orModel || "",
@@ -611,7 +596,7 @@ export default function ChatInterface({
   // Image generation is now handled by the extracted function in lib/chat-handlers.ts
   const generateImage = async (prompt: string) => {
     const context = {
-      ollamastate,
+      ollamastate: lastStateValue,
       selectedModel,
       chat,
       updateChat,
@@ -622,10 +607,10 @@ export default function ChatInterface({
       pendingErrorMessage,
       isAtBottom,
       scrolltobottom,
-      lmstudio_url,
+      lmstudio_url: lmstudioUrl,
       answerfromfile,
       sendwithhistory,
-      lmstudio_model_name,
+      lmstudio_model_name: lmstudioModelName,
       groqApiKey: groqApiKey || "",
       openrouterApiKey: openrouterApiKey || "",
       orModel: orModel || "",
@@ -644,7 +629,7 @@ export default function ChatInterface({
       role: "user",
       content: prompt,
       timestamp: new Date().toISOString(),
-      model: selectedModel,
+      model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
     };
 
     const assistantMessageId = (Date.now() + 1).toString();
@@ -653,7 +638,7 @@ export default function ChatInterface({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
-      model: selectedModel,
+      model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
     };
 
     setStreamingMessageId(assistantMessageId);
@@ -663,7 +648,7 @@ export default function ChatInterface({
       ...chat,
       messages: [...initialMessages, userMessage, assistantMessage],
       title: initialMessages.length === 0 ? prompt.slice(0, 30) : chat.title,
-      lastModelUsed: selectedModel,
+      lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
     };
     updateChat(currentChatState);
 
@@ -711,6 +696,7 @@ export default function ChatInterface({
       updateChat({
         ...chat,
         messages: [...initialMessages, userMessage],
+        lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
       });
     } finally {
       setIsLoading(false);
@@ -720,7 +706,7 @@ export default function ChatInterface({
 
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
-    if (lmstudio_model_name && lmstudio_url) {
+    if (lmstudioModelName && lmstudioUrl) {
       setShowDialog(false);
       // Trigger sending the message again with updated values
       handleSendMessage();
@@ -731,12 +717,12 @@ export default function ChatInterface({
         role: "assistant",
         content: "Error: Both URL and model name are required.",
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        model: lastStateValue == 0 ? selectedModel : lmstudioModelName,
       };
       updateChat({
         ...chat,
         messages: [...chat.messages, errorAssistantMessage],
-        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        lastModelUsed: lastStateValue == 0 ? selectedModel : lmstudioModelName,
       });
       setError("Both URL and model name are required.");
     }
@@ -924,17 +910,15 @@ export default function ChatInterface({
   const { value: groqApiKey } = useConfigItem<string>("groq_api_key", "")
   const { value: openrouterApiKey } = useConfigItem<string>("openrouter_api_key", "")
   const { value: orModel } = useConfigItem<string>("or_model", "")
-  const { value: lmstudioModelName } = useConfigItem<string>("lmstudio_model_name", "")
-  const { value: groqModelName } = useConfigItem<string>("groq_model_name", "")
+  const { value: lmstudioModelName, setValue: setLmstudioModelName } = useConfigItem<string>("lmstudio_model_name", "")
+  const { value: groqModelName} = useConfigItem<string>("groq_model_name", "")
+  const { value: lmstudioUrl, setValue: setLmstudioUrl } = useConfigItem<string>("lmstudio_url", "")
+  const { value: filegptUrl } = useConfigItem<string>("filegpt_url", "")
+
+  // Removed useEffect that synced lastStateValue with ollamastate prop since we now use lastStateValue directly
 
   useEffect(() => {
-    if (lastStateValue !== undefined && lastStateValue !== ollamastate) {
-      setollamastate(lastStateValue);
-    }
-  }, [lastStateValue]) // Removed ollamastate from dependencies to prevent infinite loop
-
-  useEffect(() => {
-    switch (ollamastate) {
+    switch (lastStateValue) {
       case 0:
         setvendor("Openrouter")
         break;
@@ -951,12 +935,9 @@ export default function ChatInterface({
       default:
         break;
     }
-    // Only update local storage if the value actually changed
-    if (lastStateValue !== ollamastate) {
-      setLastState(ollamastate)
-    }
+    // Removed setting lastState since we use it directly now
 
-  }, [ollamastate, setLastState, lastStateValue])
+  }, [lastStateValue])
 
   return (
     <div className="">
@@ -969,16 +950,16 @@ export default function ChatInterface({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <Input
                 type="text"
-                value={lmstudio_url}
-                onChange={(e) => setlmurl(e.target.value)}
+                value={lmstudioUrl}
+                onChange={(e) => setLmstudioUrl(e.target.value)}
                 placeholder="Enter URL"
                 className="w-full"
                 autoFocus
               />
               <Input
                 type="text"
-                value={lmstudio_model_name}
-                onChange={(e) => setlmmodel(e.target.value)}
+                value={lmstudioModelName}
+                onChange={(e) => setLmstudioModelName(e.target.value)}
                 placeholder="Enter Model Name"
                 className="w-full"
               />
@@ -1032,14 +1013,14 @@ export default function ChatInterface({
                         onEdit={handleEditMessageWrapper}
                         onQuoteMessage={handleQuoteMessage}
                         isQuoted={quotedMessages.some(q => q.id === group.message?.id)}
-                        ollamastate={ollamastate}
+                        ollamastate={lastStateValue}
                         selectedModel={selectedModel}
                         selectedModelInfo={selectedModelInfo}
                         allModels={allModels}
                         handleSelectModel={handleSelectModel}
                         isLoadingModels={isLoadingModels}
                         vendor={vendor}
-                        setollamastate={setollamastate}
+                        setollamastate={setLastState}
                         getModelColor={getModelColor}
                         getModelDisplayName={getModelDisplayName}
                         answerfromfile={answerfromfile}
@@ -1088,14 +1069,14 @@ export default function ChatInterface({
                           onQuoteMessage={handleQuoteMessage}
                           isQuoted={quotedMessages.some(q => q.id === group.question?.id)}
                           quotedMessages={quotedMessages}
-                          ollamastate={ollamastate}
+                          ollamastate={lastStateValue}
                           selectedModel={selectedModel}
                           selectedModelInfo={selectedModelInfo}
                           allModels={allModels}
                           handleSelectModel={handleSelectModel}
                           isLoadingModels={isLoadingModels}
                           vendor={vendor}
-                          setollamastate={setollamastate}
+                          setollamastate={setLastState}
                           getModelColor={getModelColor}
                           getModelDisplayName={getModelDisplayName}
                           answerfromfile={answerfromfile}
@@ -1252,23 +1233,23 @@ export default function ChatInterface({
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => {
-                  // Set ollamastate first, vendor will be updated by useEffect
-                  setollamastate(0);
+                  // Set lastStateValue first, vendor will be updated by useEffect
+                  setLastState(0);
                 }}>
                   Openrouter
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setollamastate(1);
+                  setLastState(1);
                 }}>
                   Ollama
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setollamastate(2);
+                  setLastState(2);
                 }}>
                   LM Studio
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  setollamastate(4);
+                  setLastState(4);
                 }}>
                   Groq
                 </DropdownMenuItem>
@@ -1277,24 +1258,24 @@ export default function ChatInterface({
               </DropdownMenuItem> */}
               </DropdownMenuContent>
             </DropdownMenu>
-            {ollamastate == 0 ? (
+            {lastStateValue == 0 ? (
               <ModelSelectionDialog
                 models={allModels}
                 selectedModel={selectedModel}
                 onSelectModel={handleSelectModel}
                 isLoading={isLoadingModels}
               />
-            ) : ((ollamastate === 1 || ollamastate === 2)? (
-          
+            ) : ((lastStateValue === 1 || lastStateValue === 2)? (
+
                   <LMStudioModelName
-                    model_name={lmstudio_model_name}
-                    set_model_name={setlmmodel}
-                    ollamastate={ollamastate}
-                    lmstudio_url={lmstudio_url}
+                    model_name={lmstudioModelName}
+                    set_model_name={setLmstudioModelName}
+                    ollamastate={lastStateValue}
+                    lmstudio_url={lmstudioUrl}
                   />
-               
+
         ):null)}
-            {ollamastate === 3 && (
+            {lastStateValue === 3 && (
               <div className="flex items-center gap-2">
                 {/* <FileUploader/> */}
                 {/* <Label htmlFor="picture">Picture</Label>
