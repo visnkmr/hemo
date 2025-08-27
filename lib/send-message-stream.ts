@@ -1,10 +1,10 @@
 interface SendMessageStreamParams {
   notollama: number;
   url: string;
-  model: string;
+  modelname: string;
   messages: Array<{ role: string; content: string }>;
-  lmstudio_url: string;
-  context: string
+  context: string;
+  apiKey: string
 }
 
 /**
@@ -18,42 +18,17 @@ export async function* sendMessageStream({
    notollama,
    url,
    // apiKey,
-   model,
+   modelname,
    messages,
-   lmstudio_url,
    context,
-   apiKeys
- }: SendMessageStreamParams & { apiKeys: { groq_api_key?: string; openrouter_api_key?: string; or_model?: string; lmstudio_model_name?: string; groq_model_name?: string } }): AsyncGenerator<string, void, unknown> {
-   const storedApiKey = apiKeys[notollama == 4 ? "groq_api_key" : "openrouter_api_key"]
-   console.log(storedApiKey)
-   console.log("========" + notollama)
-   // const or_mi=localStorage.getItem("or_model_info")
-   let modelname
-   switch (notollama) {
-     case 0:
-       modelname = apiKeys.or_model
-       break;
-     case 1:
-       modelname = apiKeys.lmstudio_model_name
-       break;
-     case 2:
-       modelname = apiKeys.lmstudio_model_name
-       break;
-     case 3:
-       modelname = ""
-       break;
-     case 4:
-       modelname = apiKeys.groq_model_name
-       break;
-   }
-  // const modelname = notollama==0?model:
-  console.log(modelname)
+   apiKey
+ }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
 
   let prompt = context.trim() === "" ? `Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length - 1].content}` : `Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length - 1].content}`;
   console.log(prompt)
   let headers_openrouter = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${storedApiKey}`,
+    Authorization: `Bearer ${apiKey}`,
     "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
     "X-Title": "Batu",
   };

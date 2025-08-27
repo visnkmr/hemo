@@ -196,6 +196,48 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  // const { value: ollamastate} = useConfigItem<number>("laststate", 0)
+     let whichmodel=""
+     switch(ollamastate){
+       case 0:
+         whichmodel="or_model"
+         break;
+       case 1:
+       case 2:
+         whichmodel="lmstudio_model_name"
+         break;
+       case 4:
+         whichmodel="groq_model_name"
+         break;
+
+     }
+     const {value:modelname} = useConfigItem<string>(whichmodel, "")
+     let whichapikey=""
+     switch(ollamastate){
+       case 0:
+         whichapikey="openrouter_api_key"
+         break;
+       case 4:
+         whichapikey="groq_api_key"
+         break;
+
+     }
+
+     const {value:storedApiKey} = useConfigItem<string>(whichapikey, "")
+     let whichurl=""
+     switch(ollamastate){
+       case 0:
+        whichurl = "https://openrouter.ai/api";
+         break;
+       case 1:
+       case 2:
+         whichurl=useConfigItem<string>("lmstudio_url", "").value!
+         break;
+       case 4:
+         whichurl="https://api.groq.com/openai";
+         break;
+
+     }
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -343,17 +385,8 @@ export default function ChatInterface({
     if (ollamastate !== 3) {
       try {
         // Determine API URL and model
-        let apiUrl = "";
-        if (ollamastate === 0) {
-          apiUrl = "https://openrouter.ai/api";
-        } else if (ollamastate === 4) {
-          apiUrl = "https://api.groq.com/openai";
-        } else if (ollamastate === 1 || ollamastate === 2) {
-          apiUrl = lmstudio_url;
-        } else if (ollamastate === 3) {
-          apiUrl = filegpt_url;
-        }
-        const modelToSend = ollamastate == 0 ? selectedModel : lmstudio_model_name;
+        
+        // const modelToSend = ollamastate == 0 ? selectedModel : lmstudio_model_name;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
           role: msg.role,
           content: msg.content,
@@ -370,20 +403,14 @@ export default function ChatInterface({
         // console.log(`----------context: ${context}`)
 
         for await (const contentChunk of sendMessageStream({
-          url: apiUrl,
+          url: whichurl,
           notollama: ollamastate,
+          modelname:whichmodel,
+          apiKey: whichapikey,
           // apiKey: ollamastate,
-          model: modelToSend,
           messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
-          lmstudio_url: lmstudio_url,
+          
           context: answerfromfile ? context : "",
-          apiKeys: {
-            groq_api_key: groqApiKey || "",
-            openrouter_api_key: openrouterApiKey || "",
-            or_model: orModel || "",
-            lmstudio_model_name: lmstudioModelName || "",
-            groq_model_name: groqModelName || ""
-          }
         })) {
           accumulatedContent += contentChunk;
 
