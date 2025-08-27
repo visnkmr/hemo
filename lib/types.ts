@@ -98,3 +98,10 @@ export interface OpenRouterModel {
     per_request_limits: any
     supported_parameters: string[]
 }
+
+export interface LocalModel {
+    id: string
+    name: string
+    size?: number
+    modified_at?: string
+}

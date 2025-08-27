@@ -8,7 +8,8 @@ import ApiKeyInput from "../components/api-key-input"
 import LMStudioURL from "../components/lmstudio-url"
 import LMStudioModelName from "../components/localmodelname"
 import FileGPTUrl from "../components/filegpt-url"
-import type { Chat, BranchPoint, ModelRow } from "../lib/types"
+import type { Chat, BranchPoint, ModelRow, LocalModel } from "../lib/types"
+import { fetchModelsByState } from "../lib/local-models"
 import { Button } from "../components/ui/button"
 import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
 
@@ -130,6 +131,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
+  const [localModels, setLocalModels] = useState<LocalModel[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
@@ -155,7 +157,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       setlmurl(storedlmurl)
     }
 
-    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : "lmstudio_model_name")
+    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : "local_model")
     if (storedlmurl && stored_lm_model_name) {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
@@ -171,11 +173,27 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       // if (storedApiKey) {
       //   setApiKey(storedApiKey)
       // }
-      const selmodel = localStorage.getItem("or_model")
-      const selmodelinfo = localStorage.getItem("or_model_info")
-      if (selmodel)
-        setSelectedModel(selmodel)
-      setSelectedModelInfo(selmodelinfo)
+      if (ollamastate === 0) {
+        // OpenRouter models
+        const selmodel = localStorage.getItem("or_model")
+        const selmodelinfo = localStorage.getItem("or_model_info")
+        if (selmodel)
+          setSelectedModel(selmodel)
+        setSelectedModelInfo(selmodelinfo)
+      } else if (ollamastate === 1 || ollamastate === 2) {
+        // Local models
+        const selmodel = localStorage.getItem("local_model")
+        const selmodelinfoStr = localStorage.getItem("local_model_info")
+        if (selmodel)
+          setSelectedModel(selmodel)
+        if (selmodelinfoStr && selmodelinfoStr.trim()) {
+          try {
+            setSelectedModelInfo(JSON.parse(selmodelinfoStr))
+          } catch (e) {
+            console.error("Error parsing local model info:", e)
+          }
+        }
+      }
     }
 
     // localStorage.setItem("laststate",ollamastate.toString())
@@ -221,44 +239,45 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
   }, [chats])
 
-  // Fetch models when API key is set
+  // Fetch models based on ollamastate
   useEffect(() => {
-    if (ollamastate !== 0) return
-
     const fetchModels = async () => {
       setIsLoadingModels(true)
       try {
-        const response = await fetch("https://openrouter.ai/api/v1/models", {
-          headers: {
-            // Authorization: `Bearer ${apiKey}`,
-          },
-        })
+        if (ollamastate === 0) {
+          // OpenRouter models
+          const response = await fetch("https://openrouter.ai/api/v1/models", {
+            headers: {
+              // Authorization: `Bearer ${apiKey}`,
+            },
+          })
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch models")
+          if (!response.ok) {
+            throw new Error("Failed to fetch models")
+          }
+          console.log("loaded OpenRouter models")
+          const data = await response.json()
+          const models = data.data
+
+          // Filter out models with missing required fields and sort by creation date
+          const validModels = models
+            .filter((model: any) => model?.id && model?.pricing?.prompt !== undefined && model?.pricing?.completion !== undefined)
+            .sort((a: any, b: any) => b.created - a.created);
+
+          console.log("All valid OpenRouter models:", validModels.length)
+          setAllModels(validModels)
+        } else if (ollamastate === 1 || ollamastate === 2) {
+          // Local models (Ollama or LM Studio)
+          console.log(`Fetching local models for state ${ollamastate}`)
+          const models = await fetchModelsByState(ollamastate, lmurl || undefined)
+          console.log(`Loaded ${models.length} local models`)
+          setLocalModels(models)
+
+          // Set the first model as selected if none is selected
+          if (models.length > 0 && !selectedModel) {
+            setSelectedModel(models[0].id)
+          }
         }
-        console.log("loaded models")
-        const data = await response.json()
-        const models = data.data
-        
-        // Filter out models with missing required fields and sort by creation date
-        const validModels = models
-          .filter((model: any) => model?.id && model?.pricing?.prompt !== undefined && model?.pricing?.completion !== undefined)
-          .sort((a: any, b: any) => b.created - a.created);
-        
-        console.log("All valid models:", validModels.length)
-        setAllModels(validModels)
-
-        // // Filter for free models (where pricing is 0)
-        // const freeModels = data.data.filter((model: any) => {
-        //   return Number.parseFloat(model.pricing?.prompt) <= 0 && Number.parseFloat(model.pricing?.completion) <= 0
-        // })
-
-        // Set the first model as selected if none is selected
-        // if (freeModels.length > 0 && !selectedModel) {
-        //   setSelectedModel(freeModels[0].id)
-        //   setSelectedModelInfo(freeModels[0])
-        // }
       } catch (err) {
         console.error("Error fetching models:", err)
       } finally {
@@ -267,7 +286,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
 
     fetchModels()
-  }, [ollamastate])
+  }, [ollamastate, lmurl])
 
   const createNewChat = (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
@@ -337,10 +356,20 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   const handleSelectModel = (modelId: string) => {
     setSelectedModel(modelId)
-    localStorage.setItem("or_model", modelId);
-    const modelInfo = allModels.find((model: any) => model.id === modelId)
-    setSelectedModelInfo(modelInfo || null)
-    localStorage.setItem("or_model_info", modelInfo || null);
+
+    if (ollamastate === 0) {
+      // OpenRouter models
+      localStorage.setItem("or_model", modelId);
+      const modelInfo = allModels.find((model: any) => model.id === modelId)
+      setSelectedModelInfo(modelInfo || null)
+      localStorage.setItem("or_model_info", modelInfo || null);
+    } else if (ollamastate === 1 || ollamastate === 2) {
+      // Local models
+      localStorage.setItem("local_model", modelId);
+      const modelInfo = localModels.find((model: LocalModel) => model.id === modelId)
+      setSelectedModelInfo(modelInfo || null)
+      localStorage.setItem("local_model_info", modelInfo ? JSON.stringify(modelInfo) : "");
+    }
   }
 
 
@@ -415,7 +444,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               <Button className="bg-gray-50 dark:bg-gray-900" variant="ghost" size="icon" onClick={() => toggleMenu()}>
                 {<MenuIcon size={20} />}
               </Button>
-              <Button variant={"outline"} onClick={() => createNewChat} className=" w-full flex items-center justify-center gap-2">
+              <Button variant={"outline"} onClick={() => createNewChat()} className=" w-full flex items-center justify-center gap-2">
                 <PlusIcon size={16} />
                 New Chat
               </Button>
@@ -501,7 +530,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             // filePaths={filePaths}
             setollamastate={setollamastate}
             ollamastate={ollamastate}
-            lmstudio_model_name={model_name}
+            local_model={model_name}
             setlmmodel={set_model_name}
             lmstudio_url={lmurl}
             setlmurl={setlmurl}
@@ -519,7 +548,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             setSidebarVisible={setSidebarVisible}
             getModelColor={getModelColor}
             getModelDisplayName={getModelDisplayName}
-            allModels={allModels}
+            allModels={ollamastate === 0 ? allModels : localModels}
             handleSelectModel={handleSelectModel}
             isLoadingModels={isLoadingModels}
           />

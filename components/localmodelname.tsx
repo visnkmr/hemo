@@ -19,13 +19,13 @@ export default function LMStudioModelName({ model_name, set_model_name,ollamasta
       setInputValue(model_name)
     },[model_name])
      useEffect(()=>{
-    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_model_name":"lmstudio_model_name")
+    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_model_name":"local_model")
       if (storedApiKey) {
         setInputValue(storedApiKey)
       }},[ollamastate])
   const handleSave = () => {
     set_model_name(inputValue)
-    localStorage.setItem(ollamastate==4?"groq_model_name":"lmstudio_model_name", inputValue)
+    localStorage.setItem(ollamastate==4?"groq_model_name":"local_model", inputValue)
   }
   const [label,setlabel]=useState("")
   useEffect(()=>{

@@ -16,6 +16,7 @@ import { Progress } from "../components/ui/progress"
 import LMStudioURL from "./lmstudio-url"
 import QuestionsSidebar from "./questions-sidebar"
 import ModelSelectionDialog from "./model-selection-dialog"
+import LocalModelSelectionDialog from "./local-model-selection-dialog"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -293,7 +294,7 @@ interface ChatInterfaceProps {
   selectedModelInfo: any;
   onBranchConversation: (branchPoint: BranchPoint) => void;
   lmstudio_url: string;
-  lmstudio_model_name: string;
+  local_model: string;
   filegpt_url: string;
   message?: FileItem;
   directsendmessage?: boolean;
@@ -308,7 +309,7 @@ interface ChatInterfaceProps {
   isLoadingModels: boolean;
 }
 
-// async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,lmstudio_model_name: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
+// async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,local_model: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
 //   // try{
 
 //   //   const response = await axios.post(`${filegptendpoint}/embed`, { files: filePaths.map((r)=>r.replace("C:\\","\\mnt\\c\\")) });
@@ -328,7 +329,7 @@ interface ChatInterfaceProps {
 //                 role: "assistant",
 //                 content:  `File: ${filePaths} added to context`,
 //                 timestamp: new Date().toISOString(),
-//                 model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//                 model:  ollamastate==0 ? selectedModel : local_model,
 //               };
 
 
@@ -337,7 +338,7 @@ interface ChatInterfaceProps {
 //                   ...chat,
 //                   messages: [...initialMessages, assistantMessage],
 //                   title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
-//                   lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//                   lastModelUsed:  ollamastate==0 ? selectedModel : local_model,
 //               };
 //               updateChat(currentChatState);
 //         })
@@ -348,7 +349,7 @@ interface ChatInterfaceProps {
 //                 role: "assistant",
 //                 content:  `Faled to add File: ${filePaths}`,
 //                 timestamp: new Date().toISOString(),
-//                 model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//                 model:  ollamastate==0 ? selectedModel : local_model,
 //               };
 
 
@@ -357,7 +358,7 @@ interface ChatInterfaceProps {
 //                   ...chat,
 //                   messages: [...initialMessages, assistantMessage],
 //                   title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
-//                   lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+//                   lastModelUsed:  ollamastate==0 ? selectedModel : local_model,
 //               };
 //               updateChat(currentChatState);
 //               setIsLoading(false)
@@ -398,10 +399,8 @@ export async function* sendMessageStream({
       modelname = localStorage.getItem("or_model")
       break;
     case 1:
-      modelname = localStorage.getItem("lmstudio_model_name")
-      break;
     case 2:
-      modelname = localStorage.getItem("lmstudio_model_name")
+      modelname = localStorage.getItem("local_model")
       break;
     case 3:
       modelname = ""
@@ -548,7 +547,7 @@ export default function ChatInterface({
   lmstudio_url,
   setlmmodel,
   setlmurl,
-  lmstudio_model_name,
+  local_model,
   filegpt_url,
   message,
   selectedModel,
@@ -610,7 +609,7 @@ export default function ChatInterface({
   //               role: "assistant",
   //               content:  `File: ${filePaths} added to context`,
   //               timestamp: new Date().toISOString(),
-  //               model:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+  //               model:  ollamastate==0 ? selectedModel : local_model,
   //             };
 
 
@@ -619,7 +618,7 @@ export default function ChatInterface({
   //                 ...chat,
   //                 messages: [...initialMessages, assistantMessage],
   //                 title: initialMessages.length === 0 ? `FileGPT: ${filePaths} ` : chat.title,
-  //                 lastModelUsed:  ollamastate==0 ? selectedModel : lmstudio_model_name,
+  //                 lastModelUsed:  ollamastate==0 ? selectedModel : local_model,
   //             };
   //             updateChat(currentChatState);
   //       })
@@ -628,7 +627,7 @@ export default function ChatInterface({
     if (message?.path) {
       setSelectedFilePath([...message.path])
       // setFilePaths([message.path])
-      // fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,lmstudio_model_name,filegpt_url,selectedFilePath)
+      // fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,local_model,filegpt_url,selectedFilePath)
     }
   }, [message])
 
@@ -637,7 +636,7 @@ export default function ChatInterface({
   // State for dialog to request URL and model name
   const [showDialog, setShowDialog] = useState(false);
   // const [tempUrl, setTempUrl] = useState(lmstudio_url);
-  // const [tempModelName, setTempModelName] = useState(lmstudio_model_name);
+  // const [tempModelName, setTempModelName] = useState(local_model);
 
   // Main function to handle sending a message
   const handleSendMessage = async (messageContent: string = input) => {
@@ -647,7 +646,7 @@ export default function ChatInterface({
 
     // Check if using LM Studio or Ollama and if URL and model are provided
     if (ollamastate === 1 || ollamastate === 2) {
-      if (!lmstudio_url || !lmstudio_model_name) {
+      if (!lmstudio_url || !local_model) {
         setShowDialog(true);
         setIsLoading(false);
         return;
@@ -665,7 +664,7 @@ export default function ChatInterface({
       role: "user",
       content: messageContent,
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      model: ollamastate == 0 ? selectedModel : local_model,
     };
     // If there is a leftover pending error message from a previous failure, flush it into the chat
     if (pendingErrorMessage) {
@@ -674,12 +673,12 @@ export default function ChatInterface({
         role: "assistant",
         content: pendingErrorMessage,
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        model: ollamastate == 0 ? selectedModel : local_model,
       }
       const flushed = {
         ...chat,
         messages: [...chat.messages, errorAsAssistant],
-        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
       }
       updateChat(flushed)
       setPendingErrorMessage(null)
@@ -690,7 +689,7 @@ export default function ChatInterface({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      model: ollamastate == 0 ? selectedModel : local_model,
     };
 
     setStreamingMessageId(assistantMessageId);
@@ -701,7 +700,7 @@ export default function ChatInterface({
       ...chat,
       messages: [...initialMessages, userMessage, assistantMessage],
       title: initialMessages.length === 0 ? messageContent.slice(0, 30) : chat.title,
-      lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+      lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
     };
     updateChat(currentChatState);
 
@@ -726,12 +725,12 @@ export default function ChatInterface({
         } else if (ollamastate === 3) {
           apiUrl = filegpt_url;
         }
-        const modelToSend = ollamastate == 0 ? selectedModel : lmstudio_model_name;
+        const modelToSend = ollamastate == 0 ? selectedModel : local_model;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
-        //  const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+        //  const stored_lm_model_name = localStorage.getItem("local_model")
         let accumulatedContent = "";
         let context = ""
         // const context=answerfromfile?(await invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
@@ -776,12 +775,12 @@ export default function ChatInterface({
           role: "assistant",
           content: `Error: ${errMsg}`,
           timestamp: new Date().toISOString(),
-          model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+          model: ollamastate == 0 ? selectedModel : local_model,
         };
         updateChat({
           ...chat,
           messages: [...initialMessages, userMessage, errorAssistantMessage],
-          lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+          lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
         });
         // In case UI batching prevents immediate update, keep a pending copy to flush on next send
         setPendingErrorMessage(`Error: ${errMsg}`);
@@ -795,7 +794,7 @@ export default function ChatInterface({
         role: msg.role,
         content: msg.content,
       }));
-      // const stored_lm_model_name = localStorage.getItem("lmstudio_model_name")
+      // const stored_lm_model_name = localStorage.getItem("local_model")
       //   invoke("queryfile",{question:JSON.stringify(messagesToSend[messagesToSend.length-1].content),
       //      model:stored_lm_model_name?stored_lm_model_name:"qwen2.5:3b",
       //      embeddingmodelname:"nomic-embed-text",
@@ -994,7 +993,7 @@ export default function ChatInterface({
 
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
-    if (lmstudio_model_name && lmstudio_url) {
+    if (local_model && lmstudio_url) {
       setShowDialog(false);
       // Trigger sending the message again with updated values
       handleSendMessage();
@@ -1005,12 +1004,12 @@ export default function ChatInterface({
         role: "assistant",
         content: "Error: Both URL and model name are required.",
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        model: ollamastate == 0 ? selectedModel : local_model,
       };
       updateChat({
         ...chat,
         messages: [...chat.messages, errorAssistantMessage],
-        lastModelUsed: ollamastate == 0 ? selectedModel : lmstudio_model_name,
+        lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
       });
       setError("Both URL and model name are required.");
     }
@@ -1224,30 +1223,42 @@ export default function ChatInterface({
     <div className="">
       {/* Dialog for URL and Model Name */}
       {showDialog && (
-        <div className="mx-auto flex w-full max-w-3xl mb-2 px-4">
-          <div className="w-full border rounded-lg p-3 bg-white dark:bg-gray-800">
-            <h2 className="text-sm font-semibold mb-2">LM Studio/Ollama Configuration</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Provide URL and model to proceed.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <Input
-                type="text"
-                value={lmstudio_url}
-                onChange={(e) => setlmurl(e.target.value)}
-                placeholder="Enter URL"
-                className="w-full"
-                autoFocus
-              />
-              <Input
-                type="text"
-                value={lmstudio_model_name}
-                onChange={(e) => setlmmodel(e.target.value)}
-                placeholder="Enter Model Name"
-                className="w-full"
-              />
-            </div>
-            <div className="flex justify-end gap-2 mt-2">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-              <Button onClick={handleDialogSubmit}>Submit</Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="mx-auto w-full max-w-md p-4">
+            <div className="w-full border rounded-lg p-6 bg-white dark:bg-gray-800 shadow-xl">
+              <h2 className="text-lg font-semibold mb-3">LM Studio/Ollama Configuration</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Provide URL and model name to proceed.</p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="lm-url" className="text-sm font-medium">Server URL</Label>
+                  <Input
+                    id="lm-url"
+                    type="text"
+                    value={lmstudio_url}
+                    onChange={(e) => setlmurl(e.target.value)}
+                    placeholder="http://localhost:11434 (Ollama) or http://localhost:1234 (LM Studio)"
+                    className="w-full mt-1"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lm-model" className="text-sm font-medium">Model Name</Label>
+                  <Input
+                    id="lm-model"
+                    type="text"
+                    value={local_model}
+                    onChange={(e) => setlmmodel(e.target.value)}
+                    placeholder="e.g., llama2:7b, qwen2.5:3b"
+                    className="w-full mt-1"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
+                <Button onClick={handleDialogSubmit} disabled={!lmstudio_url.trim() || !local_model.trim()}>
+                  Configure & Continue
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1398,6 +1409,7 @@ export default function ChatInterface({
 
           </div>
           <div className="mt-4 flex flex-row gap-4 w-full">
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -1442,7 +1454,15 @@ export default function ChatInterface({
                 onSelectModel={handleSelectModel}
                 isLoading={isLoadingModels}
               />
+            ) : (ollamastate === 1 || ollamastate === 2) ? (
+              <LocalModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
             ) : null}
+            
             {ollamastate === 3 && (
               <div className="flex items-center gap-2">
                 {/* <FileUploader/> */}
@@ -1455,7 +1475,7 @@ export default function ChatInterface({
                 placeholder="Enter file path or choose file"
                 className="flex-grow"
               /> */}
-                {/* <Button variant="outline" size="icon" onClick={() => fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,lmstudio_model_name,filegpt_url,selectedFilePath)}>
+                {/* <Button variant="outline" size="icon" onClick={() => fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,local_model,filegpt_url,selectedFilePath)}>
                 <FileIcon className="h-4 w-4" />
                 <Input  id="picture" type="file" />
               </Button> */}
