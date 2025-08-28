@@ -20,7 +20,7 @@ export class GeminiImageService {
     }
 
     try {
-      const url = `${this.baseUrl}/v1/${model}:generateImage?alt=sse`;
+      const url = `${this.baseUrl}/v1beta/models/${model}:generateContent`;
 
       const headers = {
         "Content-Type": "application/json",
@@ -33,35 +33,40 @@ export class GeminiImageService {
         enhancedPrompt += ` --no ${parameters.negativePrompt}`;
       }
 
-      const requestBody: any = {
-        prompt: {
-          text: enhancedPrompt,
-        },
-        generationConfig: {},
-      };
-
-      // Add generation config if parameters are provided
-      if (parameters) {
-        if (parameters.aspectRatio) {
-          requestBody.generationConfig.aspectRatio = parameters.aspectRatio;
-        }
-        if (parameters.quality) {
-          requestBody.generationConfig.quality = parameters.quality;
-        }
-        if (parameters.personGeneration) {
-          requestBody.generationConfig.personGeneration = parameters.personGeneration;
-        }
-        if (parameters.safetyFilterLevel) {
-          requestBody.generationConfig.safetyFilterLevel = parameters.safetyFilterLevel;
-        }
-        if (parameters.seed !== undefined) {
-          requestBody.generationConfig.seed = parameters.seed;
-        }
-        if (parameters.style) {
-          // Add style information to the prompt
-          requestBody.prompt.text = `Create an image in ${parameters.style} style: ${enhancedPrompt}`;
-        }
+      if (parameters?.style) {
+        // Add style information to the prompt
+        enhancedPrompt = `Create an image in ${parameters.style} style: ${enhancedPrompt}`;
       }
+
+      const requestBody: any = {
+        contents: [{
+          parts: [{
+            text: enhancedPrompt
+          }]
+        }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+         },
+       };
+
+       // Add generation config parameters if provided
+      //  if (parameters) {
+      //    if (parameters.aspectRatio) {
+      //      requestBody.generationConfig.aspect_ratio = parameters.aspectRatio;
+      //    }
+      //    if (parameters.quality) {
+      //      requestBody.generationConfig.quality = parameters.quality;
+      //    }
+      //    if (parameters.personGeneration) {
+      //      requestBody.generationConfig.person_generation = parameters.personGeneration;
+      //    }
+      //    if (parameters.safetyFilterLevel) {
+      //      requestBody.generationConfig.safety_filter_level = parameters.safetyFilterLevel;
+      //    }
+      //   if (parameters.seed !== undefined) {
+      //     requestBody.generationConfig.seed = parameters.seed;
+      //   }
+      // }
 
       const response = await fetch(url, {
         method: "POST",
@@ -86,51 +91,28 @@ export class GeminiImageService {
         throw new Error(errorMessage);
       }
 
-      // Parse the streaming response
+      // Parse the JSON response from the new API
+      const responseData = await response.json();
+      console.log(responseData)
       const images: ImageGenerationResponse['images'] = [];
 
-      if (response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = '';
+      // Extract image data from the new response format
+      if (responseData.candidates?.[0]?.content?.parts) {
+        const parts = responseData.candidates[0].content.parts;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        for (const part of parts) {
+          if (part.inlineData) {
+            // The new API format includes dimensions in the structValue
+            const width = part.inlineData.structValue?.width || 0;
+            const height = part.inlineData.structValue?.height || 0;
 
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process complete SSE messages
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-              const data = line.slice(6).trim();
-
-              try {
-                const parsedData = JSON.parse(data);
-
-                // Extract image data from response
-                if (parsedData.candidates?.[0]?.content?.parts) {
-                  const parts = parsedData.candidates[0].content.parts;
-
-                  for (const part of parts) {
-                    if (part.inlineData) {
-                      images.push({
-                        uri: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
-                        mimeType: part.inlineData.mimeType,
-                        width: part.inlineData.width || 0,
-                        height: part.inlineData.height || 0,
-                        generationParameters: parameters,
-                      });
-                    }
-                  }
-                }
-              } catch (e) {
-                console.warn("Failed to parse Gemini image response chunk:", e);
-              }
-            }
+            images.push({
+              uri: `data:image/png;base64,${part.inlineData.data}`,
+              mimeType: part.inlineData.mimeType,
+              width: typeof width === 'number' ? width : parseInt(width) || 0,
+              height: typeof height === 'number' ? height : parseInt(height) || 0,
+              // generationParameters: parameters,
+            });
           }
         }
       }
@@ -158,13 +140,17 @@ export class GeminiImageService {
    * Checks if a model supports image generation
    */
   static isModelImageCapable(modelName: string): boolean {
+    return modelName.includes("image-generation");
     const imageCapableModels = [
       "models/gemini-2.0-flash-exp",
+      "models/gemini-2.0-flash-preview-image-generation",
       "models/gemini-1.5-pro-002",
       "models/gemini-1.5-pro",
       "models/gemini-1.5-flash-002",
       "models/gemini-1.5-flash",
       "models/gemini-pro-vision",
+      "models/gemini-1.5-pro-latest",
+      "models/gemini-1.5-flash-latest",
     ];
 
     return imageCapableModels.some(capableModel =>
@@ -172,23 +158,22 @@ export class GeminiImageService {
     );
   }
 
-  /**
-   * Gets default parameters for image generation
-   */
-  static getDefaultParameters(): ImageGenerationParameters {
-    return {
-      aspectRatio: "1:1",
-      quality: "standard",
-      personGeneration: "block_some",
-      safetyFilterLevel: "block_some",
-    };
-  }
-}
+  // /**
+  //  * Gets default parameters for image generation
+  //  */
+  // static getDefaultParameters(): ImageGenerationParameters {
+  //   return {
+  //     aspectRatio: "1:1",
+  //     quality: "standard",
+  //     personGeneration: "block_some",
+  //     safetyFilterLevel: "block_some",
+  //   };
+  // }
 
   /**
-   * Factory function to create a Gemini image service instance
+   * Static factory method to create a Gemini image service instance
    */
-  export function createGeminiImageService(): GeminiImageService | null {
+  static createGeminiImageService(): GeminiImageService | null {
     const apiKey = localStorage.getItem("gemini_api_key");
 
     if (!apiKey) {
@@ -197,3 +182,4 @@ export class GeminiImageService {
 
     return new GeminiImageService(apiKey);
   }
+}

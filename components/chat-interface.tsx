@@ -784,7 +784,7 @@ export async function* sendMessageStream({
       "x-goog-api-key": storedApiKey,
     };
 
-    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?alt=sse`, {
+    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?key=${storedApiKey}`, {
       method: "POST",
       headers: headers_gemini,
       body: JSON.stringify({
@@ -794,11 +794,12 @@ export async function* sendMessageStream({
           }]
         }],
         generationConfig: {
-          temperature: 0.9,
-          topK: 1,
-          topP: 1.0,
-          maxOutputTokens: 2048,
-        }
+           temperature: 0.9,
+           topK: 1,
+           topP: 1.0,
+           maxOutputTokens: 2048,
+           response_modality: "text",
+         }
       }),
     });
   } else {

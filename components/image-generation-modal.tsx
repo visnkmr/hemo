@@ -89,10 +89,10 @@ export default function ImageGenerationModal({
       const request: ImageGenerationRequest = {
         prompt: prompt.trim(),
         model: selectedModel,
-        parameters: {
-          ...parameters,
-          negativePrompt: negativePrompt.trim() || undefined,
-        }
+        // parameters: {
+        //   ...parameters,
+        //   negativePrompt: negativePrompt.trim() || undefined,
+        // }
       }
 
       const response = await imageService.generateImage(request)
