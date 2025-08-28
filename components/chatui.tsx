@@ -166,6 +166,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         } else if (ollamastate === 3) {
           // apiUrl = filegpt_url;
         }
+        setlmurl(apiUrl)
 
     const model_name = localStorage.getItem(ollamastate==0?"or_model":(ollamastate == 4 ? "groq_model_name" : (ollamastate == 5 ? "gemini_model_name" : "local_model")))
     if (model_name) {
