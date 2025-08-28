@@ -414,36 +414,64 @@ export async function* sendMessageStream({
       modelname = localStorage.getItem("gemini_model_name")
       break;
   }
-  switch (notollama) {
-    case 5:
-      url=url+'/openai'
-      break;
-    default:
-      url=url+'/v1/'
-      break;
-  }
   // const modelname = notollama==0?model:
   console.log(modelname)
 
   let prompt = context.trim() === "" ? `Given the following chathistory, answer the question accurately and concisely. \n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nQuestion: ${messages[messages.length - 1].content}` : `Given the following chathistory, context, answer the question accurately and concisely. If the answer is not in the context, state that you cannot answer from the provided information.\n\nChat History:\n${messages.slice(0, messages.length - 1).map(m => m.content).join('\n')}\n\nContext: ${context}\n\nQuestion: ${messages[messages.length - 1].content}`;
   console.log(prompt)
-  let headers_openrouter = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${storedApiKey}`,
-    "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
-    "X-Title": "Batu",
-  };
-  let headers_ollama = { 'Content-Type': 'application/json' };
-  // if (notollama===0 || notollama===2) {
-  const response = await fetch(`${url}/chat/completions`, {
-    method: "POST",
-    headers: (notollama === 0 || notollama === 2 || notollama === 4 || notollama === 5) ? headers_openrouter : headers_ollama,
-    body: JSON.stringify({
-      model: modelname,
-      messages: [{ role: 'user', content: prompt }],
-      stream: true,
-    }),
-  });
+
+  let response: Response;
+
+  if (notollama === 5) {
+    // Gemini API - use correct endpoint and format
+    if (!storedApiKey) {
+      throw new Error("Gemini API key is not available");
+    }
+
+    const headers_gemini = {
+      "Content-Type": "application/json",
+      "x-goog-api-key": storedApiKey,
+    };
+
+    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?alt=sse`, {
+      method: "POST",
+      headers: headers_gemini,
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.9,
+          topK: 1,
+          topP: 1.0,
+          maxOutputTokens: 2048,
+        }
+      }),
+    });
+  } else {
+    // OpenRouter, Grok, Ollama APIs
+    let headers_openrouter = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${storedApiKey}`,
+      "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
+      "X-Title": "Batu",
+    };
+    let headers_ollama = { 'Content-Type': 'application/json' };
+
+    const apiUrl = notollama === 0 || notollama === 4 ? `${url}/v1/chat/completions` : `${url}/chat/completions`;
+
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers: (notollama === 0 || notollama === 2 || notollama === 4) ? headers_openrouter : headers_ollama,
+      body: JSON.stringify({
+        model: modelname,
+        messages: [{ role: 'user', content: prompt }],
+        stream: true,
+      }),
+    });
+  }
 
   if (!response.ok) {
     const errorData = await response.text();
@@ -464,27 +492,61 @@ export async function* sendMessageStream({
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  if (notollama === 5) {
+    // Gemini streaming format
+    let buffer = '';
 
-    const chunk = decoder.decode(value);
-    const lines = chunk
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((line) => line.replace(/^data: /, "").trim());
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    for (const line of lines) {
-      if (line === "[DONE]") continue;
+      buffer += decoder.decode(value, { stream: true });
 
-      try {
-        const parsedLine = JSON.parse(line);
-        const content = parsedLine.choices[0]?.delta?.content || "";
-        if (content) {
-          yield content; // Yield each content chunk
+      // Process complete SSE messages
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsedData = JSON.parse(data);
+            const content = parsedData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (content) {
+              yield content;
+            }
+          } catch (e) {
+            console.warn("Failed to parse Gemini stream line:", line, e);
+          }
         }
-      } catch (e) {
-        console.warn("Failed to parse stream line:", line, e);
+      }
+    }
+  } else {
+    // OpenAI/Grok/Ollama streaming format
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => line.replace(/^data: /, "").trim());
+
+      for (const line of lines) {
+        if (line === "[DONE]") continue;
+
+        try {
+          const parsedLine = JSON.parse(line);
+          const content = parsedLine.choices[0]?.delta?.content || "";
+          if (content) {
+            yield content; // Yield each content chunk
+          }
+        } catch (e) {
+          console.warn("Failed to parse stream line:", line, e);
+        }
       }
     }
   }
