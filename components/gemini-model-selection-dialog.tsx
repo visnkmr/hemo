@@ -3,12 +3,13 @@
 import React, { useState, useEffect } from "react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 import { Button } from "../components/ui/button"
-import { BotIcon, Loader2, ChevronDown } from "lucide-react"
+import { Bot, BotIcon, Loader2, ChevronDown } from "lucide-react"
 import { cn } from "../lib/utils"
 import { ScrollArea } from "../components/ui/scroll-area"
 import { Input } from "../components/ui/input"
 import { Badge } from "../components/ui/badge"
 import type { GeminiModel } from "../lib/types"
+import { GeminiImageService } from "../lib/gemini-image-service"
 
 interface GeminiModelSelectionDialogProps {
   models: GeminiModel[]
@@ -16,6 +17,12 @@ interface GeminiModelSelectionDialogProps {
   onSelectModel: (modelId: string) => void
   isLoading?: boolean
 }
+
+// Helper function to check if a model supports image generation
+const shouldShowImageGenerationBadge = (model: GeminiModel): boolean => {
+  const modelName = model.name || '';
+  return GeminiImageService.isModelImageCapable(modelName.split('/').pop() || modelName);
+};
 
 export default function GeminiModelSelectionDialog({
   models,
@@ -150,7 +157,7 @@ export default function GeminiModelSelectionDialog({
                     <DropdownMenuItem
                       key={model.name || `model-${Math.random()}`}
                       // Prevent first-letter typeahead from auto-focusing items while typing in the search box
-                      onKeyDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
                       className={cn(
                         "flex items-center justify-between p-3 cursor-pointer focus:bg-accent focus:text-accent-foreground",
                         selectedModel === model.name?.split('/').pop() && "bg-primary/10"
@@ -180,11 +187,19 @@ export default function GeminiModelSelectionDialog({
                             <Badge variant="outline" className="text-xs px-1 py-0">
                               {formatTokens(model.outputTokenLimit)} out
                             </Badge>
-                            {model.supportedGenerationMethods?.includes("generateContent") && (
-                              <Badge variant="secondary" className="text-xs px-1 py-0">
-                                Text
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {model.supportedGenerationMethods?.includes("generateContent") && (
+                                <Badge variant="secondary" className="text-xs px-1 py-0">
+                                  Text
+                                </Badge>
+                              )}
+                              {shouldShowImageGenerationBadge(model) && (
+                                <Badge variant="outline" className="text-xs px-1 py-0">
+                                  <Bot className="h-3 w-3 mr-1" />
+                                  Image Gen
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

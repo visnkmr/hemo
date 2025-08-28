@@ -19,6 +19,9 @@ import ModelSelectionDialog from "./model-selection-dialog"
 import LocalModelSelectionDialog from "./local-model-selection-dialog"
 import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
 import EditMessageModal from "./edit-message-modal"
+import ImageGenerationModal from "./image-generation-modal"
+import { GeminiImageService } from "../lib/gemini-image-service"
+import type { ImageGenerationResponse } from "../lib/types"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -168,6 +171,72 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                   <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
                 </div>
               )}
+
+              {/* Display generated images from imageGenerations */}
+              {message.imageGenerations && message.imageGenerations.length > 0 && (
+                <div className="mt-2 space-y-3">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {/* Show generation parameters if available */}
+                    {message.generationParameters && (
+                      <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
+                        <div className="text-xs space-y-1">
+                          {message.generationParameters.aspectRatio && (
+                            <div>Aspect Ratio: {message.generationParameters.aspectRatio}</div>
+                          )}
+                          {message.generationParameters.style && (
+                            <div>Style: {message.generationParameters.style}</div>
+                          )}
+                          {message.generationParameters.quality && (
+                            <div>Quality: {message.generationParameters.quality}</div>
+                          )}
+                          {message.generationParameters.prompt && (
+                            <div>Prompt: {message.generationParameters.prompt}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Generated Images */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {message.imageGenerations.flatMap((generation, genIndex) =>
+                        generation.images.map((image, imgIndex) => (
+                          <div key={`${genIndex}-${imgIndex}`} className="relative group">
+                            <img
+                              src={image.uri}
+                              alt={`Generated image ${genIndex + 1}.${imgIndex + 1}`}
+                              className="w-full h-auto rounded-lg shadow-md border"
+                            />
+                            <div className="mt-2 flex justify-between items-center">
+                              <div className="text-xs text-gray-500">
+                                {image.width}×{image.height}
+                              </div>
+                              <div className="flex gap-1">
+                                {/* Download button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = image.uri;
+                                    link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  title="Download image"
+                                >
+                                  <FileIcon className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto break-words hyphens-auto">
                 {isEditing ? (
                   <div className="flex flex-col gap-2">
@@ -298,7 +367,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setsendwithhistory(cv => !cv)}
+                  onClick={() => setsendwithhistory((cv: boolean) => !cv)}
                   className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
                 // title="Include chat history"
                 >
@@ -1211,6 +1280,42 @@ export default function ChatInterface({
 
   // --- Other Handlers ---
 
+  // Handle image generation
+  const handleImageGenerated = (response: ImageGenerationResponse) => {
+    // Create a new assistant message with the generated images
+    const userPrompt = `Generate image: ${response.images[0]?.generationParameters?.prompt || "AI generated image"}`;
+    const assistantContent = `I've generated ${response.images.length} image${response.images.length > 1 ? 's' : ''} based on your prompt. Here ${response.images.length === 1 ? 'it is' : 'they are'}:`;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: userPrompt,
+      timestamp: new Date(response.timestamp).toISOString(),
+      model: response.model,
+      generationParameters: response.images[0]?.generationParameters,
+    };
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: assistantContent,
+      timestamp: new Date(response.timestamp).toISOString(),
+      model: response.model,
+      imageGenerations: [response],
+    };
+
+    const updatedMessages = [...chat.messages, userMessage, assistantMessage];
+    const updatedChat = {
+      ...chat,
+      messages: updatedMessages,
+      title: chat.title,
+      lastModelUsed: response.model,
+    };
+
+    updateChat(updatedChat);
+    setIsImageGenerationOpen(false);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
   };
@@ -1350,6 +1455,9 @@ export default function ChatInterface({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Image generation state
+  const [isImageGenerationOpen, setIsImageGenerationOpen] = useState(false);
 
   // Group messages for Grok-style display
   const groupedMessages = React.useMemo(() => {
@@ -1964,9 +2072,36 @@ export default function ChatInterface({
                 {answerfromfile ? "answer from file" : "Answer without context"}
               </HoverCardContent>
             </HoverCard>) : null}
+            {/* Image Generation Button - Only show for Gemini models that support image generation */}
+            {ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel) && (
+              <HoverCard>
+                <HoverCardTrigger>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsImageGenerationOpen(true)}
+                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                    title="Generate image with Gemini"
+                  >
+                    <Bot className="h-4 w-4" />
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                  Generate AI images with Gemini
+                </HoverCardContent>
+              </HoverCard>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Image Generation Modal */}
+      <ImageGenerationModal
+        isOpen={isImageGenerationOpen}
+        onClose={() => setIsImageGenerationOpen(false)}
+        onImageGenerated={handleImageGenerated}
+        selectedModel={selectedModel}
+      />
     </div>
   );
 }

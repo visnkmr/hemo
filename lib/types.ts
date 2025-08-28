@@ -18,6 +18,10 @@ export interface Message {
   timestamp: string;
   model: string;
   imageUrl?: string;
+  imageGenerations?: ImageGenerationResponse[];
+  isGeneratingImage?: boolean;
+  imageGenerationError?: string;
+  generationParameters?: ImageGenerationParameters;
 }
 
 export interface BranchPoint {
@@ -118,4 +122,42 @@ export interface GeminiModel {
     temperature?: number
     topP?: number
     topK?: number
+    isImageGenerationCapable?: boolean
+}
+
+// Image Generation types for Gemini
+export interface ImageGenerationParameters {
+  prompt?: string; // Made optional for default parameter config
+  aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
+  personGeneration?: "allow_adult" | "block_some" | "block_many";
+  style?: "photorealistic" | "creative" | "abstract" | "cartoon";
+  quality?: "standard" | "premium";
+  seed?: number;
+  negativePrompt?: string;
+  safetyFilterLevel?: "block_most" | "block_some" | "block_few" | "block_fewest";
+}
+
+export interface ImageGenerationRequest {
+  prompt: string;
+  parameters?: ImageGenerationParameters;
+  model?: string;
+}
+
+export interface ImageGenerationResponse {
+  images: Array<{
+    uri: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    generationParameters?: ImageGenerationParameters;
+  }>;
+  model: string;
+  timestamp: string;
+}
+
+export interface EnhancedMessage extends Message {
+  imageGenerations?: ImageGenerationResponse[];
+  isGeneratingImage?: boolean;
+  imageGenerationError?: string;
+  generationParameters?: ImageGenerationParameters;
 }
