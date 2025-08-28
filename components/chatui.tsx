@@ -222,8 +222,23 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           setSelectedModelInfo(selmodelinfo)
       }
     }
-    const keyName = ollamastate==4?"groq_api_key":ollamastate==5?"gemini_api_key":"openrouter_api_key"
-    setApiKey(localStorage.getItem(keyName)!)
+    let keyName: string;
+    switch (ollamastate) {
+      case 4:
+        keyName = "groq_api_key";
+        break;
+      case 5:
+        keyName = "gemini_api_key";
+        break;
+      default:
+        keyName = "openrouter_api_key";
+    }
+    const storedApiKey = localStorage.getItem(keyName);
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    } else {
+      setApiKey("");
+    }
     
     // localStorage.setItem("laststate",ollamastate.toString())
   }, [ollamastate]);
