@@ -670,21 +670,21 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             {(ollamastate == 0 || ollamastate == 4 || ollamastate == 5) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <ApiKeyInput ollamastate={ollamastate} />
             </div>) : null}
-            {(ollamastate == 4 || ollamastate == 5) && (
+            {/* {(ollamastate == 4 || ollamastate == 5) && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
               </div>
-            )}
+            )} */}
             {(ollamastate !== 0 && ollamastate !== 4 && ollamastate !== 5) ? (
               <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
                 </div>
-                {ollamastate !== 3 && (
+                {/* {ollamastate !== 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                     <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
                   </div>
-                )}
+                )} */}
                 {ollamastate === 3 && (
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                     <FileGPTUrl filegpturl={filegpturl} setFilegpturl={setFilegpturl} />
