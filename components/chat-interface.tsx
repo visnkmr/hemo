@@ -32,6 +32,17 @@ export let setcolorpertheme = "bg-white dark:bg-gray-800"
 
 // Enhanced MessageItem with expand/collapse functionality
 interface ExpandableMessageItemProps {
+  vendor:string
+  setvendor:any
+  ollamastate:number
+  setollamastate: (state: number) => void
+  allModels: any[]
+  selectedModel: string
+  handleSelectModel: (modelId: string) => void
+  isLoadingModels: boolean
+  setsendwithhistory:any
+  sendwithhistory:any
+  geminiModels: any[]
   message: Message
   isStreaming?: boolean
   onCopy: () => void
@@ -45,7 +56,7 @@ interface ExpandableMessageItemProps {
   isEditing?: boolean
 }
 
-function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false }: ExpandableMessageItemProps) {
+function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,message, isStreaming = false, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false }: ExpandableMessageItemProps) {
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -169,6 +180,167 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
                       placeholder="Edit your message..."
                     />
                     <div className="flex justify-end gap-2">
+                    <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Bot size={16} className="mr-2" />
+                  {vendor}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("Openrouter")
+                  setollamastate(0);
+                }}>
+                  Openrouter
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("Ollama")
+                  setollamastate(1);
+                }}>
+                  Ollama
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("LM Studio")
+                  setollamastate(2);
+                }}>
+                  LM Studio
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("Groq")
+                  setollamastate(4);
+                }}>
+                  Groq
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("Gemini")
+                  setollamastate(5);
+                }}>
+                  Gemini
+                </DropdownMenuItem>
+                {/* <DropdownMenuItem onClick={() => { setcobi(true); setollamastate(3); }}>
+                FileGPT
+              </DropdownMenuItem> */}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {ollamastate == 0 ? (
+              <ModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : (ollamastate === 1 || ollamastate === 2) ? (
+              <LocalModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : ollamastate === 4 ? (
+              <LocalModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : ollamastate === 5 ? (
+              
+              <GeminiModelSelectionDialog
+                models={geminiModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : null}
+            
+            {ollamastate === 3 && (
+              <div className="flex items-center gap-2">
+                {/* <FileUploader/> */}
+                {/* <Label htmlFor="picture">Picture</Label>
+            <Input id="picture" type="file" />
+              <Input
+                type="text"
+                value={selectedFilePath[(selectedFilePath.length-1)]}
+                onChange={(e) => setSelectedFilePath([...e.target.value])}
+                placeholder="Enter file path or choose file"
+                className="flex-grow"
+              /> */}
+                {/* <Button variant="outline" size="icon" onClick={() => fileloader(setIsLoading,chat,updateChat,ollamastate,selectedModel,local_model,filegpt_url,selectedFilePath)}>
+                <FileIcon className="h-4 w-4" />
+                <Input  id="picture" type="file" />
+              </Button> */}
+              </div>
+            )}
+
+            <Button variant={"outline"} onClick={handleSaveEdit}
+                        disabled={!editedContent.trim() || editedContent.trim() === message.content} className="text-black dark:text-white ">
+               <SendIcon className="h-4 w-4" />
+            </Button>
+            {/* {answerfromfile ? (<HoverCard>
+              <HoverCardTrigger>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setfullfileascontext(cv => !cv)}
+                  className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                // title="Include file history"
+                >
+                  {fullfileascontext ? (<FileCheck className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                {fullfileascontext ? "Full file contents will be passed as context" : "Embeddings will be passed as context"}
+              </HoverCardContent>
+            </HoverCard>) : null} */}
+            <HoverCard>
+              <HoverCardTrigger>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setsendwithhistory(cv => !cv)}
+                  className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                // title="Include chat history"
+                >
+                  {sendwithhistory ? (<FileClock className="h-4 w-4" />) : (<BookX className="h-4 w-4" />)}
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                {sendwithhistory ? "Full chat history will be passed as context" : "Ignore chat history"}
+              </HoverCardContent>
+            </HoverCard>
+            {/* {(morethanonefile) ? (<HoverCard>
+              <HoverCardTrigger>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setsearchcurrent(cv => !cv)}
+                  className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                // title="Search which files"
+                >
+                  {searchcurrent ? (<File className="h-4 w-4" />) : (<FileStack className="h-4 w-4" />)}
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                {searchcurrent ? "Search current file" : "Search all the files"}
+              </HoverCardContent>
+            </HoverCard>) : null} */}
+            {/* {(true) ? (<HoverCard>
+              <HoverCardTrigger>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setanswerfromfile(cv => !cv)}
+                  className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                // title="Search which files"
+                >
+                  {answerfromfile ? (<FilePlus className="h-4 w-4" />) : (<FileMinus className="h-4 w-4" />)}
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                {answerfromfile ? "answer from file" : "Answer without context"}
+              </HoverCardContent>
+            </HoverCard>) : null} */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -176,15 +348,6 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
                         className="text-xs"
                       >
                         Cancel
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleSaveEdit}
-                        disabled={!editedContent.trim() || editedContent.trim() === message.content}
-                        className="text-xs"
-                      >
-                        Save & Resend
                       </Button>
                     </div>
                   </div>
@@ -211,9 +374,9 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
                 <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={onEdit} title="Edit message">
+                {/* <Button variant="ghost" size="icon" onClick={onEdit} title="Edit message">
                   <EditIcon className="h-4 w-4" />
-                </Button>
+                </Button> */}
               </>
             )}
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
@@ -238,14 +401,25 @@ function getModelDisplayName(modelId: string): string {
 
 // Question Group Component for Grok-style scrollable answers
 interface QuestionGroupProps {
+  vendor:string
+  setvendor:any
+  ollamastate:number
+  setollamastate:any
+  allModels: any[]
+  selectedModel: string
+  handleSelectModel: (modelId: string) => void
+  isLoadingModels: boolean
+  setsendwithhistory: any
+  sendwithhistory: boolean
+  geminiModels: any[]
   question: Message
   answers: Message[]
   onCopy: (content: string) => void
   onBranch: (messageId: string) => void
   onEdit: () => void
   onSaveEdit?: (newContent: string) => void
-  setdsm: any
-  setmts: any
+  setdsm?: any
+  setmts?: any
   isStreaming?: boolean
   streamingMessageId?: string | null
   isQuestionExpanded: boolean
@@ -255,7 +429,9 @@ interface QuestionGroupProps {
   onAnswerIndexChange: (index: number) => void
 }
 
-function QuestionGroup({ question, answers, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
+function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,question, answers, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
+  const _setdsm = setdsm || (() => {})
+  const _setmts = setmts || (() => {})
   const handlePrevious = () => {
     const newIndex = Math.max(0, currentAnswerIndex - 1)
     onAnswerIndexChange(newIndex)
@@ -286,6 +462,17 @@ function QuestionGroup({ question, answers, onCopy, onBranch, onEdit, onSaveEdit
     <div className="w-full space-y-4">
       {/* Question with expand/collapse */}
       <ExpandableMessageItem
+        vendor={vendor}
+        setvendor={setvendor}
+        ollamastate={ollamastate}
+        setollamastate={setollamastate}
+        allModels={allModels}
+        selectedModel={selectedModel}
+        handleSelectModel={handleSelectModel}
+        isLoadingModels={isLoadingModels}
+        setsendwithhistory={setsendwithhistory}
+        sendwithhistory={sendwithhistory}
+        geminiModels={geminiModels}
         message={question}
         onCopy={() => onCopy(question.content)}
         onBranch={() => onBranch(question.id)}
@@ -1478,6 +1665,18 @@ export default function ChatInterface({
                   {group.type === 'single' && group.message ? (
                     group.message.role === 'user' ? (
                       <ExpandableMessageItem
+                        vendor={vendor}
+                        setvendor={setvendor}
+                        ollamastate={ollamastate}
+                        setollamastate={setollamastate}
+                        allModels={allModels}
+                        selectedModel={selectedModel}
+                        handleSelectModel={handleSelectModel}
+                        isLoadingModels={isLoadingModels}
+                        setsendwithhistory={setsendwithhistory}
+                        sendwithhistory={sendwithhistory}
+                        geminiModels={geminiModels}
+
                         message={group.message}
                         isStreaming={streamingMessageId === group.message.id}
                         onCopy={() => handleCopyMessage(group.message!.content)}
@@ -1502,6 +1701,17 @@ export default function ChatInterface({
                       const currentIndex = questionGroupAnswerIndices.get(questionKey) ?? group.answers.length - 1; // Default to latest answer
                       return (
                         <QuestionGroup
+                          vendor={vendor}
+                          setvendor={setvendor}
+                          ollamastate={ollamastate}
+                          setollamastate={setollamastate}
+                          allModels={allModels}
+                          selectedModel={selectedModel}
+                          handleSelectModel={handleSelectModel}
+                          isLoadingModels={isLoadingModels}
+                          setsendwithhistory={setsendwithhistory}
+                          sendwithhistory={sendwithhistory}
+                          geminiModels={geminiModels}
                           question={group.question}
                           answers={group.answers}
                           onCopy={handleCopyMessage}
