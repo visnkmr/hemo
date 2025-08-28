@@ -24,6 +24,7 @@ import { useIsMobile } from "../hooks/use-mobile"
 import { Label } from "./ui/label"
 import { cn } from "@/lib/utils"
 import {checkProviderCredentials} from '@/lib/credentials-checker'
+import { set } from "date-fns"
 // import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
 export let setcolorpertheme = "bg-white dark:bg-gray-800"
@@ -1310,17 +1311,47 @@ export default function ChatInterface({
                     autoFocus
                   />
                 </div>
-                <div>
+                {ollamastate == 0 ? (
+                  <ModelSelectionDialog
+                    models={allModels}
+                    selectedModel={selectedModel}
+                    onSelectModel={handleSelectModel}
+                    isLoading={isLoadingModels}
+                  />
+                ) : (ollamastate === 1 || ollamastate === 2) ? (
+                  <LocalModelSelectionDialog
+                    models={allModels}
+                    selectedModel={selectedModel}
+                    onSelectModel={handleSelectModel}
+                    isLoading={isLoadingModels}
+                  />
+                ) : ollamastate === 4 ? (
+                  <LocalModelSelectionDialog
+                    models={allModels}
+                    selectedModel={selectedModel}
+                    onSelectModel={handleSelectModel}
+                    isLoading={isLoadingModels}
+                  />
+                ) : ollamastate === 5 ? (
+                  
+                  <GeminiModelSelectionDialog
+                    models={geminiModels}
+                    selectedModel={selectedModel}
+                    onSelectModel={handleSelectModel}
+                    isLoading={isLoadingModels}
+                  />
+                ) : null}
+                {/* <div>
                   <Label htmlFor="lm-model" className="text-sm font-medium">Model Name</Label>
                   <Input
                     id="lm-model"
                     type="text"
-                    value={local_model}
-                    onChange={(e) => setlmmodel(e.target.value)}
+                    value={selectedModel}
+                    onChange={(e) => handleSelectModel(e.target.value)}
                     placeholder="e.g., llama2:7b, qwen2.5:3b"
                     className="w-full mt-1"
                   />
-                </div>
+                </div> */}
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
