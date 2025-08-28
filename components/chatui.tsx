@@ -142,6 +142,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   useEffect(() => {
     setCollapsed(true)
   }, [currentChatId])
+  useEffect(()=>{
+    const lastState = localStorage.getItem("laststate");
+    setollamastate(lastState ? parseInt(lastState, 10) : 0);
+    
+  },[])
   // useEffect(()=>{const storedApiKey = localStorage.getItem("openrouter_api_key")
   //     if (storedApiKey) {
   //       setApiKey(storedApiKey)
@@ -262,9 +267,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   //Chat history loader
   useEffect(() => {
-    console.log("checking here for ollamastate val 1")
-    const lastState = localStorage.getItem("laststate");
-    setollamastate(lastState ? parseInt(lastState, 10) : 0);
+    
     const storedChats = localStorage.getItem("chat_history")
     if (storedChats) {
       try {

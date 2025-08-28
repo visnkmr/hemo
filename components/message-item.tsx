@@ -16,11 +16,13 @@ interface MessageItemProps {
   isStreaming?: boolean
   onCopy: () => void
   onBranch: () => void
-  setdsm: any
-  setmts: any
+  setdsm?: any
+  setmts?: any
 }
 
 export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts }: MessageItemProps) {
+  const _setdsm = setdsm || (() => {})
+  const _setmts = setmts || (() => {})
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -52,8 +54,8 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   //   },
   // }
   const Resend = () => {
-    setdsm(true)
-    setmts(message.content)
+    _setdsm(true)
+    _setmts(message.content)
   }
 
   return (

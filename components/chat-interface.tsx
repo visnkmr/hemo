@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -18,6 +18,7 @@ import QuestionsSidebar from "./questions-sidebar"
 import ModelSelectionDialog from "./model-selection-dialog"
 import LocalModelSelectionDialog from "./local-model-selection-dialog"
 import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
+import EditMessageModal from "./edit-message-modal"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -35,16 +36,25 @@ interface ExpandableMessageItemProps {
   isStreaming?: boolean
   onCopy: () => void
   onBranch: () => void
-  setdsm: any
-  setmts: any
+  onEdit: () => void
+  onSaveEdit?: (newContent: string) => void
+  setdsm?: any
+  setmts?: any
   isExpanded: boolean
   onToggleExpand: () => void
+  isEditing?: boolean
 }
 
-function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts, isExpanded, onToggleExpand }: ExpandableMessageItemProps) {
+function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false }: ExpandableMessageItemProps) {
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [editedContent, setEditedContent] = useState(message.content)
+  const [editingTextareaHeight, setEditingTextareaHeight] = useState("auto")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const _setdsm = setdsm || (() => {})
+  const _setmts = setmts || (() => {})
 
   // Blinking cursor effect for streaming messages
   useEffect(() => {
@@ -58,14 +68,50 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
   }, [isStreaming])
 
   const Resend = () => {
-    setdsm(true)
-    setmts(message.content)
+    _setdsm(true)
+    _setmts(message.content)
   }
 
   const truncateText = (text: string, maxLength: number = 100) => {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + "..."
   }
+
+  const handleSaveEdit = () => {
+    if (onSaveEdit && editedContent.trim()) {
+      onSaveEdit(editedContent.trim())
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditedContent(message.content)
+    onEdit() // This should toggle off editing mode
+  }
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedContent(e.target.value)
+    e.target.style.height = "auto"
+    e.target.style.height = `${e.target.scrollHeight}px`
+  }
+
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.ctrlKey && !e.shiftKey) {
+      e.preventDefault()
+      handleSaveEdit()
+    } else if (e.key === "Escape") {
+      handleCancelEdit()
+    }
+  }
+
+  // Auto-focus the textarea when entering edit mode
+  React.useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      setTimeout(() => {
+        textareaRef.current?.focus()
+        textareaRef.current?.setSelectionRange(editedContent.length, editedContent.length)
+      }, 100)
+    }
+  }, [isEditing, editedContent.length])
 
   const shouldShowExpandButton = isUser && message.content.length > 100
 
@@ -112,14 +158,48 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
                 </div>
               )}
               <div className="overflow-x-auto break-words hyphens-auto">
-                <Markdown>
-                  {shouldShowExpandButton && !isExpanded
-                    ? truncateText(message.content)
-                    : message.content
-                  }
-                </Markdown>
+                {isEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <Textarea
+                      ref={textareaRef}
+                      value={editedContent}
+                      onChange={handleTextareaChange}
+                      onKeyDown={handleTextareaKeyDown}
+                      className="w-full border rounded-md p-2 min-h-[60px] resize-none text-sm bg-white dark:bg-gray-700"
+                      placeholder="Edit your message..."
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEdit}
+                        className="text-xs"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleSaveEdit}
+                        disabled={!editedContent.trim() || editedContent.trim() === message.content}
+                        className="text-xs"
+                      >
+                        Save & Resend
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Markdown>
+                      {shouldShowExpandButton && !isExpanded
+                        ? truncateText(message.content)
+                        : message.content
+                      }
+                    </Markdown>
+                    <span className={`animate-pulse ${isStreaming ? (showCursor ? "" : "invisible") : "hidden"}`}>▌</span>
+                  </>
+                )}
               </div>
-              <span className={`animate-pulse ${isStreaming ? (showCursor ? "" : "invisible") : "hidden"}`}>▌</span>
             </div>
           </div>
         </div>
@@ -127,9 +207,14 @@ function ExpandableMessageItem({ message, isStreaming = false, onCopy, onBranch,
         {!isStreaming && (
           <div className={cn("flex gap-1 mt-2", isHovered ? "visible" : "invisible")}>
             {isUser && (
-              <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <>
+                <Button variant="ghost" size="icon" onClick={Resend} title="Resend message">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={onEdit} title="Edit message">
+                  <EditIcon className="h-4 w-4" />
+                </Button>
+              </>
             )}
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
@@ -157,17 +242,20 @@ interface QuestionGroupProps {
   answers: Message[]
   onCopy: (content: string) => void
   onBranch: (messageId: string) => void
+  onEdit: () => void
+  onSaveEdit?: (newContent: string) => void
   setdsm: any
   setmts: any
   isStreaming?: boolean
   streamingMessageId?: string | null
   isQuestionExpanded: boolean
   onToggleQuestionExpand: () => void
+  isQuestionEditing?: boolean
   currentAnswerIndex: number
   onAnswerIndexChange: (index: number) => void
 }
 
-function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
+function QuestionGroup({ question, answers, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
   const handlePrevious = () => {
     const newIndex = Math.max(0, currentAnswerIndex - 1)
     onAnswerIndexChange(newIndex)
@@ -201,10 +289,13 @@ function QuestionGroup({ question, answers, onCopy, onBranch, setdsm, setmts, is
         message={question}
         onCopy={() => onCopy(question.content)}
         onBranch={() => onBranch(question.id)}
+        onEdit={onEdit}
+        onSaveEdit={onSaveEdit}
         setdsm={setdsm}
         setmts={setmts}
         isExpanded={isQuestionExpanded}
         onToggleExpand={onToggleQuestionExpand}
+        isEditing={isQuestionEditing}
       />
 
       {/* Answer Group with Navigation */}
@@ -986,6 +1077,58 @@ export default function ChatInterface({
     }
   };
 
+  const handleEditMessage = (messageId: string) => {
+    if (editingMessageId === messageId) {
+      // If already editing this message, cancel editing
+      setEditingMessageId(null)
+    } else {
+      // Start editing this message
+      setEditingMessageId(messageId)
+    }
+  };
+
+  const handleEditSave = async (newContent: string) => {
+    if (!editingMessageId) return;
+
+    // Find the message index to replace it with edited content
+    const messageIndex = chat.messages.findIndex(msg => msg.id === editingMessageId);
+    if (messageIndex === -1) return;
+
+    // Create updated message
+    const updatedMessage: Message = {
+      ...chat.messages[messageIndex],
+      content: newContent
+    };
+
+    // Update chat messages
+    const updatedMessages = [...chat.messages];
+    updatedMessages[messageIndex] = updatedMessage;
+
+    const updatedChat = {
+      ...chat,
+      messages: updatedMessages
+    };
+
+    // Update the chat state
+    updateChat(updatedChat);
+
+    // Now regenerate the answer by finding the corresponding assistant message
+    const assistantMessageIndex = messageIndex + 1;
+    if (assistantMessageIndex < chat.messages.length && chat.messages[assistantMessageIndex].role === 'assistant') {
+      // Remove the old assistant message
+      updatedMessages.splice(assistantMessageIndex, 1);
+      updateChat({ ...chat, messages: updatedMessages });
+
+      // Trigger a new message send with the edited content
+      setmts(newContent);
+      setdsm(true);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingMessageId(null);
+  };
+
 
   // Function to handle API key dialog submission
   const handleApiKeyDialogSubmit = () => {
@@ -1187,6 +1330,7 @@ export default function ChatInterface({
   // },[])
   const [vendor, setvendor] = useState("Openrouter")
   // const [label,setlabel]=useState("")
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   useEffect(() => {
     const lastState = localStorage.getItem("laststate");
     setollamastate(lastState ? parseInt(lastState, 10) : 0);
@@ -1338,10 +1482,11 @@ export default function ChatInterface({
                         isStreaming={streamingMessageId === group.message.id}
                         onCopy={() => handleCopyMessage(group.message!.content)}
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
-                        setmts={setmts}
-                        setdsm={setdsm}
+                        onEdit={() => handleEditMessage(group.message!.id)}
+                        onSaveEdit={handleEditSave}
                         isExpanded={expandedMessages.has(group.message.id)}
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
+                        isEditing={editingMessageId === group.message.id}
                       />
                     ) : (
                       <MessageItem
@@ -1349,8 +1494,6 @@ export default function ChatInterface({
                         isStreaming={streamingMessageId === group.message.id}
                         onCopy={() => handleCopyMessage(group.message!.content)}
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
-                        setmts={setmts}
-                        setdsm={setdsm}
                       />
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
@@ -1363,6 +1506,7 @@ export default function ChatInterface({
                           answers={group.answers}
                           onCopy={handleCopyMessage}
                           onBranch={handleBranchFromMessage}
+                          onEdit={() => handleEditMessage(group.question!.id)}
                           setmts={setmts}
                           setdsm={setdsm}
                           isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
