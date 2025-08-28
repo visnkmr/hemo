@@ -7,8 +7,9 @@ import { useIsMobile } from "../hooks/use-mobile"
 import ApiKeyInput from "../components/api-key-input"
 import LMStudioURL from "../components/lmstudio-url"
 import LMStudioModelName from "../components/localmodelname"
+import GeminiModelSelectionDialog from "../components/gemini-model-selection-dialog"
 import FileGPTUrl from "../components/filegpt-url"
-import type { Chat, BranchPoint, ModelRow, LocalModel } from "../lib/types"
+import type { Chat, BranchPoint, ModelRow, LocalModel, GeminiModel } from "../lib/types"
 import { fetchModelsByState } from "../lib/local-models"
 import { Button } from "../components/ui/button"
 import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
@@ -132,6 +133,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const [allModels, setAllModels] = useState<any[]>([])
   const [localModels, setLocalModels] = useState<LocalModel[]>([])
+  const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
@@ -157,7 +159,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       setlmurl(storedlmurl)
     }
 
-    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : "local_model")
+    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : ollamastate == 5 ? "gemini_model_name" : "local_model")
     if (storedlmurl && stored_lm_model_name) {
       set_model_name(stored_lm_model_name)
       setSelectedModel(model_name)
@@ -277,6 +279,156 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           if (models.length > 0 && !selectedModel) {
             setSelectedModel(models[0].id)
           }
+        } else if (ollamastate === 4) {
+          // Grok models
+          console.log("Fetching Grok models")
+          try {
+            const groqApiKey = localStorage.getItem("groq_api_key")
+            if (groqApiKey) {
+              const response = await fetch("https://api.groq.com/openai/v1/models", {
+                headers: {
+                  Authorization: `Bearer ${groqApiKey}`,
+                },
+              })
+              if (response.ok) {
+                const data = await response.json()
+                const models = data.data.map((model: any) => ({
+                  id: model.id,
+                  name: model.id,
+                  size: null,
+                  modified_at: null
+                }))
+                console.log(`Loaded ${models.length} Grok models`)
+                setLocalModels(models)
+
+                // Set the first model as selected if none is selected
+                if (models.length > 0 && !selectedModel) {
+                  setSelectedModel(models[0].id)
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching Grok models:", error)
+          }
+        } else if (ollamastate === 5) {
+          // Gemini models - fetch from API if key available
+          console.log("Fetching Gemini models")
+          try {
+            const geminiApiKey = localStorage.getItem("gemini_api_key")
+            if (geminiApiKey) {
+              const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+                headers: {
+                  "x-goog-api-key": geminiApiKey,
+                },
+              })
+              if (response.ok) {
+                const data = await response.json()
+                const models = data.models.map((model: any) => ({
+                  name: model.name,
+                  baseModelId: model.baseModelId,
+                  version: model.version,
+                  displayName: model.displayName,
+                  description: model.description,
+                  inputTokenLimit: model.inputTokenLimit,
+                  outputTokenLimit: model.outputTokenLimit,
+                  supportedGenerationMethods: model.supportedGenerationMethods,
+                  temperature: model.temperature,
+                  topP: model.topP,
+                  topK: model.topK
+                }))
+                console.log(`Loaded ${models.length} Gemini models`)
+                setGeminiModels(models)
+
+                // Set the first model as selected if none is selected
+                if (models.length > 0 && !selectedModel) {
+                  const firstModel = models[0]
+                  setSelectedModel(firstModel.name?.split('/').pop() || firstModel.name || '')
+                }
+              }
+            } else {
+              // No API key, use hardcoded models with full GeminiModel structure
+              const fallbackModels: GeminiModel[] = [
+                {
+                  name: "models/gemini-pro",
+                  baseModelId: "gemini-pro",
+                  version: "001",
+                  displayName: "Gemini Pro",
+                  description: "Gemini Pro model",
+                  inputTokenLimit: 30720,
+                  outputTokenLimit: 2048,
+                  supportedGenerationMethods: ["generateContent"],
+                  temperature: 0.9,
+                  topP: 1.0,
+                  topK: 1
+                },
+                {
+                  name: "models/gemini-pro-vision",
+                  baseModelId: "gemini-pro-vision",
+                  version: "001",
+                  displayName: "Gemini Pro Vision",
+                  description: "Gemini Pro Vision model with image understanding",
+                  inputTokenLimit: 16384,
+                  outputTokenLimit: 2048,
+                  supportedGenerationMethods: ["generateContent"],
+                  temperature: 0.9,
+                  topP: 1.0,
+                  topK: 1
+                },
+                {
+                  name: "models/gemini-1.5-pro",
+                  baseModelId: "gemini-1.5-pro",
+                  version: "001",
+                  displayName: "Gemini 1.5 Pro",
+                  description: "Latest Gemini 1.5 Pro model with enhanced capabilities",
+                  inputTokenLimit: 2097152,
+                  outputTokenLimit: 8192,
+                  supportedGenerationMethods: ["generateContent"],
+                  temperature: 0.9,
+                  topP: 1.0,
+                  topK: 1
+                },
+                {
+                  name: "models/gemini-1.5-flash",
+                  baseModelId: "gemini-1.5-flash",
+                  version: "001",
+                  displayName: "Gemini 1.5 Flash",
+                  description: "Fast Gemini 1.5 Flash model optimized for speed",
+                  inputTokenLimit: 1048576,
+                  outputTokenLimit: 8192,
+                  supportedGenerationMethods: ["generateContent"],
+                  temperature: 0.9,
+                  topP: 1.0,
+                  topK: 1
+                }
+              ]
+              setGeminiModels(fallbackModels)
+
+              // Set the first model as selected if none is selected
+              if (fallbackModels.length > 0 && !selectedModel) {
+                const firstModel = fallbackModels[0]
+                setSelectedModel(firstModel.name?.split('/').pop() || firstModel.name || '')
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching Gemini models:", error)
+            // Fallback to hardcoded models
+            const fallbackModels: GeminiModel[] = [
+              {
+                name: "models/gemini-pro",
+                baseModelId: "gemini-pro",
+                version: "001",
+                displayName: "Gemini Pro",
+                description: "Gemini Pro model",
+                inputTokenLimit: 30720,
+                outputTokenLimit: 2048,
+                supportedGenerationMethods: ["generateContent"],
+                temperature: 0.9,
+                topP: 1.0,
+                topK: 1
+              }
+            ]
+            setGeminiModels(fallbackModels)
+          }
         }
       } catch (err) {
         console.error("Error fetching models:", err)
@@ -369,6 +521,18 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       const modelInfo = localModels.find((model: LocalModel) => model.id === modelId)
       setSelectedModelInfo(modelInfo || null)
       localStorage.setItem("local_model_info", modelInfo ? JSON.stringify(modelInfo) : "");
+    } else if (ollamastate === 4) {
+      // Grok models
+      localStorage.setItem("groq_model_name", modelId);
+      const modelInfo = localModels.find((model: LocalModel) => model.id === modelId)
+      setSelectedModelInfo(modelInfo || null)
+      localStorage.setItem("groq_model_info", modelInfo ? JSON.stringify(modelInfo) : "");
+    } else if (ollamastate === 5) {
+      // Gemini models
+      localStorage.setItem("gemini_model_name", modelId);
+      const modelInfo = geminiModels.find((model: GeminiModel) => model.name?.split('/').pop() === modelId)
+      setSelectedModelInfo(modelInfo || null)
+      localStorage.setItem("gemini_model_info", modelInfo ? JSON.stringify(modelInfo) : "");
     }
   }
 
@@ -465,15 +629,15 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
           </div>
           <div className={cn(`overflow-y-auto absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`, "pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
-            {(ollamastate == 0 || ollamastate == 4) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            {(ollamastate == 0 || ollamastate == 4 || ollamastate == 5) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <ApiKeyInput ollamastate={ollamastate} />
             </div>) : null}
-            {ollamastate == 4 && (
+            {(ollamastate == 4 || ollamastate == 5) && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <LMStudioModelName model_name={model_name} set_model_name={set_model_name} ollamastate={ollamastate} />
               </div>
             )}
-            {(ollamastate !== 0 && ollamastate !== 4) ? (
+            {(ollamastate !== 0 && ollamastate !== 4 && ollamastate !== 5) ? (
               <>
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <LMStudioURL ollamastate={ollamastate} lmurl={lmurl} setlmurl={setlmurl} />
@@ -549,6 +713,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             getModelColor={getModelColor}
             getModelDisplayName={getModelDisplayName}
             allModels={ollamastate === 0 ? allModels : localModels}
+            geminiModels={geminiModels}
             handleSelectModel={handleSelectModel}
             isLoadingModels={isLoadingModels}
           />

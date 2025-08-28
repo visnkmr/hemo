@@ -19,13 +19,15 @@ export default function LMStudioModelName({ model_name, set_model_name,ollamasta
       setInputValue(model_name)
     },[model_name])
      useEffect(()=>{
-    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_model_name":"local_model")
-      if (storedApiKey) {
-        setInputValue(storedApiKey)
-      }},[ollamastate])
+   const keyName = ollamastate==4?"groq_model_name":"local_model"
+   const storedApiKey = localStorage.getItem(keyName)
+     if (storedApiKey) {
+       setInputValue(storedApiKey)
+     }},[ollamastate])
   const handleSave = () => {
     set_model_name(inputValue)
-    localStorage.setItem(ollamastate==4?"groq_model_name":"local_model", inputValue)
+    const keyName = ollamastate==4?"groq_model_name":"local_model"
+    localStorage.setItem(keyName, inputValue)
   }
   const [label,setlabel]=useState("")
   useEffect(()=>{
@@ -43,7 +45,7 @@ export default function LMStudioModelName({ model_name, set_model_name,ollamasta
       case 4:
         setlabel("Groq")
         break;
-    
+
       default:
         break;
     }
@@ -59,7 +61,7 @@ export default function LMStudioModelName({ model_name, set_model_name,ollamasta
             type={"text"}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="LM Studio Model name"
+            placeholder={ollamastate == 5 ? "Gemini Model name (e.g., gemini-pro)" : "LM Studio Model name"}
             className="pr-10"
           />
         </div>

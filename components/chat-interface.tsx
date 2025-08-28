@@ -17,6 +17,7 @@ import LMStudioURL from "./lmstudio-url"
 import QuestionsSidebar from "./questions-sidebar"
 import ModelSelectionDialog from "./model-selection-dialog"
 import LocalModelSelectionDialog from "./local-model-selection-dialog"
+import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -305,6 +306,7 @@ interface ChatInterfaceProps {
   getModelDisplayName: any;
   setollamastate: any;
   allModels: any[];
+  geminiModels: any[];
   handleSelectModel: (modelId: string) => void;
   isLoadingModels: boolean;
 }
@@ -389,7 +391,7 @@ export async function* sendMessageStream({
   lmstudio_url,
   context
 }: SendMessageStreamParams): AsyncGenerator<string, void, unknown> {
-  const storedApiKey = localStorage.getItem(notollama == 4 ? "groq_api_key" : "openrouter_api_key")
+  const storedApiKey = localStorage.getItem(notollama == 4 ? "groq_api_key" : notollama == 5 ? "gemini_api_key" : "openrouter_api_key")
   console.log(storedApiKey)
   console.log("========" + notollama)
   // const or_mi=localStorage.getItem("or_model_info")
@@ -408,6 +410,17 @@ export async function* sendMessageStream({
     case 4:
       modelname = localStorage.getItem("groq_model_name")
       break;
+    case 5:
+      modelname = localStorage.getItem("gemini_model_name")
+      break;
+  }
+  switch (notollama) {
+    case 5:
+      url=url+'/openai'
+      break;
+    default:
+      url=url+'/v1/'
+      break;
   }
   // const modelname = notollama==0?model:
   console.log(modelname)
@@ -422,9 +435,9 @@ export async function* sendMessageStream({
   };
   let headers_ollama = { 'Content-Type': 'application/json' };
   // if (notollama===0 || notollama===2) {
-  const response = await fetch(`${url}/v1/chat/completions`, {
+  const response = await fetch(`${url}/chat/completions`, {
     method: "POST",
-    headers: (notollama === 0 || notollama === 2 || notollama === 4) ? headers_openrouter : headers_ollama,
+    headers: (notollama === 0 || notollama === 2 || notollama === 4 || notollama === 5) ? headers_openrouter : headers_ollama,
     body: JSON.stringify({
       model: modelname,
       messages: [{ role: 'user', content: prompt }],
@@ -562,6 +575,7 @@ export default function ChatInterface({
   getModelColor,
   setollamastate,
   allModels,
+  geminiModels,
   handleSelectModel,
   isLoadingModels
 }: ChatInterfaceProps) {
@@ -720,6 +734,8 @@ export default function ChatInterface({
           apiUrl = "https://openrouter.ai/api";
         } else if (ollamastate === 4) {
           apiUrl = "https://api.groq.com/openai";
+        } else if (ollamastate === 5) {
+          apiUrl = "https://generativelanguage.googleapis.com";
         } else if (ollamastate === 1 || ollamastate === 2) {
           apiUrl = lmstudio_url;
         } else if (ollamastate === 3) {
@@ -1212,6 +1228,9 @@ export default function ChatInterface({
       case 4:
         setvendor("Groq")
         break;
+      case 5:
+        setvendor("Gemini")
+        break;
 
       default:
         break;
@@ -1442,6 +1461,12 @@ export default function ChatInterface({
                 }}>
                   Groq
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setvendor("Gemini")
+                  setollamastate(5);
+                }}>
+                  Gemini
+                </DropdownMenuItem>
                 {/* <DropdownMenuItem onClick={() => { setcobi(true); setollamastate(3); }}>
                 FileGPT
               </DropdownMenuItem> */}
@@ -1457,6 +1482,20 @@ export default function ChatInterface({
             ) : (ollamastate === 1 || ollamastate === 2) ? (
               <LocalModelSelectionDialog
                 models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : ollamastate === 4 ? (
+              <LocalModelSelectionDialog
+                models={allModels}
+                selectedModel={selectedModel}
+                onSelectModel={handleSelectModel}
+                isLoading={isLoadingModels}
+              />
+            ) : ollamastate === 5 ? (
+              <GeminiModelSelectionDialog
+                models={geminiModels}
                 selectedModel={selectedModel}
                 onSelectModel={handleSelectModel}
                 isLoading={isLoadingModels}

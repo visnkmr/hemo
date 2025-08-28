@@ -105,3 +105,17 @@ export interface LocalModel {
     size?: number
     modified_at?: string
 }
+
+export interface GeminiModel {
+    name?: string
+    baseModelId?: string
+    version?: string
+    displayName?: string
+    description?: string
+    inputTokenLimit?: number
+    outputTokenLimit?: number
+    supportedGenerationMethods?: string[]
+    temperature?: number
+    topP?: number
+    topK?: number
+}

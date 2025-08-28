@@ -16,7 +16,8 @@ export default function ApiKeyInput({  ollamastate }: ApiKeyInputProps) {
   const [showKey, setShowKey] = useState(false)
   const [inputValue, setInputValue] = useState("")
   useEffect(()=>{
-    const storedApiKey = localStorage.getItem(ollamastate==4?"groq_api_key":"openrouter_api_key")
+    const keyName = ollamastate==4?"groq_api_key":ollamastate==5?"gemini_api_key":"openrouter_api_key"
+    const storedApiKey = localStorage.getItem(keyName)
     console.log(storedApiKey)
       if (storedApiKey) {
         setInputValue(storedApiKey)
@@ -25,12 +26,13 @@ export default function ApiKeyInput({  ollamastate }: ApiKeyInputProps) {
       }},[ollamastate])
   const handleSave = () => {
     // setApiKey(inputValue)
-    localStorage.setItem(ollamastate==4?"groq_api_key":"openrouter_api_key", inputValue)
+    const keyName = ollamastate==4?"groq_api_key":ollamastate==5?"gemini_api_key":"openrouter_api_key"
+    localStorage.setItem(keyName, inputValue)
   }
 
   return (
       <div className="space-y-2 text-black dark:text-white">
-      <Label className="dark:text-white text-black " htmlFor="api-key">{ollamastate==4?"Groq":"OpenRouter"} API Key</Label>
+      <Label className="dark:text-white text-black " htmlFor="api-key">{ollamastate==4?"Groq":ollamastate==5?"Gemini":"OpenRouter"} API Key</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
