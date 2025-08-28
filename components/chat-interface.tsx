@@ -297,6 +297,8 @@ interface ChatInterfaceProps {
   selectedModelInfo: any;
   onBranchConversation: (branchPoint: BranchPoint) => void;
   lmstudio_url: string;
+  tempApiKey:any,
+  setTempApiKey:any,
   // local_model: string;
   // filegpt_url: string;
   message?: FileItem;
@@ -632,7 +634,8 @@ export default function ChatInterface({
   onBranchConversation,
   directsendmessage = false,
   messagetosend = "",
-
+  tempApiKey,
+  setTempApiKey,
   sidebarVisible,
   setSidebarVisible,
   getModelDisplayName,
@@ -714,8 +717,7 @@ export default function ChatInterface({
   // State for dialogs
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showUrlDialog, setShowUrlDialog] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState("");
-  const [tempUrl, setTempUrl] = useState("http://localhost:11434");
+  // const [tempUrl, setTempUrl] = useState("http://localhost:11434");
 
   // Main function to handle sending a message
   const handleSendMessage = async (messageContent: string = input) => {
@@ -731,7 +733,7 @@ export default function ChatInterface({
             setShowApiKeyDialog(true);
         } else if (ollamastate === 1 || ollamastate === 2) {
             // Show URL dialog for local providers
-            setTempUrl("http://localhost:11434");
+            setlmurl("http://localhost:11434");
             setShowUrlDialog(true);
         }
         setIsLoading(false);
@@ -984,100 +986,11 @@ export default function ChatInterface({
     }
   };
 
-  const generateImage = async (prompt: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: prompt,
-      timestamp: new Date().toISOString(),
-      model: selectedModel,
-    };
-
-    const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: "assistant",
-      content: "",
-      timestamp: new Date().toISOString(),
-      model: selectedModel,
-    };
-
-    setStreamingMessageId(assistantMessageId);
-
-    const initialMessages = chat.messages;
-    let currentChatState = {
-      ...chat,
-      messages: [...initialMessages, userMessage, assistantMessage],
-      title: initialMessages.length === 0 ? prompt.slice(0, 30) : chat.title,
-      lastModelUsed: selectedModel,
-    };
-    updateChat(currentChatState);
-
-    // Scroll to bottom if we were already at the bottom when starting to stream
-    if (isAtBottom) {
-      setTimeout(scrolltobottom, 100);
-    }
-
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/images/generations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("openrouter_api_key")}`,
-        },
-        body: JSON.stringify({
-          prompt: prompt,
-          n: 1,
-          size: "512x512",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate image");
-      }
-
-      const data = await response.json();
-      const imageUrl = data.data[0].url;
-
-      const updatedMessages = [...currentChatState.messages];
-      updatedMessages[updatedMessages.length - 1] = {
-        ...updatedMessages[updatedMessages.length - 1],
-        content: `Image generated for prompt: ${prompt}`,
-        imageUrl: imageUrl,
-      };
-
-      currentChatState = {
-        ...currentChatState,
-        messages: updatedMessages,
-      };
-      updateChat(currentChatState);
-    } catch (err) {
-      console.error("Error generating image:", err);
-      setError(err instanceof Error ? err.message : "An error occurred");
-      updateChat({
-        ...chat,
-        messages: [...initialMessages, userMessage],
-      });
-    } finally {
-      setIsLoading(false);
-      setStreamingMessageId(null);
-    }
-  };
 
   // Function to handle API key dialog submission
   const handleApiKeyDialogSubmit = () => {
     if (tempApiKey.trim()) {
-      // Save the API key
-      if (ollamastate === 0) {
-        localStorage.setItem("openrouter_api_key", tempApiKey);
-      } else if (ollamastate === 4) {
-        localStorage.setItem("groq_api_key", tempApiKey);
-      } else if (ollamastate === 5) {
-        localStorage.setItem("gemini_api_key", tempApiKey);
-      }
+     setTempApiKey(tempApiKey)
       setShowApiKeyDialog(false);
       // Trigger model fetching and then send message
       setTimeout(() => handleSendMessage(), 100);
@@ -1086,10 +999,10 @@ export default function ChatInterface({
 
   // Function to handle URL dialog submission
   const handleUrlDialogSubmit = () => {
-    if (tempUrl.trim()) {
+    if (lmstudio_url.trim()) {
       // Save the URL
-      localStorage.setItem("lmstudio_url", tempUrl);
-      setlmurl(tempUrl);
+      localStorage.setItem("lmstudio_url", lmstudio_url);
+      setlmurl(lmstudio_url);
       setShowUrlDialog(false);
       // Trigger model fetching and then send message
       setTimeout(() => handleSendMessage(), 100);
@@ -1367,8 +1280,8 @@ export default function ChatInterface({
                   <Input
                     id="server-url"
                     type="text"
-                    value={tempUrl}
-                    onChange={(e) => setTempUrl(e.target.value)}
+                    value={lmstudio_url}
+                    onChange={(e) => setlmurl(e.target.value)}
                     placeholder="http://localhost:11434"
                     className="w-full mt-1"
                     autoFocus
@@ -1381,7 +1294,7 @@ export default function ChatInterface({
                 </Button>
                 <Button
                   onClick={handleUrlDialogSubmit}
-                  disabled={!tempUrl.trim()}
+                  disabled={!lmstudio_url.trim()}
                 >
                   Connect & Continue
                 </Button>

@@ -119,7 +119,7 @@ interface gptargs {
 //   });
 // }
 export default function ChatUI({ message, fgptendpoint = "localhost", setasollama = false, whichgpt = 0 }: gptargs) {
-  // const [apiKey, setApiKey] = useState<string>("")
+  const [apiKey, setApiKey] = useState<string>("")
   const [lmurl, setlmurl] = useState<string>("")
   const [model_name, set_model_name] = useState<string>("")
   const [filegpturl, setFilegpturl] = useState<string>("")
@@ -138,7 +138,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
   const isMobile = useIsMobile();
-
+  // const [tempApiKey, setTempApiKey] = useState("");
   useEffect(() => {
     setCollapsed(true)
   }, [currentChatId])
@@ -222,9 +222,25 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           setSelectedModelInfo(selmodelinfo)
       }
     }
-
+    const keyName = ollamastate==4?"groq_api_key":ollamastate==5?"gemini_api_key":"openrouter_api_key"
+    setApiKey(localStorage.getItem(keyName)!)
+    
     // localStorage.setItem("laststate",ollamastate.toString())
   }, [ollamastate]);
+  useEffect(() => {
+       // const handleApiKeyDialogSubmit = () => {
+          if (apiKey && apiKey.trim()) {
+            // Save the API key
+            if (ollamastate === 0) {
+              localStorage.setItem("openrouter_api_key", apiKey);
+            } else if (ollamastate === 4) {
+              localStorage.setItem("groq_api_key", apiKey);
+            } else if (ollamastate === 5) {
+              localStorage.setItem("gemini_api_key", apiKey);
+            }
+          }
+        // };
+    },[apiKey])
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
   // console.log(model_name)
@@ -460,7 +476,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
 
     fetchModels()
-  }, [ollamastate, lmurl])
+  }, [ollamastate, lmurl,apiKey])
 
   const createNewChat = (chattitle = "New Chat") => {
     const newChatId = Date.now().toString()
@@ -715,6 +731,8 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             // filegpturl={filegpturl}
             // filePaths={filePaths}
             setollamastate={setollamastate}
+            tempApiKey={apiKey}
+            setTempApiKey={setApiKey}
             ollamastate={ollamastate}
             // local_model={model_name}
             // setlmmodel={set_model_name}
