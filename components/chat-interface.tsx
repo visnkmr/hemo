@@ -23,6 +23,7 @@ import { useIsMobile } from "../hooks/use-mobile"
 // import { invoke } from "@tauri-apps/api/tauri";
 import { Label } from "./ui/label"
 import { cn } from "@/lib/utils"
+import {checkProviderCredentials} from '@/lib/credentials-checker'
 // import { FileUploader } from "./fileupoader"
 // --- Type Definitions ---
 export let setcolorpertheme = "bg-white dark:bg-gray-800"
@@ -286,7 +287,7 @@ interface SendMessageStreamParams {
 
 interface ChatInterfaceProps {
   setlmurl: any;
-  setlmmodel: any;
+  // setlmmodel: any;
   ollamastate: number;
   chat: Chat;
   updateChat: (chat: Chat) => void;
@@ -295,8 +296,8 @@ interface ChatInterfaceProps {
   selectedModelInfo: any;
   onBranchConversation: (branchPoint: BranchPoint) => void;
   lmstudio_url: string;
-  local_model: string;
-  filegpt_url: string;
+  // local_model: string;
+  // filegpt_url: string;
   message?: FileItem;
   directsendmessage?: boolean;
   messagetosend?: string;
@@ -620,10 +621,10 @@ export default function ChatInterface({
   updateChat,
   // apiKey,
   lmstudio_url,
-  setlmmodel,
+  // setlmmodel,
   setlmurl,
-  local_model,
-  filegpt_url,
+  // local_model,
+  // filegpt_url,
   message,
   selectedModel,
   selectedModelInfo,
@@ -721,12 +722,10 @@ export default function ChatInterface({
     setError(null);
 
     // Check if using LM Studio or Ollama and if URL and model are provided
-    if (ollamastate === 1 || ollamastate === 2) {
-      if (!lmstudio_url || !local_model) {
+    if (!checkProviderCredentials(ollamastate)) {
         setShowDialog(true);
         setIsLoading(false);
         return;
-      }
     }
 
     setIsLoading(true);
@@ -740,7 +739,7 @@ export default function ChatInterface({
       role: "user",
       content: messageContent,
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : local_model,
+      model: selectedModel,
     };
     // If there is a leftover pending error message from a previous failure, flush it into the chat
     if (pendingErrorMessage) {
@@ -749,12 +748,12 @@ export default function ChatInterface({
         role: "assistant",
         content: pendingErrorMessage,
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : local_model,
+        model: selectedModel,
       }
       const flushed = {
         ...chat,
         messages: [...chat.messages, errorAsAssistant],
-        lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
+        lastModelUsed: selectedModel,
       }
       updateChat(flushed)
       setPendingErrorMessage(null)
@@ -765,7 +764,7 @@ export default function ChatInterface({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
-      model: ollamastate == 0 ? selectedModel : local_model,
+      model: selectedModel,
     };
 
     setStreamingMessageId(assistantMessageId);
@@ -776,7 +775,7 @@ export default function ChatInterface({
       ...chat,
       messages: [...initialMessages, userMessage, assistantMessage],
       title: initialMessages.length === 0 ? messageContent.slice(0, 30) : chat.title,
-      lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
+      lastModelUsed: selectedModel,
     };
     updateChat(currentChatState);
 
@@ -791,19 +790,8 @@ export default function ChatInterface({
     if (ollamastate !== 3) {
       try {
         // Determine API URL and model
-        let apiUrl = "";
-        if (ollamastate === 0) {
-          apiUrl = "https://openrouter.ai/api";
-        } else if (ollamastate === 4) {
-          apiUrl = "https://api.groq.com/openai";
-        } else if (ollamastate === 5) {
-          apiUrl = "https://generativelanguage.googleapis.com";
-        } else if (ollamastate === 1 || ollamastate === 2) {
-          apiUrl = lmstudio_url;
-        } else if (ollamastate === 3) {
-          apiUrl = filegpt_url;
-        }
-        const modelToSend = ollamastate == 0 ? selectedModel : local_model;
+        
+        const modelToSend = selectedModel;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
           role: msg.role,
           content: msg.content,
@@ -820,7 +808,7 @@ export default function ChatInterface({
         // console.log(`----------context: ${context}`)
 
         for await (const contentChunk of sendMessageStream({
-          url: apiUrl,
+          url: lmstudio_url,
           notollama: ollamastate,
           // apiKey: ollamastate,
           model: modelToSend,
@@ -853,12 +841,12 @@ export default function ChatInterface({
           role: "assistant",
           content: `Error: ${errMsg}`,
           timestamp: new Date().toISOString(),
-          model: ollamastate == 0 ? selectedModel : local_model,
+          model: selectedModel,
         };
         updateChat({
           ...chat,
           messages: [...initialMessages, userMessage, errorAssistantMessage],
-          lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
+          lastModelUsed: selectedModel,
         });
         // In case UI batching prevents immediate update, keep a pending copy to flush on next send
         setPendingErrorMessage(`Error: ${errMsg}`);
@@ -1071,7 +1059,7 @@ export default function ChatInterface({
 
   // Function to handle dialog submission
   const handleDialogSubmit = () => {
-    if (local_model && lmstudio_url) {
+    if (checkProviderCredentials(ollamastate)) {
       setShowDialog(false);
       // Trigger sending the message again with updated values
       handleSendMessage();
@@ -1082,12 +1070,12 @@ export default function ChatInterface({
         role: "assistant",
         content: "Error: Both URL and model name are required.",
         timestamp: new Date().toISOString(),
-        model: ollamastate == 0 ? selectedModel : local_model,
+        model: selectedModel,
       };
       updateChat({
         ...chat,
         messages: [...chat.messages, errorAssistantMessage],
-        lastModelUsed: ollamastate == 0 ? selectedModel : local_model,
+        lastModelUsed: selectedModel,
       });
       setError("Both URL and model name are required.");
     }
@@ -1556,6 +1544,7 @@ export default function ChatInterface({
                 isLoading={isLoadingModels}
               />
             ) : ollamastate === 5 ? (
+              
               <GeminiModelSelectionDialog
                 models={geminiModels}
                 selectedModel={selectedModel}

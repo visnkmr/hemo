@@ -151,17 +151,25 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
   //     fileloader(filegpturl,filePaths as string[])
   //   }},[filePaths])
-  // Load API key and chats from localStorage on initial render
+
+  // Load API key and model info from localStorage on initial render
   useEffect(() => {
+    let apiUrl = "";
+        if (ollamastate === 0) {
+          apiUrl = "https://openrouter.ai/api";
+        } else if (ollamastate === 4) {
+          apiUrl = "https://api.groq.com/openai";
+        } else if (ollamastate === 5) {
+          apiUrl = "https://generativelanguage.googleapis.com";
+        } else if (ollamastate === 1 || ollamastate === 2) {
+          apiUrl = localStorage.getItem("lmstudio_url")!;
+        } else if (ollamastate === 3) {
+          // apiUrl = filegpt_url;
+        }
 
-    const storedlmurl = localStorage.getItem("lmstudio_url")
-    if (storedlmurl) {
-      setlmurl(storedlmurl)
-    }
-
-    const stored_lm_model_name = localStorage.getItem(ollamastate == 4 ? "groq_model_name" : ollamastate == 5 ? "gemini_model_name" : "local_model")
-    if (storedlmurl && stored_lm_model_name) {
-      set_model_name(stored_lm_model_name)
+    const model_name = localStorage.getItem(ollamastate==0?"or_model":(ollamastate == 4 ? "groq_model_name" : (ollamastate == 5 ? "gemini_model_name" : "local_model")))
+    if (model_name) {
+      set_model_name(model_name)
       setSelectedModel(model_name)
     }
 
@@ -181,7 +189,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         const selmodelinfo = localStorage.getItem("or_model_info")
         if (selmodel)
           setSelectedModel(selmodel)
-        setSelectedModelInfo(selmodelinfo)
+          setSelectedModelInfo(selmodelinfo)
       } else if (ollamastate === 1 || ollamastate === 2) {
         // Local models
         const selmodel = localStorage.getItem("local_model")
@@ -196,10 +204,26 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           }
         }
       }
+      else if (ollamastate === 4) {
+        // Groq models
+        const selmodel = localStorage.getItem("groq_model_name")
+        const selmodelinfo = localStorage.getItem("groq_model_info")
+        if (selmodel)
+          setSelectedModel(selmodel)
+          setSelectedModelInfo(selmodelinfo)
+      }
+      else if (ollamastate === 5) {
+        // Gemini models
+        const selmodel = localStorage.getItem("gemini_model_name")
+        const selmodelinfo = localStorage.getItem("gemini_model_info")
+        if (selmodel)
+          setSelectedModel(selmodel)
+          setSelectedModelInfo(selmodelinfo)
+      }
     }
 
     // localStorage.setItem("laststate",ollamastate.toString())
-  }, []);
+  }, [ollamastate]);
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
   // console.log(model_name)
@@ -209,10 +233,6 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     console.log("checking here for ollamastate val 1")
     const lastState = localStorage.getItem("laststate");
     setollamastate(lastState ? parseInt(lastState, 10) : 0);
-
-
-
-
     const storedChats = localStorage.getItem("chat_history")
     if (storedChats) {
       try {
@@ -345,89 +365,90 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                   setSelectedModel(firstModel.name?.split('/').pop() || firstModel.name || '')
                 }
               }
-            } else {
-              // No API key, use hardcoded models with full GeminiModel structure
-              const fallbackModels: GeminiModel[] = [
-                {
-                  name: "models/gemini-pro",
-                  baseModelId: "gemini-pro",
-                  version: "001",
-                  displayName: "Gemini Pro",
-                  description: "Gemini Pro model",
-                  inputTokenLimit: 30720,
-                  outputTokenLimit: 2048,
-                  supportedGenerationMethods: ["generateContent"],
-                  temperature: 0.9,
-                  topP: 1.0,
-                  topK: 1
-                },
-                {
-                  name: "models/gemini-pro-vision",
-                  baseModelId: "gemini-pro-vision",
-                  version: "001",
-                  displayName: "Gemini Pro Vision",
-                  description: "Gemini Pro Vision model with image understanding",
-                  inputTokenLimit: 16384,
-                  outputTokenLimit: 2048,
-                  supportedGenerationMethods: ["generateContent"],
-                  temperature: 0.9,
-                  topP: 1.0,
-                  topK: 1
-                },
-                {
-                  name: "models/gemini-1.5-pro",
-                  baseModelId: "gemini-1.5-pro",
-                  version: "001",
-                  displayName: "Gemini 1.5 Pro",
-                  description: "Latest Gemini 1.5 Pro model with enhanced capabilities",
-                  inputTokenLimit: 2097152,
-                  outputTokenLimit: 8192,
-                  supportedGenerationMethods: ["generateContent"],
-                  temperature: 0.9,
-                  topP: 1.0,
-                  topK: 1
-                },
-                {
-                  name: "models/gemini-1.5-flash",
-                  baseModelId: "gemini-1.5-flash",
-                  version: "001",
-                  displayName: "Gemini 1.5 Flash",
-                  description: "Fast Gemini 1.5 Flash model optimized for speed",
-                  inputTokenLimit: 1048576,
-                  outputTokenLimit: 8192,
-                  supportedGenerationMethods: ["generateContent"],
-                  temperature: 0.9,
-                  topP: 1.0,
-                  topK: 1
-                }
-              ]
-              setGeminiModels(fallbackModels)
+            } 
+            // else {
+            //   // No API key, use hardcoded models with full GeminiModel structure
+            //   const fallbackModels: GeminiModel[] = [
+            //     {
+            //       name: "models/gemini-pro",
+            //       baseModelId: "gemini-pro",
+            //       version: "001",
+            //       displayName: "Gemini Pro",
+            //       description: "Gemini Pro model",
+            //       inputTokenLimit: 30720,
+            //       outputTokenLimit: 2048,
+            //       supportedGenerationMethods: ["generateContent"],
+            //       temperature: 0.9,
+            //       topP: 1.0,
+            //       topK: 1
+            //     },
+            //     {
+            //       name: "models/gemini-pro-vision",
+            //       baseModelId: "gemini-pro-vision",
+            //       version: "001",
+            //       displayName: "Gemini Pro Vision",
+            //       description: "Gemini Pro Vision model with image understanding",
+            //       inputTokenLimit: 16384,
+            //       outputTokenLimit: 2048,
+            //       supportedGenerationMethods: ["generateContent"],
+            //       temperature: 0.9,
+            //       topP: 1.0,
+            //       topK: 1
+            //     },
+            //     {
+            //       name: "models/gemini-1.5-pro",
+            //       baseModelId: "gemini-1.5-pro",
+            //       version: "001",
+            //       displayName: "Gemini 1.5 Pro",
+            //       description: "Latest Gemini 1.5 Pro model with enhanced capabilities",
+            //       inputTokenLimit: 2097152,
+            //       outputTokenLimit: 8192,
+            //       supportedGenerationMethods: ["generateContent"],
+            //       temperature: 0.9,
+            //       topP: 1.0,
+            //       topK: 1
+            //     },
+            //     {
+            //       name: "models/gemini-1.5-flash",
+            //       baseModelId: "gemini-1.5-flash",
+            //       version: "001",
+            //       displayName: "Gemini 1.5 Flash",
+            //       description: "Fast Gemini 1.5 Flash model optimized for speed",
+            //       inputTokenLimit: 1048576,
+            //       outputTokenLimit: 8192,
+            //       supportedGenerationMethods: ["generateContent"],
+            //       temperature: 0.9,
+            //       topP: 1.0,
+            //       topK: 1
+            //     }
+            //   ]
+            //   setGeminiModels(fallbackModels)
 
-              // Set the first model as selected if none is selected
-              if (fallbackModels.length > 0 && !selectedModel) {
-                const firstModel = fallbackModels[0]
-                setSelectedModel(firstModel.name?.split('/').pop() || firstModel.name || '')
-              }
-            }
+            //   // Set the first model as selected if none is selected
+            //   if (fallbackModels.length > 0 && !selectedModel) {
+            //     const firstModel = fallbackModels[0]
+            //     setSelectedModel(firstModel.name?.split('/').pop() || firstModel.name || '')
+            //   }
+            // }
           } catch (error) {
             console.error("Error fetching Gemini models:", error)
-            // Fallback to hardcoded models
-            const fallbackModels: GeminiModel[] = [
-              {
-                name: "models/gemini-pro",
-                baseModelId: "gemini-pro",
-                version: "001",
-                displayName: "Gemini Pro",
-                description: "Gemini Pro model",
-                inputTokenLimit: 30720,
-                outputTokenLimit: 2048,
-                supportedGenerationMethods: ["generateContent"],
-                temperature: 0.9,
-                topP: 1.0,
-                topK: 1
-              }
-            ]
-            setGeminiModels(fallbackModels)
+            // // Fallback to hardcoded models
+            // const fallbackModels: GeminiModel[] = [
+            //   {
+            //     name: "models/gemini-pro",
+            //     baseModelId: "gemini-pro",
+            //     version: "001",
+            //     displayName: "Gemini Pro",
+            //     description: "Gemini Pro model",
+            //     inputTokenLimit: 30720,
+            //     outputTokenLimit: 2048,
+            //     supportedGenerationMethods: ["generateContent"],
+            //     temperature: 0.9,
+            //     topP: 1.0,
+            //     topK: 1
+            //   }
+            // ]
+            // setGeminiModels(fallbackModels)
           }
         }
       } catch (err) {
@@ -694,11 +715,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             // filePaths={filePaths}
             setollamastate={setollamastate}
             ollamastate={ollamastate}
-            local_model={model_name}
-            setlmmodel={set_model_name}
+            // local_model={model_name}
+            // setlmmodel={set_model_name}
             lmstudio_url={lmurl}
             setlmurl={setlmurl}
-            filegpt_url={filegpturl}
+            // filegpt_url={filegpturl}
             message={message}
             chat={currentChat}
             updateChat={updateChat}
