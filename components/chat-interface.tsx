@@ -711,10 +711,11 @@ export default function ChatInterface({
 
   // const [context,setcontext]=useState("")
 
-  // State for dialog to request URL and model name
-  const [showDialog, setShowDialog] = useState(false);
-  // const [tempUrl, setTempUrl] = useState(lmstudio_url);
-  // const [tempModelName, setTempModelName] = useState(local_model);
+  // State for dialogs
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [showUrlDialog, setShowUrlDialog] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState("");
+  const [tempUrl, setTempUrl] = useState("http://localhost:11434");
 
   // Main function to handle sending a message
   const handleSendMessage = async (messageContent: string = input) => {
@@ -722,9 +723,17 @@ export default function ChatInterface({
 
     setError(null);
 
-    // Check if using LM Studio or Ollama and if URL and model are provided
+    // Check if credentials are available
     if (!checkProviderCredentials(ollamastate)) {
-        setShowDialog(true);
+        if (ollamastate === 0 || ollamastate === 4 || ollamastate === 5) {
+            // Show API key dialog for cloud providers
+            setTempApiKey("");
+            setShowApiKeyDialog(true);
+        } else if (ollamastate === 1 || ollamastate === 2) {
+            // Show URL dialog for local providers
+            setTempUrl("http://localhost:11434");
+            setShowUrlDialog(true);
+        }
         setIsLoading(false);
         return;
     }
@@ -1058,27 +1067,32 @@ export default function ChatInterface({
     }
   };
 
-  // Function to handle dialog submission
-  const handleDialogSubmit = () => {
-    if (checkProviderCredentials(ollamastate)) {
-      setShowDialog(false);
-      // Trigger sending the message again with updated values
-      handleSendMessage();
-    } else {
-      // Do not use a blocking dialog; surface inline among messages
-      const errorAssistantMessage: Message = {
-        id: (Date.now() + 3).toString(),
-        role: "assistant",
-        content: "Error: Both URL and model name are required.",
-        timestamp: new Date().toISOString(),
-        model: selectedModel,
-      };
-      updateChat({
-        ...chat,
-        messages: [...chat.messages, errorAssistantMessage],
-        lastModelUsed: selectedModel,
-      });
-      setError("Both URL and model name are required.");
+  // Function to handle API key dialog submission
+  const handleApiKeyDialogSubmit = () => {
+    if (tempApiKey.trim()) {
+      // Save the API key
+      if (ollamastate === 0) {
+        localStorage.setItem("openrouter_api_key", tempApiKey);
+      } else if (ollamastate === 4) {
+        localStorage.setItem("groq_api_key", tempApiKey);
+      } else if (ollamastate === 5) {
+        localStorage.setItem("gemini_api_key", tempApiKey);
+      }
+      setShowApiKeyDialog(false);
+      // Trigger model fetching and then send message
+      setTimeout(() => handleSendMessage(), 100);
+    }
+  };
+
+  // Function to handle URL dialog submission
+  const handleUrlDialogSubmit = () => {
+    if (tempUrl.trim()) {
+      // Save the URL
+      localStorage.setItem("lmstudio_url", tempUrl);
+      setlmurl(tempUrl);
+      setShowUrlDialog(false);
+      // Trigger model fetching and then send message
+      setTimeout(() => handleSendMessage(), 100);
     }
   };
   const [autoscroll, setautoscroll] = useState(false);
@@ -1291,72 +1305,85 @@ export default function ChatInterface({
   }, [ollamastate])
   return (
     <div className="">
-      {/* Dialog for URL and Model Name */}
-      {showDialog && (
+      {/* API Key Dialog */}
+      {showApiKeyDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="mx-auto w-full max-w-md p-4">
             <div className="w-full border rounded-lg p-6 bg-white dark:bg-gray-800 shadow-xl">
-              <h2 className="text-lg font-semibold mb-3">LM Studio/Ollama Configuration</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Provide URL and model name to proceed.</p>
+              <h2 className="text-lg font-semibold mb-3">
+                {ollamastate === 0 ? "OpenRouter" : ollamastate === 4 ? "Groq" : "Gemini"} API Configuration
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Enter your API key to continue.
+              </p>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="lm-url" className="text-sm font-medium">Server URL</Label>
+                  <Label htmlFor="api-key" className="text-sm font-medium">
+                    API Key
+                  </Label>
                   <Input
-                    id="lm-url"
-                    type="text"
-                    value={lmstudio_url}
-                    onChange={(e) => setlmurl(e.target.value)}
-                    placeholder="http://localhost:11434 (Ollama) or http://localhost:1234 (LM Studio)"
+                    id="api-key"
+                    type="password"
+                    value={tempApiKey}
+                    onChange={(e) => setTempApiKey(e.target.value)}
+                    placeholder="Enter your API key"
                     className="w-full mt-1"
                     autoFocus
                   />
                 </div>
-                {ollamastate == 0 ? (
-                  <ModelSelectionDialog
-                    models={allModels}
-                    selectedModel={selectedModel}
-                    onSelectModel={handleSelectModel}
-                    isLoading={isLoadingModels}
-                  />
-                ) : (ollamastate === 1 || ollamastate === 2) ? (
-                  <LocalModelSelectionDialog
-                    models={allModels}
-                    selectedModel={selectedModel}
-                    onSelectModel={handleSelectModel}
-                    isLoading={isLoadingModels}
-                  />
-                ) : ollamastate === 4 ? (
-                  <LocalModelSelectionDialog
-                    models={allModels}
-                    selectedModel={selectedModel}
-                    onSelectModel={handleSelectModel}
-                    isLoading={isLoadingModels}
-                  />
-                ) : ollamastate === 5 ? (
-                  
-                  <GeminiModelSelectionDialog
-                    models={geminiModels}
-                    selectedModel={selectedModel}
-                    onSelectModel={handleSelectModel}
-                    isLoading={isLoadingModels}
-                  />
-                ) : null}
-                {/* <div>
-                  <Label htmlFor="lm-model" className="text-sm font-medium">Model Name</Label>
-                  <Input
-                    id="lm-model"
-                    type="text"
-                    value={selectedModel}
-                    onChange={(e) => handleSelectModel(e.target.value)}
-                    placeholder="e.g., llama2:7b, qwen2.5:3b"
-                    className="w-full mt-1"
-                  />
-                </div> */}
               </div>
               <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-                <Button onClick={handleDialogSubmit} disabled={!lmstudio_url.trim() || !local_model.trim()}>
-                  Configure & Continue
+                <Button variant="outline" onClick={() => setShowApiKeyDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleApiKeyDialogSubmit}
+                  disabled={!tempApiKey.trim()}
+                >
+                  Save & Continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* URL Dialog */}
+      {showUrlDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="mx-auto w-full max-w-md p-4">
+            <div className="w-full border rounded-lg p-6 bg-white dark:bg-gray-800 shadow-xl">
+              <h2 className="text-lg font-semibold mb-3">
+                {ollamastate === 1 ? "Ollama" : "LM Studio"} Configuration
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Enter the server URL to connect to your local instance.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="server-url" className="text-sm font-medium">
+                    Server URL
+                  </Label>
+                  <Input
+                    id="server-url"
+                    type="text"
+                    value={tempUrl}
+                    onChange={(e) => setTempUrl(e.target.value)}
+                    placeholder="http://localhost:11434"
+                    className="w-full mt-1"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowUrlDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUrlDialogSubmit}
+                  disabled={!tempUrl.trim()}
+                >
+                  Connect & Continue
                 </Button>
               </div>
             </div>
