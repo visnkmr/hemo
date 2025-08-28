@@ -21,7 +21,7 @@ import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
 import EditMessageModal from "./edit-message-modal"
 import ImageGenerationModal from "./image-generation-modal"
 import { GeminiImageService } from "../lib/gemini-image-service"
-import type { ImageGenerationResponse } from "../lib/types"
+import type { ImageGenerationResponse, ImageGenerationRequest } from "../lib/types"
 import { useIsMobile } from "../hooks/use-mobile"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
@@ -459,6 +459,20 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
       </div>
     </div>
   )
+}
+
+// Helper function to check if message content suggests image generation intent
+function checkForImageGenerationIntent(userMessage: string, assistantMessage: string): boolean {
+  // Keywords that suggest image generation intent
+  const imageKeywords = [
+    'generate image', 'create image', 'draw', 'show me', 'visualize', 'picture',
+    'image of', 'photo of', 'artwork', 'illustration', 'design', 'render',
+    'imagine', 'depict', 'illustrate', 'photograph', 'diagram'
+  ];
+
+  const combinedText = (userMessage + ' ' + assistantMessage).toLowerCase();
+
+  return imageKeywords.some(keyword => combinedText.includes(keyword));
 }
 
 // Helper function to get a display name from model ID
@@ -1190,6 +1204,45 @@ export default function ChatInterface({
             messages: updatedMessages,
           };
           updateChat(currentChatState); // Update UI
+        }
+
+        // Check if we should generate an image automatically for Gemini models
+        if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
+          const shouldGenerateImage = checkForImageGenerationIntent(
+            userMessage.content,
+            accumulatedContent
+          );
+
+          if (shouldGenerateImage) {
+            try {
+              const imageService = GeminiImageService.createGeminiImageService();
+              if (imageService) {
+                const imageRequest: ImageGenerationRequest = {
+                  prompt: userMessage.content,
+                  model: selectedModel,
+                };
+
+                const imageResponse = await imageService.generateImage(imageRequest);
+
+                // Update the assistant message to include the generated image
+                const finalMessages = [...currentChatState.messages];
+                finalMessages[finalMessages.length - 1] = {
+                  ...finalMessages[finalMessages.length - 1],
+                  content: accumulatedContent,
+                  imageGenerations: [imageResponse],
+                };
+
+                currentChatState = {
+                  ...currentChatState,
+                  messages: finalMessages,
+                };
+                updateChat(currentChatState);
+              }
+            } catch (imageError) {
+              console.warn("Automatic image generation failed:", imageError);
+              // Don't fail the entire response if image generation fails
+            }
+          }
         }
       } catch (err) {
         console.error("Error sending message:", err);

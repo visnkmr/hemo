@@ -1,7 +1,7 @@
 "use client"
 
 import type { Message } from "../lib/types"
-import { CopyIcon, GitBranchIcon, RefreshCw } from "lucide-react"
+import { CopyIcon, GitBranchIcon, RefreshCw, FileIcon } from "lucide-react"
 import { cn } from "../lib/utils"
 
 // import ReactMarkdown from "react-markdown"
@@ -105,6 +105,73 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                   <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
                 </div>
               )}
+
+              {/* Display generated images from imageGenerations */}
+              {message.imageGenerations && message.imageGenerations.length > 0 && (
+                <div className="mt-2 space-y-3">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {/* Show generation parameters if available */}
+                    {message.generationParameters && (
+                      <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
+                        <div className="text-xs space-y-1">
+                          {message.generationParameters.aspectRatio && (
+                            <div>Aspect Ratio: {message.generationParameters.aspectRatio}</div>
+                          )}
+                          {message.generationParameters.style && (
+                            <div>Style: {message.generationParameters.style}</div>
+                          )}
+                          {message.generationParameters.quality && (
+                            <div>Quality: {message.generationParameters.quality}</div>
+                          )}
+                          {message.generationParameters.prompt && (
+                            <div>Prompt: {message.generationParameters.prompt}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Generated Images */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {message.imageGenerations.flatMap((generation, genIndex) =>
+                        generation.images.map((image, imgIndex) => (
+                          <div key={`${genIndex}-${imgIndex}`} className="relative group">
+                            <img
+                              src={image.uri}
+                              alt={`Generated image ${genIndex + 1}.${imgIndex + 1}`}
+                              className="w-full h-auto rounded-lg shadow-md border"
+                            />
+                            <div className="mt-2 flex justify-between items-center">
+                              <div className="text-xs text-gray-500">
+                                {image.width}×{image.height}
+                              </div>
+                              <div className="flex gap-1">
+                                {/* Download button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = image.uri;
+                                    link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  title="Download image"
+                                >
+                                  <FileIcon className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto break-words hyphens-auto">
                 <Markdown>
                   {message.content}
