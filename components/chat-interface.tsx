@@ -82,8 +82,12 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
   }, [isStreaming])
 
   const Resend = () => {
-    _setdsm(true)
-    _setmts(message.content)
+    if (_setdsm && _setmts) {
+      _setdsm(true)
+      _setmts(message.content)
+    } else {
+      console.warn('Resend functionality not available due to missing state setters')
+    }
   }
 
   const truncateText = (text: string, maxLength: number = 100) => {
@@ -826,14 +830,14 @@ export async function* sendMessageStream({
     };
     let headers_ollama = { 'Content-Type': 'application/json' };
 
-    const apiUrl = notollama === 0 || notollama === 4 ? `${url}/v1/chat/completions` : `${url}/chat/completions`;
+    const apiUrl = notollama !== 5 ? `${url}/v1/chat/completions` : `${url}/chat/completions`;
 
     response = await fetch(apiUrl, {
       method: "POST",
       headers: (notollama === 0 || notollama === 2 || notollama === 4) ? headers_openrouter : headers_ollama,
       body: JSON.stringify({
         model: modelname,
-        messages: [{ role: 'user', content: prompt }],
+        messages: messages,
         stream: true,
       }),
     });
@@ -1845,6 +1849,8 @@ export default function ChatInterface({
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
                         onEdit={() => handleEditMessage(group.message!.id)}
                         onSaveEdit={handleEditSave}
+                        setdsm={setdsm}
+                        setmts={setmts}
                         isExpanded={expandedMessages.has(group.message.id)}
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
                         isEditing={editingMessageId === group.message.id}
