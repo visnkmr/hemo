@@ -15,7 +15,8 @@ import { GeminiImageService } from "../lib/gemini-image-service"
 import { imageDBService } from "../lib/image-db-service"
 import { Button } from "../components/ui/button"
 import { Database } from "lucide-react"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 
 import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
@@ -161,12 +162,16 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   };
 
   /**
-   * Calculates and reports total localStorage space usage
+   * Calculates and reports total storage space usage (localStorage + IndexedDB)
    */
-  const reportLocalStorageUsage = (): number => {
+  const reportStorageUsage = async (): Promise<void> => {
+    console.log(`\n[Storage] 📊 COMPREHENSIVE STORAGE USAGE REPORT:`);
+
     try {
+      // localStorage report
+      console.log(`├── localStorage:`);
       const totalItems = localStorage.length;
-      let totalBytes = 0;
+      let totalLocalBytes = 0;
       const itemsReport: string[] = [];
 
       for (let i = 0; i < localStorage.length; i++) {
@@ -178,29 +183,48 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         const valueSize = value.length;
         const pairSize = keySize + valueSize;
 
-        totalBytes += pairSize;
+        totalLocalBytes += pairSize;
 
-        // Track top 5 largest items for reporting
-        // if (itemsReport.length < 5) {
+        if (itemsReport.length < 5) {
           itemsReport.push(`${key}: ${formatBytes(pairSize)}`);
-        // }
+        }
       }
 
-      console.log(`\n[localStorage] 📊 STORAGE USAGE REPORT:`);
-      console.log(`├── Total Items: ${totalItems}`);
-      console.log(`├── Total Size: ${formatBytes(totalBytes)}`);
-      console.log(`│`);
-      console.log(`├── Largest Items:`);
+      console.log(`│   ├── Items: ${totalItems}`);
+      console.log(`│   ├── Size: ${formatBytes(totalLocalBytes)}`);
+      console.log(`│   └── Largest Items:`);
       itemsReport.forEach((item, index) => {
-        console.log(`│   ${index + 1}. ${item}`);
+        console.log(`│       ${index + 1}. ${item}`);
       });
-      console.log('└── ');
 
-      return totalBytes;
+      // IndexedDB report
+      console.log(`├── IndexedDB (Images):`);
+      try {
+        const imageDBStats = await imageDBService.getStats();
+        console.log(`│   ├── Images: ${imageDBStats.totalImages}`);
+        console.log(`│   ├── Size: ${formatBytes(imageDBStats.totalSize)}`);
+        console.log(`│   ├── Image Types:`, imageDBStats.imagesByType);
+        if (imageDBStats.oldestImage && imageDBStats.newestImage) {
+          console.log(`│   └── Date Range: ${imageDBStats.oldestImage.toLocaleDateString()} - ${imageDBStats.newestImage.toLocaleDateString()}`);
+        }
+
+        // Combined total
+        const totalStorage = totalLocalBytes + imageDBStats.totalSize;
+        console.log(`└── Combined Total:`);
+        console.log(`    ├── localStorage: ${formatBytes(totalLocalBytes)}`);
+        console.log(`    ├── IndexedDB: ${formatBytes(imageDBStats.totalSize)}`);
+        console.log(`   ्यू Total Used: ${formatBytes(totalStorage)}`);
+
+      } catch (dbError) {
+        console.log(`│   ❌ IndexedDB not available or inaccessible`);
+        console.log(`│       ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+
+        // Still show localStorage total
+        console.log(`└── Total localStorage: ${formatBytes(totalLocalBytes)}`);
+      }
 
     } catch (error) {
-      console.error('[localStorage] ❌ Error calculating storage usage:', error);
-      return 0;
+      console.error('[Storage] ❌ Error calculating storage usage:', error);
     }
   };
 
@@ -215,7 +239,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
     // Report storage usage before optimization
     console.log('\n[Chat Optimization] 📊 BEFORE OPTIMIZATION:');
-    const storageBefore = reportLocalStorageUsage();
+    await reportStorageUsage();
 
     try {
       const geminiService = GeminiImageService.createGeminiImageService();
@@ -236,7 +260,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           let messageModified = false;
 
           // Optimize single imageUrl
-          if (message.imageUrl) {
+          if (message.imageUrl && (message.imageUrl.startsWith('data:image/') || message.imageUrl.startsWith('indexeddb:'))) {
             try {
               let imageData: string | null = null;
 
@@ -252,12 +276,11 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 const result = await geminiService.optimizeImageForGemini(imageData);
 
                 // Store optimized image in IndexedDB and update message reference
-                const optimImageId = `optimized_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
 
-                // The convertToIndexedDB method should return the key, but let's lookup by original content for now
-                // For now, we'll use convertToIndexedDB which already stores the image
-                message.imageUrl = result.optimizedBase64; // Keep base64 for now, will be converted during migration
+                // For optimization, we keep the optimized base64 in the message
+                // Migration will happen later when user clicks migrate button
+                message.imageUrl = result.optimizedBase64;
                 totalSavings += result.savings.savingsBytes;
                 imagesProcessed++;
                 messageModified = true;
@@ -276,7 +299,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 for (let imgIndex = 0; imgIndex < generation.images.length; imgIndex++) {
                   const image = generation.images[imgIndex];
 
-                  if (image.uri) {
+                  if (image.uri && (image.uri.startsWith('data:image/') || image.uri.startsWith('indexeddb:'))) {
                     try {
                       let imageData: string | null = null;
 
@@ -294,7 +317,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                         // Store optimized image in IndexedDB and update image reference
                         await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
 
-                        // Keep base64 for now, will be converted during migration
+                        // For optimization, we keep the optimized base64 in the message
                         image.uri = result.optimizedBase64;
                         totalSavings += result.savings.savingsBytes;
                         imagesProcessed++;
@@ -324,22 +347,15 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       // Update state to reflect changes
       setChats(optimizedChats);
 
-      // Report storage usage after optimization
-      console.log('\n[Chat Optimization] 📊 AFTER OPTIMIZATION:');
-      const storageAfter = reportLocalStorageUsage();
-
-      // Calculate actual localStorage space saved
-      const localStorageSaved = storageBefore - storageAfter;
-      const actualReduction = (localStorageSaved / storageBefore) * 100;
-
       // Report comprehensive results
       console.log('\n[Chat Optimization] 🎉 OPTIMIZATION COMPLETE:');
       console.log(`├── Images Processed: ${imagesProcessed}`);
-      console.log(`├── Direct Image Savings: ${formatBytes(totalSavings)}`);
-      console.log(`├── Total Storage Saved: ${formatBytes(localStorageSaved)} (${actualReduction.toFixed(1)}%)`);
-      console.log(`├── Storage Before: ${formatBytes(storageBefore)}`);
-      console.log(`├── Storage After: ${formatBytes(storageAfter)}`);
-      console.log(`└── Chat Data Reduction: ${((1 - JSON.stringify(optimizedChats).length / JSON.stringify(chats).length) * 100).toFixed(1)}%\n`);
+      console.log(`├── Space Saved: ${formatBytes(totalSavings)}`);
+      console.log(`└── Optimization completed successfully!`);
+
+      // Report storage usage after optimization
+      console.log('\n[Chat Optimization] 📊 AFTER OPTIMIZATION:');
+      await reportStorageUsage();
 
     } catch (error) {
       console.error('[Chat Optimization] ❌ Error during optimization:', error);
@@ -1010,40 +1026,6 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
               <Button
                 variant="outline"
-                onClick={optimizeChatHistoryImages}
-                disabled={isOptimizing || chats.length === 0}
-                title="Optimize images in chat history"
-              >
-                <Zap size={16} className="opacity-70" />
-                <span className="hidden lg:inline lg:ml-2">
-                  {isOptimizing ? "Optimizing..." : "Optimize"}
-                </span>
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => reportLocalStorageUsage()}
-                title="Check localStorage space usage"
-              >
-                <Bot size={16} className="opacity-70" />
-                <span className="hidden lg:inline lg:ml-2">Storage</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  // Dynamic import to get the test function
-                  const { ImageOptimizations } = await import('../lib/image-optimization-service');
-                  ImageOptimizations.testPicaOptimization();
-                }}
-                title="Test Pica optimization on sample image"
-              >
-                <Zap size={16} className="opacity-70" />
-                <span className="hidden lg:inline lg:ml-2">Test Pica</span>
-              </Button>
-
-              <Button
-                variant="outline"
                 onClick={() => setIsImageGalleryOpen(true)}
                 title="View all images in chat history"
               >
@@ -1051,17 +1033,51 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 <span className="hidden lg:inline lg:ml-2">Images</span>
               </Button>
 
-              <Button
-                variant="outline"
-                onClick={migrateImagesToIndexedDB}
-                disabled={isMigratingImages || chats.length === 0}
-                title="Migrate images from base64 to IndexedDB"
-              >
-                <Database size={16} className="opacity-70" />
-                <span className="hidden lg:inline lg:ml-2">
-                  {isMigratingImages ? "Migrating..." : "Migrate"}
-                </span>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" title="Debug and maintenance tools">
+                    <Bug size={16} className="opacity-70" />
+                    <span className="hidden lg:inline lg:ml-2">Debug</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Storage Operations</div>
+                  <DropdownMenuItem onClick={reportStorageUsage}>
+                    <Bot className="mr-2 h-4 w-4" />
+                    <span>Storage Usage</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={migrateImagesToIndexedDB}
+                    disabled={isMigratingImages || chats.length === 0}
+                  >
+                    <Database className="mr-2 h-4 w-4" />
+                    <span>{isMigratingImages ? "Migrating..." : "Migrate to IndexedDB"}</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Optimization Tools</div>
+                  <DropdownMenuItem
+                    onClick={optimizeChatHistoryImages}
+                    disabled={isOptimizing || chats.length === 0}
+                  >
+                    <Zap className="mr-2 h-4 w-4" />
+                    <span>{isOptimizing ? "Optimizing..." : "Optimize Images"}</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Debug Tools</div>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      // Dynamic import to get the test function
+                      const { ImageOptimizations } = await import('../lib/image-optimization-service');
+                      ImageOptimizations.testPicaOptimization();
+                    }}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Test Pica</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
             </div>
           </div>
