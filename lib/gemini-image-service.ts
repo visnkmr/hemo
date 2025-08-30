@@ -1,9 +1,17 @@
 import type { ImageGenerationParameters, ImageGenerationRequest, ImageGenerationResponse } from "./types";
+import {
+  ImageOptimizationService,
+  ImageOptimizations,
+  type SpaceSavings
+} from "./image-optimization-service";
 
 export class GeminiImageService {
   private readonly baseUrl = "https://generativelanguage.googleapis.com";
+  private imageOptimizer: ImageOptimizationService;
 
-  constructor(private apiKey: string) {}
+  constructor(private apiKey: string) {
+    this.imageOptimizer = new ImageOptimizationService();
+  }
 
   /**
    * Generates images using Gemini API
@@ -106,12 +114,22 @@ export class GeminiImageService {
             const width = part.inlineData.structValue?.width || 0;
             const height = part.inlineData.structValue?.height || 0;
 
+            const originalBase64 = `data:image/png;base64,${part.inlineData.data}`;
+
+            // Optimize the generated image for better performance
+            const optimizationResult = await this.optimizeImageForGemini(originalBase64);
+            const optimizedUri = optimizationResult.optimizedBase64;
+
+            // Use optimized dimensions for better UI display
+            const optimizedWidth = typeof width === 'number' ? width : parseInt(width) || 0;
+            const optimizedHeight = typeof height === 'number' ? height : parseInt(height) || 0;
+
             images.push({
-              uri: `data:image/png;base64,${part.inlineData.data}`,
-              mimeType: part.inlineData.mimeType,
-              width: typeof width === 'number' ? width : parseInt(width) || 0,
-              height: typeof height === 'number' ? height : parseInt(height) || 0,
-              // generationParameters: parameters,
+              uri: optimizedUri,
+              mimeType: "image/jpeg", // Optimized to JPEG format
+              width: optimizedWidth,
+              height: optimizedHeight,
+              generationParameters: parameters,
             });
           }
         }
@@ -140,7 +158,7 @@ export class GeminiImageService {
    * Checks if a model supports image generation
    */
   static isModelImageCapable(modelName: string): boolean {
-    return modelName.includes("image-generation");
+    return modelName.includes("image") || modelName.toLowerCase().includes("Banana");
     const imageCapableModels = [
       "models/gemini-2.0-flash-exp",
       "models/gemini-2.0-flash-preview-image-generation",
@@ -171,8 +189,51 @@ export class GeminiImageService {
   // }
 
   /**
-   * Static factory method to create a Gemini image service instance
+   * Optimize an image for Gemini API submission (typically for quoted images)
    */
+  async optimizeImageForGemini(base64Image: string): Promise<{ optimizedBase64: string; savings: SpaceSavings }> {
+    console.log('[GeminiImageService] 📝 Optimizing image for Gemini API submission...');
+
+    try {
+      const result = await this.imageOptimizer.optimizeImage(base64Image, {
+        maxWidth: 1536,
+        maxHeight: 1536,
+        quality: 0.85,
+        format: 'jpeg',
+        autoResize: true
+      });
+
+      // Display optimization results
+      ImageOptimizations.showSpaceSavings(result.savings);
+
+      return result;
+    } catch (error) {
+      console.error('[GeminiImageService] ❌ Image optimization failed:', error);
+      // Return original if optimization fails
+      return {
+        optimizedBase64: base64Image,
+        savings: {
+          originalSize: this.getBase64Size(base64Image),
+          optimizedSize: this.getBase64Size(base64Image),
+          savingsBytes: 0,
+          savingsPercent: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * Calculate base64 string size (helper method)
+   */
+  private getBase64Size(base64String: string): number {
+    const base64Data = base64String.split(',')[1] || base64String;
+    const bytes = (base64Data.length * 3) / 4;
+    return Math.ceil(bytes);
+  }
+
+  /**
+    * Static factory method to create a Gemini image service instance
+    */
   static createGeminiImageService(): GeminiImageService | null {
     const apiKey = localStorage.getItem("gemini_api_key");
 

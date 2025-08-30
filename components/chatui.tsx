@@ -11,8 +11,9 @@ import GeminiModelSelectionDialog from "../components/gemini-model-selection-dia
 import FileGPTUrl from "../components/filegpt-url"
 import type { Chat, BranchPoint, ModelRow, LocalModel, GeminiModel } from "../lib/types"
 import { fetchModelsByState } from "../lib/local-models"
+import { GeminiImageService } from "../lib/gemini-image-service"
 import { Button } from "../components/ui/button"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap } from "lucide-react"
 
 import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
@@ -137,8 +138,177 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const isMobile = useIsMobile();
   // const [tempApiKey, setTempApiKey] = useState("");
+
+  /**
+   * Formats bytes into human-readable format
+   */
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  /**
+   * Calculates and reports total localStorage space usage
+   */
+  const reportLocalStorageUsage = (): number => {
+    try {
+      const totalItems = localStorage.length;
+      let totalBytes = 0;
+      const itemsReport: string[] = [];
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+
+        const value = localStorage.getItem(key) || '';
+        const keySize = key.length;
+        const valueSize = value.length;
+        const pairSize = keySize + valueSize;
+
+        totalBytes += pairSize;
+
+        // Track top 5 largest items for reporting
+        // if (itemsReport.length < 5) {
+          itemsReport.push(`${key}: ${formatBytes(pairSize)}`);
+        // }
+      }
+
+      console.log(`\n[localStorage] 📊 STORAGE USAGE REPORT:`);
+      console.log(`├── Total Items: ${totalItems}`);
+      console.log(`├── Total Size: ${formatBytes(totalBytes)}`);
+      console.log(`│`);
+      console.log(`├── Largest Items:`);
+      itemsReport.forEach((item, index) => {
+        console.log(`│   ${index + 1}. ${item}`);
+      });
+      console.log('└── ');
+
+      return totalBytes;
+
+    } catch (error) {
+      console.error('[localStorage] ❌ Error calculating storage usage:', error);
+      return 0;
+    }
+  };
+
+  /**
+   * Optimizes existing images in chat history using the Gemini image optimizer
+   */
+  const optimizeChatHistoryImages = async () => {
+    if (isOptimizing) return;
+
+    setIsOptimizing(true);
+    console.log('[Chat Optimization] 🔧 Starting chat history image optimization...');
+
+    // Report storage usage before optimization
+    console.log('\n[Chat Optimization] 📊 BEFORE OPTIMIZATION:');
+    const storageBefore = reportLocalStorageUsage();
+
+    try {
+      const geminiService = GeminiImageService.createGeminiImageService();
+      if (!geminiService) {
+        console.error('[Chat Optimization] ❌ Gemini API key not available');
+        return;
+      }
+
+      let totalSavings = 0;
+      let imagesProcessed = 0;
+      const optimizedChats = JSON.parse(JSON.stringify(chats)); // Deep clone
+
+      for (let chatIndex = 0; chatIndex < optimizedChats.length; chatIndex++) {
+        const chat = optimizedChats[chatIndex];
+
+        for (let messageIndex = 0; messageIndex < chat.messages.length; messageIndex++) {
+          const message = chat.messages[messageIndex];
+          let messageModified = false;
+
+          // Optimize single imageUrl
+          if (message.imageUrl && message.imageUrl.startsWith('data:image/')) {
+            try {
+              console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${messageIndex})...`);
+              const result = await geminiService.optimizeImageForGemini(message.imageUrl);
+              message.imageUrl = result.optimizedBase64;
+              totalSavings += result.savings.savingsBytes;
+              imagesProcessed++;
+              messageModified = true;
+            } catch (error) {
+              console.error(`[Chat Optimization] ❌ Failed to optimize imageUrl in ${chat.title}:`, error);
+            }
+          }
+
+          // Optimize images in imageGenerations array
+          if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
+            for (let genIndex = 0; genIndex < message.imageGenerations.length; genIndex++) {
+              const generation = message.imageGenerations[genIndex];
+
+              if (generation.images && Array.isArray(generation.images)) {
+                for (let imgIndex = 0; imgIndex < generation.images.length; imgIndex++) {
+                  const image = generation.images[imgIndex];
+
+                  if (image.uri && image.uri.startsWith('data:image/')) {
+                    try {
+                      console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - generation ${genIndex}, image ${imgIndex}...`);
+                      const result = await geminiService.optimizeImageForGemini(image.uri);
+                      image.uri = result.optimizedBase64;
+                      totalSavings += result.savings.savingsBytes;
+                      imagesProcessed++;
+                      messageModified = true;
+
+                      // Update mimeType to reflect JPEG optimization
+                      image.mimeType = "image/jpeg";
+                    } catch (error) {
+                      console.error(`[Chat Optimization] ❌ Failed to optimize image in ${chat.title}:`, error);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          if (messageModified) {
+            console.log(`[Chat Optimization] ✅ Optimized message ${messageIndex} in "${chat.title}"`);
+          }
+        }
+      }
+
+      // Save optimized chats back to localStorage
+      localStorage.setItem("chat_history", JSON.stringify(optimizedChats));
+
+      // Update state to reflect changes
+      setChats(optimizedChats);
+
+      // Report storage usage after optimization
+      console.log('\n[Chat Optimization] 📊 AFTER OPTIMIZATION:');
+      const storageAfter = reportLocalStorageUsage();
+
+      // Calculate actual localStorage space saved
+      const localStorageSaved = storageBefore - storageAfter;
+      const actualReduction = (localStorageSaved / storageBefore) * 100;
+
+      // Report comprehensive results
+      console.log('\n[Chat Optimization] 🎉 OPTIMIZATION COMPLETE:');
+      console.log(`├── Images Processed: ${imagesProcessed}`);
+      console.log(`├── Direct Image Savings: ${formatBytes(totalSavings)}`);
+      console.log(`├── Total Storage Saved: ${formatBytes(localStorageSaved)} (${actualReduction.toFixed(1)}%)`);
+      console.log(`├── Storage Before: ${formatBytes(storageBefore)}`);
+      console.log(`├── Storage After: ${formatBytes(storageAfter)}`);
+      console.log(`└── Chat Data Reduction: ${((1 - JSON.stringify(optimizedChats).length / JSON.stringify(chats).length) * 100).toFixed(1)}%\n`);
+
+    } catch (error) {
+      console.error('[Chat Optimization] ❌ Error during optimization:', error);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   useEffect(() => {
     setCollapsed(true)
   }, [currentChatId])
@@ -694,6 +864,27 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               >
                 <Download size={16} className="" />
                 <span className="hidden lg:inline lg:ml-2">Export</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={optimizeChatHistoryImages}
+                disabled={isOptimizing || chats.length === 0}
+                title="Optimize images in chat history"
+              >
+                <Zap size={16} className="opacity-70" />
+                <span className="hidden lg:inline lg:ml-2">
+                  {isOptimizing ? "Optimizing..." : "Optimize"}
+                </span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => reportLocalStorageUsage()}
+                title="Check localStorage space usage"
+              >
+                <Bot size={16} className="opacity-70" />
+                <span className="hidden lg:inline lg:ml-2">Storage</span>
               </Button>
 
             </div>
