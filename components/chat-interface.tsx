@@ -1232,7 +1232,7 @@ export default function ChatInterface({
                   model: selectedModel,
                 };
 
-                const imageResponse = await imageService.generateImage(imageRequest);
+                const imageResponse = await imageService.generateImage(imageRequest, quotedMessage || undefined);
 
                 // Update the assistant message to include the generated image
                 const finalMessages = [...currentChatState.messages];
@@ -1470,7 +1470,22 @@ export default function ChatInterface({
   };
 
   const handleQuoteMessage = (message: Message) => {
-    setQuotedMessage(message);
+    // Check if message contains images
+    const hasImages = message.imageUrl || (message.imageGenerations && message.imageGenerations.length > 0);
+
+    if (hasImages) {
+      // Only allow quoting image messages when using Gemini image generation models
+      if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
+        setQuotedMessage(message);
+      } else {
+        // Optional: Could add a toast notification or error message here
+        console.log("Image quoting only available for Gemini image generation models");
+        return;
+      }
+    } else {
+      // Non-image messages can be quoted normally (existing behavior)
+      setQuotedMessage(message);
+    }
   };
 
   const clearQuotedMessage = () => {
