@@ -247,20 +247,20 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     
     // localStorage.setItem("laststate",ollamastate.toString())
   }, [ollamastate]);
-  useEffect(() => {
-       // const handleApiKeyDialogSubmit = () => {
-          if (apiKey && apiKey.trim()) {
-            // Save the API key
-            if (ollamastate === 0) {
-              localStorage.setItem("openrouter_api_key", apiKey);
-            } else if (ollamastate === 4) {
-              localStorage.setItem("groq_api_key", apiKey);
-            } else if (ollamastate === 5) {
-              localStorage.setItem("gemini_api_key", apiKey);
-            }
-          }
-        // };
-    },[apiKey])
+  // useEffect(() => {
+  //      // const handleApiKeyDialogSubmit = () => {
+  //         if (apiKey && apiKey.trim()) {
+  //           // Save the API key
+  //           if (ollamastate === 0) {
+  //             localStorage.setItem("openrouter_api_key", apiKey);
+  //           } else if (ollamastate === 4) {
+  //             localStorage.setItem("groq_api_key", apiKey);
+  //           } else if (ollamastate === 5) {
+  //             localStorage.setItem("gemini_api_key", apiKey);
+  //           }
+  //         }
+  //       // };
+  //   },[apiKey])
   // console.log("ollamastatae val "+ollamastate)
   // console.log(lmurl)
   // console.log(model_name)
