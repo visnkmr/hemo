@@ -61,9 +61,10 @@ interface ExpandableMessageItemProps {
   onToggleExpand: () => void
   isEditing?: boolean
   isQuoted?: boolean
+  hideQuoteButton?: boolean
 }
 
-function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,message, isStreaming = false, onCopy, onBranch, onEdit, onQuote, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false, isQuoted = false }: ExpandableMessageItemProps) {
+function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,message, isStreaming = false, onCopy, onBranch, onEdit, onQuote, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false, isQuoted = false, hideQuoteButton = false }: ExpandableMessageItemProps) {
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -467,9 +468,11 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                 </Button> */}
               </>
             )}
-            <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
-              <MessageSquarePlus className="h-4 w-4" />
-            </Button>
+            {!hideQuoteButton && (
+              <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
@@ -534,9 +537,10 @@ interface QuestionGroupProps {
   currentAnswerIndex: number
   onAnswerIndexChange: (index: number) => void
   quotedMessage?: Message | null
+  hasMessageImages?: (message: Message) => boolean
 }
 
-function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,question, answers, onCopy, onBranch, onQuote, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange, quotedMessage }: QuestionGroupProps) {
+function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,question, answers, onCopy, onBranch, onQuote, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange, quotedMessage, hasMessageImages}: QuestionGroupProps) {
   const _setdsm = setdsm || (() => {})
   const _setmts = setmts || (() => {})
   const handlePrevious = () => {
@@ -652,6 +656,7 @@ function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,s
             setdsm={setdsm}
             setmts={setmts}
             isQuoted={quotedMessage?.id === currentAnswer.id}
+            hideQuoteButton={hasMessageImages!(currentAnswer)}
           />
 
           {/* Multiple answers indicator */}
@@ -1485,6 +1490,16 @@ export default function ChatInterface({
     setQuotedMessage(message);
   };
 
+  // Helper function to check if message has images
+  const hasMessageImages = (message: Message): boolean => {
+    return !!((message.imageUrl && (message.imageUrl.startsWith('data:image/') || message.imageUrl.startsWith('indexeddb:'))) ||
+              (message.imageGenerations && message.imageGenerations.length > 0 && message.imageGenerations.some(gen =>
+                gen.images && gen.images.length > 0 && gen.images.some(img =>
+                  img.uri && (img.uri.startsWith('data:image/') || img.uri.startsWith('indexeddb:'))
+                )
+              )));
+  };
+
   const clearQuotedMessage = () => {
     setQuotedMessage(null);
   };
@@ -1920,6 +1935,7 @@ export default function ChatInterface({
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
                         isEditing={editingMessageId === group.message.id}
                         isQuoted={quotedMessage?.id === group.message.id}
+                        hideQuoteButton={hasMessageImages(group.message!)}
                       />
                     ) : (
                       <MessageItem
@@ -1965,6 +1981,7 @@ export default function ChatInterface({
                           currentAnswerIndex={currentIndex}
                           onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
                           quotedMessage={quotedMessage}
+                          hasMessageImages={hasMessageImages}
                         />
                       );
                     })()

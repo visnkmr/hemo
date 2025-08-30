@@ -22,9 +22,10 @@ interface MessageItemProps {
   setdsm?: any
   setmts?: any
   isQuoted?: boolean
+  hideQuoteButton?: boolean
 }
 
-export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, onQuote, setdsm, setmts, isQuoted = false }: MessageItemProps) {
+export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, onQuote, setdsm, setmts, isQuoted = false, hideQuoteButton = false }: MessageItemProps) {
   const _setdsm = setdsm || (() => {})
   const _setmts = setmts || (() => {})
   const isUser = message.role === "user"
@@ -206,9 +207,11 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                 <RefreshCw className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
-              <MessageSquarePlus className="h-4 w-4" />
-            </Button>
+            {!hideQuoteButton && (
+              <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
