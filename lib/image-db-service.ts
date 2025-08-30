@@ -4,7 +4,7 @@ export interface StoredImage {
   id: string; // Primary key (will be the key stored in message.imageUrl)
   chatId: string; // Which chat this image belongs to
   messageId: string; // Which message this image belongs to
-  uri: string; // Base64 data URL
+  uri: string; // Base64 data URL or IndexedDB key for blob storage
   mimeType: string; // e.g., "image/png", "image/jpeg"
   width: number;
   height: number;
@@ -13,15 +13,34 @@ export interface StoredImage {
   lastAccessed: Date;
   metadata?: {
     originalFileName?: string;
-    source?: 'generated' | 'uploaded' | 'quoted' | 'migrated' | 'converted';
-    quality?: number; // Compression quality if optimized
-    generationParams?: any; // Gemini generation parameters
-    imageIndex?: number; // Index in generation array
+    source?: 'generated' | 'uploaded' | 'quoted' | 'migrated' | 'converted' | 'compressed';
+    // Compression metadata
+    compression?: {
+      preset?: string;
+      library?: 'browser-image-compression' | 'jimp' | 'pica';
+      quality?: number;
+      originalSize?: number;
+      compressionTime?: number;
+      savingsPercent?: number;
+    };
+    // Blob storage metadata
+    storageType?: 'base64' | 'blob';
+    blobId?: string; // For blob storage, this references the blob in separate table
+    // Existing metadata
+    generationParams?: any;
+    imageIndex?: number;
   };
+}
+
+export interface StoredBlob {
+  id: string; // Primary key for blob reference
+  blob: Blob; // The actual blob data
+  createdAt: Date;
 }
 
 export class ImageDatabase extends Dexie {
   images!: Table<StoredImage>;
+  blobs!: Table<StoredBlob>;
   private isInitialized = false;
 
   constructor() {
@@ -38,6 +57,12 @@ export class ImageDatabase extends Dexie {
 
     this.version(3).stores({
       images: 'id, chatId, messageId, mimeType, createdAt, lastAccessed, size, width, height, *metadata',
+    });
+
+    // Add blob support and compression metadata
+    this.version(4).stores({
+      images: 'id, chatId, messageId, mimeType, createdAt, lastAccessed, size, width, height, *metadata',
+      blobs: '++id, createdAt' // Separate table for blob storage
     });
   }
 
@@ -469,6 +494,195 @@ export class ImageDBService {
     const base64Data = base64String.split(',')[1] || base64String;
     const bytes = (base64Data.length * 3) / 4;
     return Math.ceil(bytes);
+  }
+
+
+  /**
+   * Compress an existing image in the database using a preset
+   */
+  async compressImage(
+    imageId: string,
+    presetName: string,
+    options?: {
+      updateOriginal?: boolean; // Whether to replace original or create new
+      newPrefix?: string; // Prefix for new compressed images
+    }
+  ): Promise<{ originalImage?: StoredImage; compressedImage: StoredImage; result: any }> {
+    if (!this.isBrowser()) {
+      throw new Error('Image compression requires browser environment');
+    }
+
+    // Import compression service here to avoid circular dependencies
+    const { ImageCompressionService } = await import('./image-compression-service');
+    const compressionService = new ImageCompressionService();
+
+    try {
+      await this.db.ensureInitialized();
+
+      // Get the original image
+      const originalImage = await this.db.images.get(imageId);
+      if (!originalImage) {
+        throw new Error(`Image not found: ${imageId}`);
+      }
+
+      if (!originalImage.uri || !originalImage.uri.startsWith('data:image/')) {
+        // Try to resolve IndexedDB reference
+        if (originalImage.uri.startsWith('indexeddb:')) {
+          const resolvedUri = await this.db.images.get(originalImage.uri.replace('indexeddb:', ''));
+          if (resolvedUri?.uri) {
+            originalImage.uri = resolvedUri.uri;
+          } else {
+            throw new Error('Cannot resolve IndexedDB image URI');
+          }
+        } else {
+          throw new Error('Image URI is not in supported format for compression');
+        }
+      }
+
+      console.log(`[ImageDBService] 🗜️ Compressing image: ${imageId} (${this.formatBytes(originalImage.size)})`);
+
+      // Compress the image
+      const compressionResult = await compressionService.compressImageWithPreset(
+        originalImage.uri,
+        presetName
+      );
+
+      // Determine the ID for the compressed image
+      const { updateOriginal = false, newPrefix = 'compressed' } = options || {};
+      const compressedImageId = updateOriginal ? imageId : `${newPrefix}_${imageId}_${Date.now()}`;
+
+      // Store the compressed image
+      await this.db.images.put({
+        ...originalImage,
+        id: compressedImageId,
+        uri: compressionResult.compressedBase64,
+        size: compressionResult.compressedSize,
+        createdAt: updateOriginal ? originalImage.createdAt : new Date(),
+        lastAccessed: updateOriginal ? originalImage.lastAccessed : new Date(),
+        metadata: {
+          ...originalImage.metadata,
+          source: updateOriginal ? originalImage.metadata?.source : 'compressed',
+          compression: {
+            preset: presetName,
+            library: compressionResult.library,
+            quality: compressionResult.quality,
+            originalSize: compressionResult.originalSize,
+            compressionTime: compressionResult.processingTime,
+            savingsPercent: compressionResult.savingsPercent
+          }
+        }
+      } as StoredImage);
+
+      console.log(`[ImageDBService] ✅ Compressed image: ${compressedImageId}`);
+      console.log(`[ImageDBService] 📊 Savings: ${Math.round(compressionResult.savingsPercent)}%`);
+
+      return {
+        originalImage: updateOriginal ? undefined : originalImage,
+        compressedImage: await this.db.images.get(compressedImageId) as StoredImage,
+        result: compressionResult
+      };
+
+    } catch (error) {
+      console.error('[ImageDBService] ❌ Compression failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all images from database
+   */
+  async getAllImages(): Promise<StoredImage[]> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return [];
+    }
+
+    try {
+      await this.db.ensureInitialized();
+      const images = await this.db.images.toArray();
+      console.log(`[ImageDB] 📋 Found ${images.length} total images in database`);
+      return images;
+    } catch (error) {
+      console.error('[ImageDB] ❌ Failed to get all images:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Compress multiple images in batch
+   */
+  async compressImagesBatch(
+    imageIds: string[],
+    presetName: string,
+    options?: {
+      updateOriginal?: boolean;
+      newPrefix?: string;
+      concurrency?: number; // Max concurrent compressions
+      onProgress?: (completed: number, total: number, result?: any) => void;
+    }
+  ): Promise<{
+    successful: number;
+    failed: number;
+    totalSpaceSaved: number;
+    results: Array<{ id: string; success: boolean; error?: string; result?: any }>;
+  }> {
+    if (!this.isBrowser()) {
+      throw new Error('Image compression requires browser environment');
+    }
+
+    const { concurrency = 3, onProgress } = options || {};
+    const results: Array<{ id: string; success: boolean; error?: string; result?: any }> = [];
+    let successful = 0;
+    let failed = 0;
+    let totalSpaceSaved = 0;
+
+    console.log(`[ImageDBService] 🗜️ Batch compressing ${imageIds.length} images...`);
+
+    // Process in batches to avoid overwhelming the browser
+    for (let i = 0; i < imageIds.length; i += concurrency) {
+      const batch = imageIds.slice(i, i + concurrency);
+      const batchPromises = batch.map(async (imageId, index) => {
+        try {
+          const compressionResult = await this.compressImage(imageId, presetName, options);
+          successful++;
+          totalSpaceSaved += compressionResult.result.savingsBytes;
+          results.push({
+            id: imageId,
+            success: true,
+            result: compressionResult.result
+          });
+          return compressionResult.result;
+        } catch (error) {
+          failed++;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          results.push({
+            id: imageId,
+            success: false,
+            error: errorMessage
+          });
+          console.warn(`[ImageDBService] ⚠️ Failed to compress ${imageId}:`, error);
+          return null;
+        }
+      });
+
+      await Promise.all(batchPromises);
+
+      // Report progress
+      const completed = i + batch.length;
+      onProgress?.(completed, imageIds.length, results[results.length - 1]);
+    }
+
+    console.log(`[ImageDBService] ✅ Batch compression complete:`);
+    console.log(`[ImageDBService] ├── Successful: ${successful}`);
+    console.log(`[ImageDBService] ├── Failed: ${failed}`);
+    console.log(`[ImageDBService] └── Total space saved: ${this.formatBytes(totalSpaceSaved)}`);
+
+    return {
+      successful,
+      failed,
+      totalSpaceSaved,
+      results
+    };
   }
 }
 

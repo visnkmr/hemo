@@ -142,7 +142,9 @@ export class GeminiImageService {
                 mimeType: "image/jpeg",
                 metadata: {
                   source: 'generated',
-                  quality: 85,
+                  compression: {
+                    quality: 0.85 // Convert to percentage (0-1)
+                  },
                   generationParams: parameters
                 }
               }

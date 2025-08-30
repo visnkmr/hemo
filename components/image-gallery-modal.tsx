@@ -4,10 +4,14 @@ import React, { useState, useMemo, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
 import { Badge } from "../components/ui/badge"
-import { Trash2, Calendar, Eye, X } from "lucide-react"
+import { Trash2, Calendar, Eye, X, Settings, Zap, Archive } from "lucide-react"
 import type { Chat } from "../lib/types"
 import { cn } from "../lib/utils"
 import { ResolvedImage } from "./resolved-image"
+import { CompressionSettingsModal } from "./compression-settings-modal"
+import { BatchCompressionModal } from "./batch-compression-modal"
+import { imageDBService } from "../lib/image-db-service"
+import { CompressionSettingsService } from "../lib/compression-settings-service"
 
 interface ImageData {
   uri: string
@@ -40,6 +44,22 @@ export default function ImageGalleryModal({
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null)
   const [gridColumns, setGridColumns] = useState(3) // Default to 3 columns
+  const [showCompressionSettings, setShowCompressionSettings] = useState(false)
+  const [showBatchCompression, setShowBatchCompression] = useState(false)
+  const getInitialCompressionSettings = () => {
+    try {
+      return CompressionSettingsService.getSettings();
+    } catch (error) {
+      // Fallback to default settings if localStorage is not available
+      return { preset: 'optimized' };
+    }
+  };
+
+  const [compressionSettings, setCompressionSettings] = useState<{
+    preset: string;
+    customSettings?: any;
+  }>(getInitialCompressionSettings())
+  const [compressingImages, setCompressingImages] = useState<Set<string>>(new Set())
 
   // Handle responsive grid columns (client-side only)
   useEffect(() => {
@@ -170,6 +190,49 @@ export default function ImageGalleryModal({
     setSelectedImage(null)
   }
 
+  const handleCompressionSettingsChange = (settings: { preset: string; customSettings?: any }) => {
+    setCompressionSettings(settings)
+  }
+
+  const handleCompressImage = async (image: ImageData) => {
+    if (!image.uri.startsWith('indexeddb:')) {
+      alert('Only IndexedDB images can be compressed')
+      return
+    }
+
+    const imageId = image.uri.replace('indexeddb:', '')
+    const compressId = `${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`
+    setCompressingImages(prev => new Set(prev).add(compressId))
+
+    try {
+      // TODO: Implement individual image compression
+      // For now, we'll use the batch compression functionality
+      const result = await imageDBService.compressImagesBatch(
+        [imageId],
+        compressionSettings.preset,
+        {
+          updateOriginal: true // Replace original with compressed version
+        }
+      )
+
+      if (result.failed > 0) {
+        alert(`Failed to compress image: ${result.results[0]?.error}`)
+      } else {
+        alert(`Image compressed! Saved ${Math.round(result.results[0]?.result?.savingsPercent || 0)}%`)
+        // Refresh the gallery might be needed here
+      }
+    } catch (error) {
+      console.error('Compression failed:', error)
+      alert('Compression failed: ' + (error as Error).message)
+    } finally {
+      setCompressingImages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(compressId)
+        return newSet
+      })
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -181,11 +244,31 @@ export default function ImageGalleryModal({
                 Chat Image Gallery
                 <Badge variant="secondary">{allImages.length} images</Badge>
               </div>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <X className="h-4 w-4" />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCompressionSettings(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Compression Settings
                 </Button>
-              </DialogClose>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBatchCompression(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Archive className="h-4 w-4" />
+                  Batch Compress
+                </Button>
+                <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogClose>
+              </div>
             </DialogTitle>
           </DialogHeader>
 
@@ -225,19 +308,34 @@ export default function ImageGalleryModal({
                     />
 
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteImage(image)
-                        }}
-                        disabled={deletingIds.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`)}
-                        className="flex items-center gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {deletingIds.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) ? 'Deleting...' : 'Delete'}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCompressImage(image)
+                          }}
+                          disabled={compressingImages.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) || !image.uri.startsWith('indexeddb:')}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Zap className="h-4 w-4" />
+                          {compressingImages.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) ? 'Compressing...' : 'Compress'}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteImage(image)
+                          }}
+                          disabled={deletingIds.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`)}
+                          className="flex items-center gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {deletingIds.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -286,6 +384,16 @@ export default function ImageGalleryModal({
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleCompressImage(selectedImage)}
+                      disabled={compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) || !selectedImage.uri.startsWith('indexeddb:')}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      {compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Compressing...' : 'Compress Image'}
+                    </Button>
+                    <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDeleteImage(selectedImage)}
@@ -314,6 +422,20 @@ export default function ImageGalleryModal({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Compression Settings Modal */}
+      <CompressionSettingsModal
+        isOpen={showCompressionSettings}
+        onClose={() => setShowCompressionSettings(false)}
+        onApplySettings={handleCompressionSettingsChange}
+        currentSettings={compressionSettings}
+      />
+
+      {/* Batch Compression Modal */}
+      <BatchCompressionModal
+        isOpen={showBatchCompression}
+        onClose={() => setShowBatchCompression(false)}
+      />
     </>
   )
 }

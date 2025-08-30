@@ -13,9 +13,10 @@ import type { Chat, BranchPoint, ModelRow, LocalModel, GeminiModel } from "../li
 import { fetchModelsByState } from "../lib/local-models"
 import { GeminiImageService } from "../lib/gemini-image-service"
 import { imageDBService } from "../lib/image-db-service"
+import { CompressionSettingsService, compressionSettingsService } from "../lib/compression-settings-service"
 import { Button } from "../components/ui/button"
 import { Database } from "lucide-react"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings, Archive, BarChart3 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 
 import ExportDialog from "../components/export-dialog"
@@ -23,6 +24,7 @@ import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
 import ImageGalleryModal from './image-gallery-modal'
+import CompressionDashboardModal from './compression-dashboard-modal'
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -145,8 +147,48 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isImageGalleryOpen, setIsImageGalleryOpen] = useState(false);
   const [isMigratingImages, setIsMigratingImages] = useState(false);
+  const [showCompressionDashboard, setShowCompressionDashboard] = useState(false);
   const isMobile = useIsMobile();
-  // const [tempApiKey, setTempApiKey] = useState("");
+
+  // Helper functions for compression settings
+  const getCompressionSettingsSummary = () => {
+    try {
+      return CompressionSettingsService.getSettingsSummary();
+    } catch (error) {
+      return 'Optimized';
+    }
+  };
+
+  const showCompressionSettings = () => {
+    try {
+      const summary = getCompressionSettingsSummary();
+      console.log(`[Compression] Current Settings: ${summary}`);
+      console.log('[Compression] Full settings:', CompressionSettingsService.getSettings());
+    } catch (error) {
+      console.log('[Compression] Settings not available');
+    }
+  };
+
+  const resetCompressionSettings = () => {
+    try {
+      CompressionSettingsService.clearSettings();
+      console.log('[Compression] ✅ Settings reset to defaults');
+    } catch (error) {
+      console.log('[Compression] Failed to reset settings');
+    }
+  };
+
+  const exportCompressionSettings = () => {
+    try {
+      const exported = CompressionSettingsService.exportSettings();
+      console.log('[Compression] 📤 Exported Settings:');
+      console.log(exported);
+    } catch (error) {
+      console.log('[Compression] Failed to export settings');
+    }
+  };
+
+ // const [tempApiKey, setTempApiKey] = useState("");
 
   /**
    * Formats bytes into human-readable format
@@ -1055,6 +1097,17 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Image Compression</div>
+                  <DropdownMenuItem onClick={showCompressionSettings}>
+                    <Zap className="mr-2 h-4 w-4" />
+                    <span>Current Settings: {getCompressionSettingsSummary()}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowCompressionDashboard(true)}>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    <span>Compression Dashboard</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
                   <div className="px-2 py-1 text-sm font-medium text-gray-500">Optimization Tools</div>
                   <DropdownMenuItem
                     onClick={optimizeChatHistoryImages}
@@ -1065,7 +1118,15 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
-                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Debug Tools</div>
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500">Debug & Maintenance</div>
+                  <DropdownMenuItem onClick={resetCompressionSettings}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Reset Compression Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportCompressionSettings}>
+                    <Database className="mr-2 h-4 w-4" />
+                    <span>Export Compression Settings</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={async () => {
                       // Dynamic import to get the test function
@@ -1073,7 +1134,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                       ImageOptimizations.testPicaOptimization();
                     }}
                   >
-                    <Settings className="mr-2 h-4 w-4" />
+                    <Bug className="mr-2 h-4 w-4" />
                     <span>Test Pica</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -1190,6 +1251,12 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         onClose={() => setIsImageGalleryOpen(false)}
         chats={chats}
         onDeleteImage={handleDeleteImage}
+      />
+
+      {/* Compression Dashboard Modal */}
+      <CompressionDashboardModal
+        isOpen={showCompressionDashboard}
+        onClose={() => setShowCompressionDashboard(false)}
       />
 
       <Toaster />
