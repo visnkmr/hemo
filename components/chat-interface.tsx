@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -181,7 +181,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                 <div className="mt-2 space-y-3">
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     {/* Show generation parameters if available */}
-                    {message.generationParameters && (
+                    {/* {message.generationParameters && (
                       <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
                         <div className="text-xs space-y-1">
                           {message.generationParameters.aspectRatio && (
@@ -198,7 +198,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                           )}
                         </div>
                       </div>
-                    )}
+                    )} */}
 
                     {/* Generated Images */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -211,9 +211,9 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                               className="w-full h-auto rounded-lg shadow-md border"
                             />
                             <div className="mt-2 flex justify-between items-center">
-                              <div className="text-xs text-gray-500">
+                              {/* <div className="text-xs text-gray-500">
                                 {image.width}×{image.height}
-                              </div>
+                              </div> */}
                               <div className="flex gap-1">
                                 {/* Download button */}
                                 <Button
@@ -230,7 +230,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                                   }}
                                   title="Download image"
                                 >
-                                  <FileIcon className="h-3 w-3" />
+                                  <Download className="h-3 w-3" />
                                 </Button>
                               </div>
                             </div>
