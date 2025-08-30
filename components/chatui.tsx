@@ -12,7 +12,9 @@ import FileGPTUrl from "../components/filegpt-url"
 import type { Chat, BranchPoint, ModelRow, LocalModel, GeminiModel } from "../lib/types"
 import { fetchModelsByState } from "../lib/local-models"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imageDBService } from "../lib/image-db-service"
 import { Button } from "../components/ui/button"
+import { Database } from "lucide-react"
 import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye } from "lucide-react"
 
 import ExportDialog from "../components/export-dialog"
@@ -141,6 +143,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [collapsed, setCollapsed] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isImageGalleryOpen, setIsImageGalleryOpen] = useState(false);
+  const [isMigratingImages, setIsMigratingImages] = useState(false);
   const isMobile = useIsMobile();
   // const [tempApiKey, setTempApiKey] = useState("");
 
@@ -233,14 +236,32 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           let messageModified = false;
 
           // Optimize single imageUrl
-          if (message.imageUrl && message.imageUrl.startsWith('data:image/')) {
+          if (message.imageUrl) {
             try {
-              console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${messageIndex})...`);
-              const result = await geminiService.optimizeImageForGemini(message.imageUrl);
-              message.imageUrl = result.optimizedBase64;
-              totalSavings += result.savings.savingsBytes;
-              imagesProcessed++;
-              messageModified = true;
+              let imageData: string | null = null;
+
+              // Handle IndexedDB URLs by resolving them first
+              if (message.imageUrl.startsWith('indexeddb:')) {
+                imageData = await geminiService.resolveImageUrl(message.imageUrl);
+              } else if (message.imageUrl.startsWith('data:image/')) {
+                imageData = message.imageUrl;
+              }
+
+              if (imageData) {
+                console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${messageIndex})...`);
+                const result = await geminiService.optimizeImageForGemini(imageData);
+
+                // Store optimized image in IndexedDB and update message reference
+                const optimImageId = `optimized_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
+
+                // The convertToIndexedDB method should return the key, but let's lookup by original content for now
+                // For now, we'll use convertToIndexedDB which already stores the image
+                message.imageUrl = result.optimizedBase64; // Keep base64 for now, will be converted during migration
+                totalSavings += result.savings.savingsBytes;
+                imagesProcessed++;
+                messageModified = true;
+              }
             } catch (error) {
               console.error(`[Chat Optimization] ❌ Failed to optimize imageUrl in ${chat.title}:`, error);
             }
@@ -255,17 +276,33 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 for (let imgIndex = 0; imgIndex < generation.images.length; imgIndex++) {
                   const image = generation.images[imgIndex];
 
-                  if (image.uri && image.uri.startsWith('data:image/')) {
+                  if (image.uri) {
                     try {
-                      console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - generation ${genIndex}, image ${imgIndex}...`);
-                      const result = await geminiService.optimizeImageForGemini(image.uri);
-                      image.uri = result.optimizedBase64;
-                      totalSavings += result.savings.savingsBytes;
-                      imagesProcessed++;
-                      messageModified = true;
+                      let imageData: string | null = null;
 
-                      // Update mimeType to reflect JPEG optimization
-                      image.mimeType = "image/jpeg";
+                      // Handle IndexedDB URLs by resolving them first
+                      if (image.uri.startsWith('indexeddb:')) {
+                        imageData = await geminiService.resolveImageUrl(image.uri);
+                      } else if (image.uri.startsWith('data:image/')) {
+                        imageData = image.uri;
+                      }
+
+                      if (imageData) {
+                        console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - generation ${genIndex}, image ${imgIndex}...`);
+                        const result = await geminiService.optimizeImageForGemini(imageData);
+
+                        // Store optimized image in IndexedDB and update image reference
+                        await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
+
+                        // Keep base64 for now, will be converted during migration
+                        image.uri = result.optimizedBase64;
+                        totalSavings += result.savings.savingsBytes;
+                        imagesProcessed++;
+                        messageModified = true;
+
+                        // Update mimeType to reflect JPEG optimization
+                        image.mimeType = "image/jpeg";
+                      }
                     } catch (error) {
                       console.error(`[Chat Optimization] ❌ Failed to optimize image in ${chat.title}:`, error);
                     }
@@ -308,6 +345,37 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       console.error('[Chat Optimization] ❌ Error during optimization:', error);
     } finally {
       setIsOptimizing(false);
+    }
+  };
+
+  /**
+   * Migrate existing images from base64 to IndexedDB
+   */
+  const migrateImagesToIndexedDB = async () => {
+    if (isMigratingImages) return;
+
+    setIsMigratingImages(true);
+    console.log('[UI Migration] 🔄 Starting image migration to IndexedDB...');
+
+    try {
+      // Migrate all images from chat history to IndexedDB
+      const migratedCount = await imageDBService.migrateFromChatHistory(chats);
+
+      // Update localStorage with migrated chat data
+      const updatedChats = JSON.parse(JSON.stringify(chats));
+      localStorage.setItem("chat_history", JSON.stringify(updatedChats));
+
+      // Refresh the chat state to show the updated data
+      setChats(updatedChats);
+
+      console.log(`[UI Migration] ✅ Successfully migrated ${migratedCount} images to IndexedDB`);
+      alert(`✅ Migration Complete!\n${migratedCount} images have been moved to IndexedDB for better performance.`);
+
+    } catch (error) {
+      console.error('[UI Migration] ❌ Migration failed:', error);
+      alert('❌ Migration failed. Please check the console for details.');
+    } finally {
+      setIsMigratingImages(false);
     }
   };
 
@@ -887,6 +955,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         window.removeEventListener('resize', debouncedSetViewportHeight);
       };
     }
+    return undefined; // Fix for TypeScript - all code paths must return a value
   }, []);
 
     // Expose test functions to global window for console testing
@@ -980,6 +1049,18 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               >
                 <Eye size={16} className="opacity-70" />
                 <span className="hidden lg:inline lg:ml-2">Images</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={migrateImagesToIndexedDB}
+                disabled={isMigratingImages || chats.length === 0}
+                title="Migrate images from base64 to IndexedDB"
+              >
+                <Database size={16} className="opacity-70" />
+                <span className="hidden lg:inline lg:ml-2">
+                  {isMigratingImages ? "Migrating..." : "Migrate"}
+                </span>
               </Button>
 
             </div>

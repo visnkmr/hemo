@@ -1,13 +1,16 @@
 import type { ImageGenerationParameters, ImageGenerationRequest, ImageGenerationResponse } from "./types";
+import type { StoredImage } from "./image-db-service";
 import {
   ImageOptimizationService,
   ImageOptimizations,
   type SpaceSavings
 } from "./image-optimization-service";
+import { imageDBService } from "./image-db-service";
 
 export class GeminiImageService {
   private readonly baseUrl = "https://generativelanguage.googleapis.com";
   private imageOptimizer: ImageOptimizationService;
+  private imageDBService = imageDBService;
 
   constructor(private apiKey: string) {
     this.imageOptimizer = new ImageOptimizationService();
@@ -108,6 +111,10 @@ export class GeminiImageService {
       if (responseData.candidates?.[0]?.content?.parts) {
         const parts = responseData.candidates[0].content.parts;
 
+        // Generate a unique chat/message ID for this image generation session
+        const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        let imageIndex = 0;
         for (const part of parts) {
           if (part.inlineData) {
             // The new API format includes dimensions in the structValue
@@ -120,15 +127,33 @@ export class GeminiImageService {
             const optimizationResult = await this.optimizeImageForGemini(originalBase64);
             const optimizedUri = optimizationResult.optimizedBase64;
 
-            // Use optimized dimensions for better UI display
-            const optimizedWidth = typeof width === 'number' ? width : parseInt(width) || 0;
-            const optimizedHeight = typeof height === 'number' ? height : parseInt(height) || 0;
+            // Create a unique ID for this image in IndexedDB
+            const imageId = `gen_${generationId}_img_${imageIndex++}`;
 
+            // Store the optimized image in IndexedDB
+            await this.imageDBService.storeImage(
+              imageId,
+              'temp', // Will be updated when image is associated with chat/message
+              generationId,
+              optimizedUri,
+              {
+                width: typeof width === 'number' ? width : parseInt(width) || 0,
+                height: typeof height === 'number' ? height : parseInt(height) || 0,
+                mimeType: "image/jpeg",
+                metadata: {
+                  source: 'generated',
+                  quality: 85,
+                  generationParams: parameters
+                }
+              }
+            );
+
+            // Use IndexedDB key as URL instead of storing base64 data
             images.push({
-              uri: optimizedUri,
-              mimeType: "image/jpeg", // Optimized to JPEG format
-              width: optimizedWidth,
-              height: optimizedHeight,
+              uri: `indexeddb:${imageId}`,
+              mimeType: "image/jpeg",
+              width: typeof width === 'number' ? width : parseInt(width) || 0,
+              height: typeof height === 'number' ? height : parseInt(height) || 0,
               generationParameters: parameters,
             });
           }
@@ -231,7 +256,89 @@ export class GeminiImageService {
     return Math.ceil(bytes);
   }
 
-  /**
+ /**
+  * Resolve IndexedDB image URL to actual base64 data
+  */
+ async resolveImageUrl(url: string): Promise<string | null> {
+   try {
+     if (!url.startsWith('indexeddb:')) {
+       return url; // Return as-is if not an IndexedDB URL
+     }
+
+     const imageId = url.replace('indexeddb:', '');
+     const storedImage = await this.imageDBService.getImage(imageId);
+
+     return storedImage ? storedImage.uri : null;
+   } catch (error) {
+     console.error('[GeminiImageService] ❌ Failed to resolve image URL:', error);
+     return null;
+   }
+ }
+
+ /**
+  * Convert a real base64 image to IndexedDB reference if it's not already
+  */
+ async convertToIndexedDB(imageUri: string, chatId: string = 'unknown', messageId: string = 'unknown'): Promise<string> {
+   try {
+     if (imageUri.startsWith('indexeddb:')) {
+       return imageUri; // Already a reference
+     }
+
+     if (!imageUri.startsWith('data:image/')) {
+       return imageUri; // Not a base64 image
+     }
+
+     // Generate unique ID and store in IndexedDB
+     const imageId = `converted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+     await this.imageDBService.storeImage(
+       imageId,
+       chatId,
+       messageId,
+       imageUri,
+       {
+         metadata: {
+           source: 'converted'
+         }
+       }
+     );
+
+     return `indexeddb:${imageId}`;
+   } catch (error) {
+     console.error('[GeminiImageService] ❌ Failed to convert image to IndexedDB:', error);
+     return imageUri; // Return original on failure
+   }
+ }
+
+ /**
+  * Update chat/message IDs for all images associated with a generation
+  */
+ async updateImageAssociations(generationId: string, chatId: string, messageId: string): Promise<void> {
+   try {
+     const images = await this.imageDBService.getMessageImages(generationId);
+
+     // Update each image to associate with the correct chat/message
+     await Promise.all(images.map(async (image: StoredImage) => {
+       await this.imageDBService.storeImage(
+         image.id, // Same ID
+         chatId,
+         messageId,
+         image.uri,
+         {
+           width: image.width,
+           height: image.height,
+           mimeType: image.mimeType,
+           metadata: image.metadata
+         }
+       );
+     }));
+
+     console.log(`[GeminiImageService] ✅ Updated associations for ${images.length} images`);
+   } catch (error) {
+     console.error('[GeminiImageService] ❌ Failed to update image associations:', error);
+   }
+ }
+
+ /**
     * Static factory method to create a Gemini image service instance
     */
   static createGeminiImageService(): GeminiImageService | null {

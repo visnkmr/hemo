@@ -10,6 +10,8 @@ import { Markdown } from "./markdown"
 // import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useEffect, useState } from "react"
 import { Button } from "../components/ui/button"
+import { ResolvedImage } from "./resolved-image"
+import { GeminiImageService } from "../lib/gemini-image-service"
 
 interface MessageItemProps {
   message: Message
@@ -105,7 +107,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
             <div className="prose dark:prose-invert prose-sm break-words w-full overflow-hidden">
               {message.imageUrl && (
                 <div className="mt-2">
-                  <img src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
+                  <ResolvedImage src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
                 </div>
               )}
 
@@ -138,7 +140,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                       {message.imageGenerations.flatMap((generation, genIndex) =>
                         generation.images.map((image, imgIndex) => (
                           <div key={`${genIndex}-${imgIndex}`} className="relative group">
-                            <img
+                            <ResolvedImage
                               src={image.uri}
                               alt={`Generated image ${genIndex + 1}.${imgIndex + 1}`}
                               className="w-full h-auto rounded-lg shadow-md border"
@@ -153,18 +155,28 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                                   variant="ghost"
                                   size="sm"
                                   className="h-6 w-6"
-                                  onClick={() => {
-                                    const link = document.createElement('a');
-                                    link.href = image.uri;
-                                    link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
+                                  onClick={async () => {
+                                    try {
+                                      const imageService = GeminiImageService.createGeminiImageService();
+                                      if (imageService) {
+                                        const resolvedUri = await imageService.resolveImageUrl(image.uri);
+                                        if (resolvedUri) {
+                                          const link = document.createElement('a');
+                                          link.href = resolvedUri;
+                                          link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
+                                          document.body.appendChild(link);
+                                          link.click();
+                                          document.body.removeChild(link);
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error('Failed to resolve image for download:', error);
+                                    }
                                   }}
                                   title="Download image"
                                 >
-                                  <Download className="h-3 w-3" /> 
-                                 
+                                  <Download className="h-3 w-3" />
+
                                 </Button>
                               </div>
                             </div>

@@ -7,6 +7,7 @@ import { Badge } from "../components/ui/badge"
 import { Trash2, Calendar, Eye, X } from "lucide-react"
 import type { Chat } from "../lib/types"
 import { cn } from "../lib/utils"
+import { ResolvedImage } from "./resolved-image"
 
 interface ImageData {
   uri: string
@@ -54,6 +55,7 @@ export default function ImageGalleryModal({
       window.addEventListener('resize', updateGridColumns)
       return () => window.removeEventListener('resize', updateGridColumns)
     }
+    return undefined; // Fix for TypeScript - all code paths must return a value
   }, [])
 
   // Extract all images from chat history
@@ -77,7 +79,7 @@ export default function ImageGalleryModal({
     chats.forEach(chat => {
       chat.messages.forEach(message => {
         // Single image from imageUrl
-        if (message.imageUrl && message.imageUrl.startsWith('data:image/')) {
+        if (message.imageUrl && (message.imageUrl.startsWith('data:image/') || message.imageUrl.startsWith('indexeddb:'))) {
           // Extract dimensions from base64 data if possible
           let width = 0, height = 0
           try {
@@ -115,7 +117,7 @@ export default function ImageGalleryModal({
           message.imageGenerations.forEach((generation, genIndex) => {
             if (generation.images && generation.images.length > 0) {
               generation.images.forEach((image, imageIndex) => {
-                if (image.uri && image.uri.startsWith('data:image/')) {
+                if (image.uri && (image.uri.startsWith('data:image/') || image.uri.startsWith('indexeddb:'))) {
                   images.push({
                     uri: image.uri,
                     mimeType: image.mimeType,
@@ -214,7 +216,7 @@ export default function ImageGalleryModal({
                     }}
                     onClick={() => handleImageClick(image)}
                   >
-                    <img
+                    <ResolvedImage
                       src={image.uri}
                       alt={`${image.chatTitle} - ${image.width}x${image.height}`}
                       className="w-full h-full object-cover"
@@ -302,7 +304,7 @@ export default function ImageGalleryModal({
               </DialogHeader>
 
               <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                <img
+                <ResolvedImage
                   src={selectedImage.uri}
                   alt={`${selectedImage.chatTitle} - ${selectedImage.width}x${selectedImage.height}`}
                   className="w-full h-auto max-h-[70vh] object-contain"
