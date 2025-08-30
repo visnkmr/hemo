@@ -895,7 +895,8 @@ export async function* sendMessageStream({
         }
       }
     }
-  } else {
+  } else 
+  {
     // OpenAI/Grok/Ollama streaming format
     while (true) {
       const { done, value } = await reader.read();
@@ -1187,30 +1188,7 @@ export default function ChatInterface({
         // }).catch(e=>console.log(e)) as string):""; 
         // console.log(`----------context: ${context}`)
 
-        for await (const contentChunk of sendMessageStream({
-          url: lmstudio_url,
-          notollama: ollamastate,
-          // apiKey: ollamastate,
-          model: modelToSend,
-          messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
-          lmstudio_url: lmstudio_url,
-          context: answerfromfile ? context : ""
-        })) {
-          accumulatedContent += contentChunk;
-
-          // Update the last message (assistant's) with new content
-          const updatedMessages = [...currentChatState.messages];
-          updatedMessages[updatedMessages.length - 1] = {
-            ...updatedMessages[updatedMessages.length - 1],
-            content: accumulatedContent,
-          };
-
-          currentChatState = {
-            ...currentChatState,
-            messages: updatedMessages,
-          };
-          updateChat(currentChatState); // Update UI
-        }
+        
 
         // Check if we should generate an image automatically for Gemini models
         if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
@@ -1248,6 +1226,32 @@ export default function ChatInterface({
               console.warn("Automatic image generation failed:", imageError);
               // Don't fail the entire response if image generation fails
             }
+          }
+        }
+        else{
+          for await (const contentChunk of sendMessageStream({
+            url: lmstudio_url,
+            notollama: ollamastate,
+            // apiKey: ollamastate,
+            model: modelToSend,
+            messages: sendwithhistory ? messagesToSend : [messagesToSend[messagesToSend.length - 1]],
+            lmstudio_url: lmstudio_url,
+            context: answerfromfile ? context : ""
+          })) {
+            accumulatedContent += contentChunk;
+  
+            // Update the last message (assistant's) with new content
+            const updatedMessages = [...currentChatState.messages];
+            updatedMessages[updatedMessages.length - 1] = {
+              ...updatedMessages[updatedMessages.length - 1],
+              content: accumulatedContent,
+            };
+  
+            currentChatState = {
+              ...currentChatState,
+              messages: updatedMessages,
+            };
+            updateChat(currentChatState); // Update UI
           }
         }
       } catch (err) {
