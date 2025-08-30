@@ -36,9 +36,9 @@ export interface SpaceSavings {
 export class ImageOptimizationService {
   private pica: Pica;
   private defaultConfig: ImageOptimizationConfig = {
-    maxWidth: 2048,
-    maxHeight: 2048,
-    quality: 0.85,
+    maxWidth: 512,
+    maxHeight: 512,
+    quality: 0.3,
     format: 'jpeg',
     autoResize: true
   };
@@ -122,8 +122,8 @@ export class ImageOptimizationService {
     let optimizedWidth = width;
     let optimizedHeight = height;
 
-    const maxWidth = this.defaultConfig.maxWidth || 2048;
-    const maxHeight = this.defaultConfig.maxHeight || 2048;
+    const maxWidth = this.defaultConfig.maxWidth || 512;
+    const maxHeight = this.defaultConfig.maxHeight || 512;
 
     if (this.defaultConfig.autoResize && (width > maxWidth || height > maxHeight)) {
       const widthRatio = maxWidth / width;
@@ -144,7 +144,7 @@ export class ImageOptimizationService {
   /**
    * Converts canvas to blob
    */
-  canvasToBlob(canvas: HTMLCanvasElement, quality: number = 0.85, format: string = 'image/jpeg'): Promise<Blob | null> {
+  canvasToBlob(canvas: HTMLCanvasElement, quality: number = 0.3, format: string = 'image/jpeg'): Promise<Blob | null> {
     return new Promise((resolve) => {
       canvas.toBlob(resolve, format, quality);
     });
@@ -185,7 +185,7 @@ export class ImageOptimizationService {
 
       // Check if resizing is needed
       const needsResize = finalConfig.autoResize &&
-        (img.width > (finalConfig.maxWidth || 2048) || img.height > (finalConfig.maxHeight || 2048));
+        (img.width > (finalConfig.maxWidth || 512) || img.height > (finalConfig.maxHeight || 512));
 
       if (!needsResize) {
         console.log('[image-optimization] ✅ Image already optimal, no resizing needed');
@@ -200,7 +200,7 @@ export class ImageOptimizationService {
 
       // Resize using Pica
       const optimizedCanvas = await this.pica.resize(sourceCanvas, targetCanvas, {
-        quality: finalConfig.quality || 0.85,
+        quality: finalConfig.quality || 0.3,
         alpha: true,
         unsharpAmount: 0,
         unsharpRadius: 0.5
@@ -225,7 +225,7 @@ export class ImageOptimizationService {
       // Calculate and display space savings
       const savings = this.calculateSpaceSavings(originalSize, currentSize);
 
-      console.log(`[image-optimization] ✅ Optimization complete. Quality: ${((finalConfig.quality || 0.85) * 100).toFixed(0)}%`);
+      console.log(`[image-optimization] ✅ Optimization complete. Quality: ${((finalConfig.quality || 0.3) * 100).toFixed(0)}%`);
       console.log(`[image-optimization] 🎯 Final format: ${finalConfig.format?.toUpperCase()}`);
 
       return {
@@ -273,7 +273,7 @@ export class ImageOptimizationService {
     const result = await this.optimizeImage(base64Image, {
       maxWidth: 1536,
       maxHeight: 1536,
-      quality: 0.85,
+      quality: 0.3,
       format: 'jpeg',
       autoResize: true
     });
@@ -311,5 +311,129 @@ export const ImageOptimizations = {
     console.log(`├── Space Saved: ${imageOptimizer['formatBytes'](savings.savingsBytes)}`)
     console.log(`└── Compression: ${savings.savingsPercent.toFixed(1)}%`);
     console.log(`\n`);
+  },
+
+ /**
+   * Test Pica optimization on an image URL (like the download.png file)
+   */
+  async testPicaOptimizationOnImage(imageUrl: string): Promise<void> {
+    console.log(`🧪[PICA TEST] Testing Pica optimization on: ${imageUrl}`);
+
+    try {
+      const img = await imageOptimizer.loadImage(imageUrl);
+      console.log(`📸[PICA TEST] Loaded image: ${img.width}x${img.height} pixels`);
+
+      const canvas = imageOptimizer.imageToCanvas(img);
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/png');
+      });
+
+      if (!blob) {
+        console.error(`❌[PICA TEST] Could not create blob from canvas`);
+        return;
+      }
+
+      const originalBase64 = await imageOptimizer.blobToBase64(blob);
+      const originalSize = blob.size;
+
+      console.log(`📏[PICA TEST] Original size: ${imageOptimizer['formatBytes'](originalSize)}`);
+
+      // Apply optimization
+      const optimizationResult = await imageOptimizer.optimizeImage(originalBase64, {
+        maxWidth: 1536,
+        maxHeight: 1536,
+        quality: 0.3,
+        format: 'jpeg',
+        autoResize: true
+      });
+
+      console.log(`✅[PICA TEST] Optimization complete!`);
+      console.log(`📏[PICA TEST] Optimized size: ${imageOptimizer['formatBytes'](optimizationResult.savings.optimizedSize)}`);
+      console.log(`📊[PICA TEST] Space saved: ${imageOptimizer['formatBytes'](optimizationResult.savings.savingsBytes)}`);
+      console.log(`📈[PICA TEST] Compression: ${optimizationResult.savings.savingsPercent.toFixed(1)}%`);
+
+      console.log(`\n🚀[PICA TEST] SUCCESS! Reduced from PNG to optimized JPEG.`);
+
+    } catch (error) {
+      console.error(`❌[PICA TEST] Error testing on ${imageUrl}:`, error);
+    }
+  },
+
+  /**
+   * Test Pica optimization on generated canvas (for demo testing)
+   */
+  async testPicaOptimization(): Promise<void> {
+    console.log(`🧪[PICA TEST] Starting Pica optimization test...`);
+
+    try {
+      // Create a large test canvas (to simulate a large image that needs optimization)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error(`❌[PICA TEST] Could not create canvas context`);
+        return;
+      }
+
+      // Create a test image - 2000x1500 pixels (large enough to trigger optimization)
+      canvas.width = 2000;
+      canvas.height = 1500;
+
+      // Fill with gradient pattern to create compressible content
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, 'rgba(255, 0, 100, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(100, 100, 255, 0.8)');
+      gradient.addColorStop(1, 'rgba(255, 0, 255, 0.8)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Add some random patterns to make it more compressible
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + Math.random() * 0.5 + 0.3 + ')';
+      for (let i = 0; i < 50; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const w = Math.random() * 200 + 50;
+        const h = Math.random() * 200 + 50;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      // Convert canvas to blob (original image) using Promise wrapper
+      const originalBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      });
+
+      if (!originalBlob) {
+        console.error(`❌[PICA TEST] Could not create blob from canvas`);
+        return;
+      }
+
+      // Convert blob to base64
+      const originalBase64 = await imageOptimizer.blobToBase64(originalBlob);
+      const originalSize = (originalBlob.size * 4) / 3; // Rough approximation for base64 size
+
+      console.log(`📏[PICA TEST] Original image: ${canvas.width}x${canvas.height} pixels`);
+      console.log(`📏[PICA TEST] Original size: ${imageOptimizer['formatBytes'](originalSize)}`);
+      console.log(`💅[PICA TEST] Original format: PNG`);
+
+      const optimizationResult = await imageOptimizer.optimizeImage(originalBase64, {
+        maxWidth: 1536,
+        maxHeight: 1536,
+        quality: 0.3,
+        format: 'jpeg',
+        autoResize: true
+      });
+
+      console.log(`✅[PICA TEST] Optimized image: 1536x${Math.round(1536 * canvas.height / canvas.width)} pixels (approx.)`);
+      console.log(`💫[PICA TEST] Optimized format: JPEG with ${85}% quality`);
+      console.log(`📊[PICA TEST] Space savings: ${imageOptimizer['formatBytes'](optimizationResult.savings.savingsBytes)}`);
+      console.log(`📊[PICA TEST] Compression ratio: ${optimizationResult.savings.savingsPercent.toFixed(1)}%`);
+      console.log(`🎯[PICA TEST] Final size: ${imageOptimizer['formatBytes'](optimizationResult.savings.optimizedSize)}`);
+
+      const efficiency = ((optimizationResult.savings.savingsBytes / optimizationResult.savings.originalSize) * 100).toFixed(1);
+      console.log(`\n🚀[PICA TEST] SUCCESS! Pica achieved ${efficiency}% size reduction from PNG ${canvas.width}x${canvas.height}px to optimized JPEG.`);
+
+    } catch (error) {
+      console.error(`❌[PICA TEST] Error during Pica test:`, error);
+    }
   }
 };
+

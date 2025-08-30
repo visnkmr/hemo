@@ -13,12 +13,13 @@ import type { Chat, BranchPoint, ModelRow, LocalModel, GeminiModel } from "../li
 import { fetchModelsByState } from "../lib/local-models"
 import { GeminiImageService } from "../lib/gemini-image-service"
 import { Button } from "../components/ui/button"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye } from "lucide-react"
 
 import ExportDialog from "../components/export-dialog"
 import { Toaster } from "../components/ui/toaster"
 import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
+import ImageGalleryModal from './image-gallery-modal'
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -139,6 +140,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   //Collapse sidebar on chat select
   const [collapsed, setCollapsed] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isImageGalleryOpen, setIsImageGalleryOpen] = useState(false);
   const isMobile = useIsMobile();
   // const [tempApiKey, setTempApiKey] = useState("");
 
@@ -780,6 +782,61 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
   }
 
+  const handleDeleteImage = async (imageData: any) => {
+    console.log('[Image Delete] Starting image deletion:', imageData);
+
+    try {
+      const updatedChats = chats.map(chat => {
+        if (chat.id !== imageData.chatId) return chat;
+
+        const updatedMessages = chat.messages.map(message => {
+          if (message.id !== imageData.messageId) return message;
+
+          const updatedMessage = { ...message };
+
+          if (imageData.isSingleImage) {
+            // Delete single imageUrl
+            updatedMessage.imageUrl = undefined;
+            console.log('[Image Delete] Removed single imageUrl from message');
+          } else {
+            // Delete from imageGenerations array
+            if (updatedMessage.imageGenerations && imageData.generationIndex !== undefined && imageData.imageIndex !== undefined) {
+              const generation = updatedMessage.imageGenerations[imageData.generationIndex];
+              if (generation && generation.images) {
+                // Remove the specific image from the generation
+                generation.images.splice(imageData.imageIndex, 1);
+
+                // If this was the only image in the generation, remove the entire generation
+                if (generation.images.length === 0) {
+                  updatedMessage.imageGenerations.splice(imageData.generationIndex, 1);
+                  console.log('[Image Delete] Removed entire generation (no images left)');
+                } else {
+                  console.log(`[Image Delete] Removed image ${imageData.imageIndex} from generation ${imageData.generationIndex}`);
+                }
+              }
+            }
+          }
+
+          return updatedMessage;
+        });
+
+        return {
+          ...chat,
+          messages: updatedMessages
+        };
+      });
+
+      // Update state and localStorage
+      setChats(updatedChats);
+
+      console.log('[Image Delete] Image deletion completed successfully');
+
+    } catch (error) {
+      console.error('[Image Delete] Error during image deletion:', error);
+      throw error;
+    }
+  }
+
 
   const toggleMenu = () => {
     setCollapsed(prev => !prev);
@@ -828,6 +885,18 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     return () => {
       window.removeEventListener('resize', debouncedSetViewportHeight);
     };
+  }, []);
+
+    // Expose test functions to global window for console testing
+  useEffect(() => {
+    // Import and expose the optimization test function
+    import('../lib/image-optimization-service').then((module) => {
+      if (typeof window !== 'undefined') {
+        // @ts-ignore
+        window.testPicaOptimization = module.ImageOptimizations.testPicaOptimization;
+        console.log('🧪 Pica test function available: run `testPicaOptimization()` in console');
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -885,6 +954,28 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               >
                 <Bot size={16} className="opacity-70" />
                 <span className="hidden lg:inline lg:ml-2">Storage</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  // Dynamic import to get the test function
+                  const { ImageOptimizations } = await import('../lib/image-optimization-service');
+                  ImageOptimizations.testPicaOptimization();
+                }}
+                title="Test Pica optimization on sample image"
+              >
+                <Zap size={16} className="opacity-70" />
+                <span className="hidden lg:inline lg:ml-2">Test Pica</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsImageGalleryOpen(true)}
+                title="View all images in chat history"
+              >
+                <Eye size={16} className="opacity-70" />
+                <span className="hidden lg:inline lg:ml-2">Images</span>
               </Button>
 
             </div>
@@ -991,6 +1082,14 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
       {/* Export Dialog */}
       <ExportDialog isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} chat={currentChat} />
+
+      {/* Image Gallery Modal */}
+      <ImageGalleryModal
+        isOpen={isImageGalleryOpen}
+        onClose={() => setIsImageGalleryOpen(false)}
+        chats={chats}
+        onDeleteImage={handleDeleteImage}
+      />
 
       <Toaster />
     </div>
