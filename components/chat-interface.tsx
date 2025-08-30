@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download, MessageSquarePlus } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -51,15 +51,17 @@ interface ExpandableMessageItemProps {
   onCopy: () => void
   onBranch: () => void
   onEdit: () => void
+  onQuote: () => void
   onSaveEdit?: (newContent: string) => void
   setdsm?: any
   setmts?: any
   isExpanded: boolean
   onToggleExpand: () => void
   isEditing?: boolean
+  isQuoted?: boolean
 }
 
-function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,message, isStreaming = false, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false }: ExpandableMessageItemProps) {
+function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,message, isStreaming = false, onCopy, onBranch, onEdit, onQuote, onSaveEdit, setdsm, setmts, isExpanded, onToggleExpand, isEditing = false, isQuoted = false }: ExpandableMessageItemProps) {
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -140,8 +142,9 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
       <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85vw] w-full")}>
         <div
           className={cn(
-            "gap-3 p-4 rounded-lg relative overflow-hidden w-full",
+            "gap-3 p-4 rounded-lg relative overflow-hidden w-full transition-all duration-200",
             isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
+            isQuoted ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 shadow-lg" : "",
           )}
         >
           <div className="space-y-2">
@@ -452,6 +455,9 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                 </Button> */}
               </>
             )}
+            <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
@@ -503,6 +509,7 @@ interface QuestionGroupProps {
   answers: Message[]
   onCopy: (content: string) => void
   onBranch: (messageId: string) => void
+  onQuote: (message: Message) => void
   onEdit: () => void
   onSaveEdit?: (newContent: string) => void
   setdsm?: any
@@ -514,9 +521,10 @@ interface QuestionGroupProps {
   isQuestionEditing?: boolean
   currentAnswerIndex: number
   onAnswerIndexChange: (index: number) => void
+  quotedMessage?: Message | null
 }
 
-function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,question, answers, onCopy, onBranch, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange }: QuestionGroupProps) {
+function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,selectedModel,handleSelectModel,isLoadingModels,setsendwithhistory,sendwithhistory,geminiModels,question, answers, onCopy, onBranch, onQuote, onEdit, onSaveEdit, setdsm, setmts, isStreaming, streamingMessageId, isQuestionExpanded, onToggleQuestionExpand, isQuestionEditing, currentAnswerIndex, onAnswerIndexChange, quotedMessage }: QuestionGroupProps) {
   const _setdsm = setdsm || (() => {})
   const _setmts = setmts || (() => {})
   const handlePrevious = () => {
@@ -560,9 +568,11 @@ function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,s
         setsendwithhistory={setsendwithhistory}
         sendwithhistory={sendwithhistory}
         geminiModels={geminiModels}
+
         message={question}
         onCopy={() => onCopy(question.content)}
         onBranch={() => onBranch(question.id)}
+        onQuote={() => onQuote(question)}
         onEdit={onEdit}
         onSaveEdit={onSaveEdit}
         setdsm={setdsm}
@@ -570,8 +580,8 @@ function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,s
         isExpanded={isQuestionExpanded}
         onToggleExpand={onToggleQuestionExpand}
         isEditing={isQuestionEditing}
+        isQuoted={quotedMessage?.id === question.id}
       />
-
       {/* Answer Group with Navigation */}
       <div className="w-full">
         {/* Answer Counter and Navigation */}
@@ -626,8 +636,10 @@ function QuestionGroup({ vendor,setvendor,ollamastate,setollamastate,allModels,s
             isStreaming={isStreaming && streamingMessageId === currentAnswer.id}
             onCopy={() => onCopy(currentAnswer.content)}
             onBranch={() => onBranch(currentAnswer.id)}
+            onQuote={() => onQuote(currentAnswer)}
             setdsm={setdsm}
             setmts={setmts}
+            isQuoted={quotedMessage?.id === currentAnswer.id}
           />
 
           {/* Multiple answers indicator */}
@@ -1171,12 +1183,26 @@ export default function ChatInterface({
     if (ollamastate !== 3) {
       try {
         // Determine API URL and model
-        
+
         const modelToSend = selectedModel;
         const messagesToSend = [...initialMessages, userMessage].map((msg) => ({
           role: msg.role,
           content: msg.content,
         }));
+
+        // If there's a quoted message, prepend context about what we're replying to
+        if (quotedMessage) {
+          const quotedContext = `You are replying to this message ${quotedMessage.role === 'user' ? 'from the user' : 'from your previous response'}:
+"${quotedMessage.content}"
+
+`;
+          messagesToSend[messagesToSend.length - 1] = {
+            ...messagesToSend[messagesToSend.length - 1],
+            content: quotedContext + userMessage.content
+          };
+          // Clear the quoted message after sending
+          setQuotedMessage(null);
+        }
         //  const stored_lm_model_name = localStorage.getItem("local_model")
         let accumulatedContent = "";
         let context = ""
@@ -1335,7 +1361,17 @@ export default function ChatInterface({
   // Effect for direct message sending
   useEffect(() => {
     if (dsm && mts && !isLoading) {
-      handleSendMessage(mts);
+      // If there's a quoted message, include it in the context for direct messages
+      let contentToSend = mts;
+      if (quotedMessage) {
+        const quotedContext = `You are replying to this message ${quotedMessage.role === 'user' ? 'from the user' : 'from your previous response'}:
+"${quotedMessage.content}"
+
+`;
+        contentToSend = quotedContext + mts;
+        setQuotedMessage(null);
+      }
+      handleSendMessage(contentToSend);
       setdsm(false)
       setmts("")
     }
@@ -1433,6 +1469,14 @@ export default function ChatInterface({
     }
   };
 
+  const handleQuoteMessage = (message: Message) => {
+    setQuotedMessage(message);
+  };
+
+  const clearQuotedMessage = () => {
+    setQuotedMessage(null);
+  };
+
   const handleEditMessage = (messageId: string) => {
     if (editingMessageId === messageId) {
       // If already editing this message, cancel editing
@@ -1519,6 +1563,9 @@ export default function ChatInterface({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Quoted message state
+  const [quotedMessage, setQuotedMessage] = useState<Message | null>(null);
 
   // Image generation state
   const [isImageGenerationOpen, setIsImageGenerationOpen] = useState(false);
@@ -1848,11 +1895,11 @@ export default function ChatInterface({
                         setsendwithhistory={setsendwithhistory}
                         sendwithhistory={sendwithhistory}
                         geminiModels={geminiModels}
-
                         message={group.message}
                         isStreaming={streamingMessageId === group.message.id}
                         onCopy={() => handleCopyMessage(group.message!.content)}
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
+                        onQuote={() => handleQuoteMessage(group.message!)}
                         onEdit={() => handleEditMessage(group.message!.id)}
                         onSaveEdit={handleEditSave}
                         setdsm={setdsm}
@@ -1860,6 +1907,7 @@ export default function ChatInterface({
                         isExpanded={expandedMessages.has(group.message.id)}
                         onToggleExpand={() => toggleMessageExpansion(group.message!.id)}
                         isEditing={editingMessageId === group.message.id}
+                        isQuoted={quotedMessage?.id === group.message.id}
                       />
                     ) : (
                       <MessageItem
@@ -1867,6 +1915,10 @@ export default function ChatInterface({
                         isStreaming={streamingMessageId === group.message.id}
                         onCopy={() => handleCopyMessage(group.message!.content)}
                         onBranch={() => handleBranchFromMessage(group.message!.id)}
+                        onQuote={() => handleQuoteMessage(group.message!)}
+                        setdsm={setdsm}
+                        setmts={setmts}
+                        isQuoted={quotedMessage?.id === group.message.id}
                       />
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
@@ -1890,6 +1942,7 @@ export default function ChatInterface({
                           answers={group.answers}
                           onCopy={handleCopyMessage}
                           onBranch={handleBranchFromMessage}
+                          onQuote={handleQuoteMessage}
                           onEdit={() => handleEditMessage(group.question!.id)}
                           setmts={setmts}
                           setdsm={setdsm}
@@ -1899,6 +1952,7 @@ export default function ChatInterface({
                           onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
                           currentAnswerIndex={currentIndex}
                           onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
+                          quotedMessage={quotedMessage}
                         />
                       );
                     })()
@@ -1959,7 +2013,31 @@ export default function ChatInterface({
 
           <div className="flex flex-grow items-center gap-2">
             <div className="flex flex-col flex-grow">
-              
+
+              {/* Quoted Message Display */}
+              {quotedMessage && (
+                <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-md relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Replying to {quotedMessage.role === 'user' ? 'your message' : 'AI response'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearQuotedMessage}
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                  <div className="text-sm text-blue-900 dark:text-blue-100 line-clamp-3">
+                    {quotedMessage.content.length > 150
+                      ? `${quotedMessage.content.substring(0, 150)}...`
+                      : quotedMessage.content
+                    }
+                  </div>
+                </div>
+              )}
 
               <Textarea
                 ref={textareaRef}

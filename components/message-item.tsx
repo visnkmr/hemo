@@ -1,7 +1,7 @@
 "use client"
 
 import type { Message } from "../lib/types"
-import { CopyIcon, GitBranchIcon, RefreshCw, FileIcon, Download } from "lucide-react"
+import { CopyIcon, GitBranchIcon, RefreshCw, FileIcon, Download, MessageSquarePlus } from "lucide-react"
 import { cn } from "../lib/utils"
 
 // import ReactMarkdown from "react-markdown"
@@ -16,11 +16,13 @@ interface MessageItemProps {
   isStreaming?: boolean
   onCopy: () => void
   onBranch: () => void
+  onQuote: () => void
   setdsm?: any
   setmts?: any
+  isQuoted?: boolean
 }
 
-export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, setdsm, setmts }: MessageItemProps) {
+export default function MessageItem({ message, isStreaming = false, onCopy, onBranch, onQuote, setdsm, setmts, isQuoted = false }: MessageItemProps) {
   const _setdsm = setdsm || (() => {})
   const _setmts = setmts || (() => {})
   const isUser = message.role === "user"
@@ -65,8 +67,9 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
       <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85vw] w-full")}>
         <div
           className={cn(
-            "gap-3 p-4 rounded-lg relative overflow-hidden w-full",
+            "gap-3 p-4 rounded-lg relative overflow-hidden w-full transition-all duration-200",
             isUser ? "bg-blue-50 dark:bg-blue-900/20 max-w-[70vw]" : "bg-gray-50 dark:bg-gray-800/50 max-w-full",
+            isQuoted ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 shadow-lg" : "",
           )}
         >
           {/* <div className="flex-shrink-0 mt-1">
@@ -191,6 +194,9 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                 <RefreshCw className="h-4 w-4" />
               </Button>
             )}
+            <Button variant="ghost" size="icon" onClick={onQuote} title="Quote message">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={onCopy} title="Copy message">
               <CopyIcon className="h-4 w-4" />
             </Button>
