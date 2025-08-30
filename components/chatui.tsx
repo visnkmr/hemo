@@ -876,15 +876,17 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   };
 
   useEffect(() => {
-    const setViewportHeight = () => {
-      document.documentElement.style.setProperty('--100vh', `${window.innerHeight}px`);
-    };
-    setViewportHeight();
-    const debouncedSetViewportHeight = debounce(setViewportHeight, 100);
-    window.addEventListener('resize', debouncedSetViewportHeight);
-    return () => {
-      window.removeEventListener('resize', debouncedSetViewportHeight);
-    };
+    if (typeof window !== 'undefined') {
+      const setViewportHeight = () => {
+        document.documentElement.style.setProperty('--100vh', `${window.innerHeight}px`);
+      };
+      setViewportHeight();
+      const debouncedSetViewportHeight = debounce(setViewportHeight, 100);
+      window.addEventListener('resize', debouncedSetViewportHeight);
+      return () => {
+        window.removeEventListener('resize', debouncedSetViewportHeight);
+      };
+    }
   }, []);
 
     // Expose test functions to global window for console testing
@@ -900,14 +902,16 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   }, []);
 
   useEffect(() => {
-    // (async ()=>createNewChat((await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ","")))()
-    // createNewChat();
-    if (typeof window !== 'undefined' && !window.isSecureContext) {
-      // In a real Next.js app, you might use next/router here
-      // For example: router.replace(window.location.href.replace('http:', 'https:'));
-      if (window.location.protocol !== 'https:') {
-        console.warn("Attempting to redirect to HTTPS (simulated for component context)");
-        // window.location.protocol = "https:"; // This would cause a full page reload
+    if (typeof window !== 'undefined') {
+      // (async ()=>createNewChat((await(await import('@tauri-apps/api/window')).appWindow.title()).replace("FileGPT: ","")))()
+      // createNewChat();
+      if (!window.isSecureContext) {
+        // In a real Next.js app, you might use next/router here
+        // For example: router.replace(window.location.href.replace('http:', 'https:'));
+        if (window.location.protocol !== 'https:') {
+          console.warn("Attempting to redirect to HTTPS (simulated for component context)");
+          // window.location.protocol = "https:"; // This would cause a full page reload
+        }
       }
     }
   }, []);

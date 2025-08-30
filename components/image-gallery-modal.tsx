@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
 import { Badge } from "../components/ui/badge"
@@ -38,6 +38,23 @@ export default function ImageGalleryModal({
 }: ImageGalleryModalProps) {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null)
+  const [gridColumns, setGridColumns] = useState(3) // Default to 3 columns
+
+  // Handle responsive grid columns (client-side only)
+  useEffect(() => {
+    const updateGridColumns = () => {
+      if (typeof window !== 'undefined') {
+        const width = window.innerWidth
+        setGridColumns(width < 768 ? 2 : width < 1200 ? 3 : 4)
+      }
+    }
+
+    updateGridColumns()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', updateGridColumns)
+      return () => window.removeEventListener('resize', updateGridColumns)
+    }
+  }, [])
 
   // Extract all images from chat history
   const allImages = useMemo(() => {
@@ -65,14 +82,16 @@ export default function ImageGalleryModal({
           let width = 0, height = 0
           try {
             // Try to get dimensions from image data, fallback to 400x300
-            const img = new Image()
-            img.onload = () => {
-              width = img.width
-              height = img.height
+            if (typeof window !== 'undefined') {
+              const img = new Image()
+              img.onload = () => {
+                width = img.width
+                height = img.height
+              }
+              img.src = message.imageUrl
+              width = width || 400
+              height = height || 300
             }
-            img.src = message.imageUrl
-            width = width || 400
-            height = height || 300
           } catch {
             width = 400
             height = 300
@@ -148,9 +167,6 @@ export default function ImageGalleryModal({
   const closeImageView = () => {
     setSelectedImage(null)
   }
-
-  // Pinterest-style masonry grid calculation
-  const gridColumns = window.innerWidth < 768 ? 2 : window.innerWidth < 1200 ? 3 : 4
 
   return (
     <>
