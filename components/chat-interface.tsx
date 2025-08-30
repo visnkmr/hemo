@@ -792,6 +792,7 @@ export async function* sendMessageStream({
   let response: Response;
 
   if (notollama === 5) {
+    console.log("send to gemini")
     // Gemini API - use correct endpoint and format
     if (!storedApiKey) {
       throw new Error("Gemini API key is not available");
@@ -802,7 +803,7 @@ export async function* sendMessageStream({
       "x-goog-api-key": storedApiKey,
     };
 
-    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?key=${storedApiKey}`, {
+    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?alt=sse`, {
       method: "POST",
       headers: headers_gemini,
       body: JSON.stringify({
@@ -816,7 +817,7 @@ export async function* sendMessageStream({
            topK: 1,
            topP: 1.0,
            maxOutputTokens: 2048,
-           response_modality: "text",
+            responseModalities: ["TEXT"]
          }
       }),
     });
@@ -877,6 +878,7 @@ export async function* sendMessageStream({
       buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
       for (const line of lines) {
+        // console.log(line)
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') continue;
