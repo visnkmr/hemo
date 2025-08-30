@@ -535,6 +535,24 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
   }
 
+  const handleApiKeySaved = () => {
+    console.log("[DEBUG] API key saved, refreshing state and fetching models")
+    // Refresh API key state from localStorage
+    const keyName = ollamastate === 5 ? "gemini_api_key" :
+                    ollamastate === 4 ? "groq_api_key" : "openrouter_api_key"
+    const storedApiKey = localStorage.getItem(keyName)
+    // console.log(`[DEBUG] Reloading API key: ${keyName}: ${storedApiKey ? 'loaded' : 'not found'}`)
+    setApiKey(storedApiKey || "")
+
+    // Trigger model fetching to update current model name
+    setTimeout(() => {
+      console.log("[DEBUG] Triggering model fetch after API key save")
+      // Use existing fetchModels logic by setting a temporary state
+      const tempOllamastate = ollamastate
+      setollamastate(prev => prev === tempOllamastate ? tempOllamastate : tempOllamastate)
+    }, 100)
+  }
+
   const handleBranchConversation = (branchPoint: BranchPoint) => {
     const newChatId = Date.now().toString()
     const originalChat = chats.find((chat) => chat.id === branchPoint.originalChatId)
@@ -686,7 +704,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           </div>
           <div className={cn(`overflow-y-auto absolute top-0 left-0 h-full bg-gray-50 dark:bg-gray-900 text-white transition-transform duration-300 ease-in-out z-40 ${collapsed ? '-translate-x-full' : 'translate-x-0'}`, "pt-20 border-r border-gray-200 dark:border-r-gray-950")}>
             {(ollamastate == 0 || ollamastate == 4 || ollamastate == 5) ? (<div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <ApiKeyInput ollamastate={ollamastate} />
+              <ApiKeyInput ollamastate={ollamastate} onApiKeySaved={handleApiKeySaved} />
             </div>) : null}
             {/* {(ollamastate == 4 || ollamastate == 5) && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">

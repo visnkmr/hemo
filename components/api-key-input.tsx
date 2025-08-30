@@ -7,10 +7,11 @@ import { Button } from "../components/ui/button"
 import { EyeIcon, EyeOffIcon, SaveIcon } from "lucide-react"
 
 interface ApiKeyInputProps {
-   ollamastate: number
+    ollamastate: number
+    onApiKeySaved?: () => void
 }
 
-export default function ApiKeyInput({ ollamastate }: ApiKeyInputProps) {
+export default function ApiKeyInput({ ollamastate, onApiKeySaved }: ApiKeyInputProps) {
    const [showKey, setShowKey] = useState(false)
    const [inputValue, setInputValue] = useState("")
 
@@ -45,8 +46,10 @@ export default function ApiKeyInput({ ollamastate }: ApiKeyInputProps) {
    }, [providerConfig.keyName])
 
    const handleSave = () => {
+    //  console.log(`[localStorage] SET ${providerConfig.keyName}: ${inputValue}`);
      localStorage.setItem(providerConfig.keyName, inputValue)
-     // Optional: Add success feedback or callback
+     // Notify parent component that API key was saved
+     onApiKeySaved?.()
    }
 
    return (
