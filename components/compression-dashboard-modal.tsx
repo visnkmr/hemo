@@ -65,6 +65,10 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
   const [stats, setStats] = useState<CompressionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [allImages, setAllImages] = useState<StoredImage[]>([]);
+  const [dedupeResult, setDedupeResult] = useState<{ totalDeleted: number; spaceSaved: number } | null>(null);
+  const [dedupeLoading, setDedupeLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{ totalDeleted: number; spaceSaved: number } | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -196,6 +200,36 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleDedupe = async () => {
+    setDedupeLoading(true);
+    try {
+      const result = await imageDBService.dedupeImages();
+      setDedupeResult(result);
+      // Reload stats to reflect changes
+      loadCompressionStats();
+      console.log('Deduplication completed:', result);
+    } catch (error) {
+      console.error('Failed to dedupe images:', error);
+    } finally {
+      setDedupeLoading(false);
+    }
+  };
+
+  const handleCleanupUnreferenced = async () => {
+    setCleanupLoading(true);
+    try {
+      const result = await imageDBService.cleanupUnreferencedImages();
+      setCleanupResult(result);
+      // Reload stats to reflect changes
+      loadCompressionStats();
+      console.log('Unreferenced cleanup completed:', result);
+    } catch (error) {
+      console.error('Failed to cleanup unreferenced images:', error);
+    } finally {
+      setCleanupLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -345,6 +379,33 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
                   </div>
                 </div>
               )}
+
+              {/* Dedupe Result */}
+              {dedupeResult && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-2">🗑️ Duplicate Cleanup Completed</h4>
+                  <div className="text-sm text-green-800">
+                    <span className="font-medium">Deleted {dedupeResult.totalDeleted} duplicate images</span>
+                    <span className="mx-4">•</span>
+                    <span className="font-medium">Saved {formatBytes(dedupeResult.spaceSaved)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Unreferenced Cleanup Result */}
+              {cleanupResult && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">🧹 Unreferenced Images Cleanup Completed</h4>
+                  <div className="text-sm text-blue-800">
+                    <span className="font-medium">Moved {cleanupResult.totalDeleted} unreferenced images to recycle bin</span>
+                    <span className="mx-4">•</span>
+                    <span className="font-medium">Potential space savings: {formatBytes(cleanupResult.spaceSaved)}</span>
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    Note: Images are moved to recycle bin for safety. Permanently delete from recycle bin if needed.
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center h-64">
@@ -354,7 +415,48 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+        <div className="flex items-center justify-between p-6 border-t border-gray-200">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDedupe}
+              disabled={dedupeLoading || loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {dedupeLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Deduping...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Dedupe Images
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleCleanupUnreferenced}
+              disabled={cleanupLoading || loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              {cleanupLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Cleaning...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Cleanup Unreferenced
+                </>
+              )}
+            </button>
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"

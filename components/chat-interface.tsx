@@ -1398,13 +1398,38 @@ export default function ChatInterface({
   // --- Other Handlers ---
 
   // Handle image generation
-  const handleImageGenerated = (response: ImageGenerationResponse) => {
+  const handleImageGenerated = async (response: ImageGenerationResponse) => {
     // Create a new assistant message with the generated images
     const userPrompt = `Generate image: ${response.images[0]?.generationParameters?.prompt || "AI generated image"}`;
     const assistantContent = `I've generated ${response.images.length} image${response.images.length > 1 ? 's' : ''} based on your prompt. Here ${response.images.length === 1 ? 'it is' : 'they are'}:`;
 
+    // Generate unique message IDs
+    const userMessageId = Date.now().toString();
+    const assistantMessageId = (Date.now() + 1).toString();
+
+    // Update IndexedDB associations for all generated images
+    const imageIds = response.images.map(img => {
+      if (img.uri.startsWith('indexeddb:')) {
+        return img.uri.replace('indexeddb:', '');
+      }
+      return null;
+    }).filter(Boolean) as string[];
+
+    // Update chat/message associations for all images
+    if (imageIds.length > 0) {
+      try {
+        const geminiService = GeminiImageService.createGeminiImageService();
+        if (geminiService) {
+          await geminiService.updateImageAssociations(`${chat.id}_${assistantMessageId}`, chat.id, assistantMessageId);
+          console.log(`[Image Generation] ✅ Updated associations for ${imageIds.length} images`);
+        }
+      } catch (error) {
+        console.warn('[Image Generation] Failed to update image associations:', error);
+      }
+    }
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: userMessageId,
       role: "user",
       content: userPrompt,
       timestamp: new Date(response.timestamp).toISOString(),
@@ -1413,12 +1438,12 @@ export default function ChatInterface({
     };
 
     const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
+      id: assistantMessageId,
       role: "assistant",
       content: assistantContent,
       timestamp: new Date(response.timestamp).toISOString(),
       model: response.model,
-      imageGenerations: [response],
+      imageGenerations: [response], // Contains IndexedDB references, not base64
     };
 
     const updatedMessages = [...chat.messages, userMessage, assistantMessage];
@@ -1431,6 +1456,8 @@ export default function ChatInterface({
 
     updateChat(updatedChat);
     setIsImageGenerationOpen(false);
+
+    console.log(`[Image Generation] 🎨 Generated ${response.images.length} images, saved to IndexedDB`);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

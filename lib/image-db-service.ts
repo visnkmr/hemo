@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { recycleBinService } from './recycle-bin-db';
 
 export interface StoredImage {
   id: string; // Primary key (will be the key stored in message.imageUrl)
@@ -132,6 +133,19 @@ export class ImageDBService {
           base64Uri.split(';')[0].split(':')[1] || 'image/jpeg' :
           'image/jpeg');
 
+      // Check if image already exists
+      const existing = await this.db.images.get(id);
+      if (existing) {
+        if (size >= existing.size) {
+          console.log(`[ImageDB] 📏 New image (${this.formatBytes(size)}) is not smaller than existing (${this.formatBytes(existing.size)}), skipping save to prevent duplicate`);
+          return;
+        } else {
+          console.log(`[ImageDB] 📏 Replacing existing image with smaller version`);
+        }
+      } else {
+        console.log(`[ImageDB] 📏 Storing new image`);
+      }
+
       const imageRecord: StoredImage = {
         id,
         chatId,
@@ -141,7 +155,7 @@ export class ImageDBService {
         width: options?.width || 0,
         height: options?.height || 0,
         size,
-        createdAt: new Date(),
+        createdAt: existing ? existing.createdAt : new Date(),
         lastAccessed: new Date(),
         metadata: options?.metadata
       };
@@ -384,6 +398,69 @@ export class ImageDBService {
     } catch (error) {
       console.error('[ImageDB] ❌ Failed to clear database:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Deduplicate images by keeping only the lowest size image for each (chatId, messageId) group
+   */
+  async dedupeImages(): Promise<{ totalDeleted: number; spaceSaved: number }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return { totalDeleted: 0, spaceSaved: 0 };
+    }
+
+    try {
+      await this.db.ensureInitialized();
+
+      const allImages = await this.db.images.toArray();
+      const groupedImages: Record<string, StoredImage[]> = {};
+
+      // Group images by messageId to ensure at least one image per message
+      for (const image of allImages) {
+        const key = image.messageId;
+        if (!groupedImages[key]) {
+          groupedImages[key] = [];
+        }
+        groupedImages[key].push(image);
+      }
+
+      let totalDeleted = 0;
+      let spaceSaved = 0;
+
+      for (const [groupKey, images] of Object.entries(groupedImages)) {
+        if (images.length <= 1) continue; // No duplicates in this group
+
+        // Sort images by size (smallest first)
+        images.sort((a, b) => a.size - b.size);
+
+        // Keep the smallest image
+        const keepImage = images[0];
+
+        // Move the rest to recycle bin instead of deleting directly
+        if (images.length > 1) {
+          const imagesToRecycle = images.slice(1); // All except the first (smallest)
+          await recycleBinService.moveToRecycleBinBatch(imagesToRecycle, 'dedupe');
+          totalDeleted += imagesToRecycle.length;
+          spaceSaved += imagesToRecycle.reduce((sum, img) => sum + img.size, 0);
+
+          // Now delete from main database
+          for (const deleteImage of imagesToRecycle) {
+            await this.db.images.delete(deleteImage.id);
+            console.log(`[ImageDB] 🗃️ Moved duplicate image to recycle bin: ${deleteImage.id} (${this.formatBytes(deleteImage.size)}), kept smaller: ${keepImage.id} (${this.formatBytes(keepImage.size)})`);
+          }
+        }
+      }
+
+      console.log(`[ImageDB] ✅ Deduplication complete:`);
+      console.log(`├── Total duplicates deleted: ${totalDeleted}`);
+      console.log(`└── Total space saved: ${this.formatBytes(spaceSaved)}`);
+
+      return { totalDeleted, spaceSaved };
+
+    } catch (error) {
+      console.error('[ImageDB] ❌ Failed to dedupe images:', error);
+      return { totalDeleted: 0, spaceSaved: 0 };
     }
   }
 
@@ -683,6 +760,83 @@ export class ImageDBService {
       totalSpaceSaved,
       results
     };
+  }
+
+  /**
+   * Clean up unreferenced images - move to recycle bin
+   */
+  async cleanupUnreferencedImages(): Promise<{ totalDeleted: number; spaceSaved: number }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return { totalDeleted: 0, spaceSaved: 0 };
+    }
+
+    try {
+      await this.db.ensureInitialized();
+
+      // Get all stored chats from localStorage to find referenced image IDs
+      const chatHistory = localStorage.getItem("chat_history");
+      if (!chatHistory) {
+        console.log('[ImageDB] 📋 No chat history found, cannot determine referenced images');
+        return { totalDeleted: 0, spaceSaved: 0 };
+      }
+
+      const chats = JSON.parse(chatHistory);
+      const referencedImageIds = new Set<string>();
+
+      // Collect all image IDs that are referenced in chat messages
+      for (const chat of chats) {
+        for (const message of chat.messages || []) {
+          // Single imageUrl
+          if (message.imageUrl && message.imageUrl.startsWith('indexeddb:')) {
+            const imageId = message.imageUrl.replace('indexeddb:', '');
+            referencedImageIds.add(imageId);
+          }
+
+          // Images in imageGenerations
+          if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
+            for (const generation of message.imageGenerations) {
+              if (generation.images && Array.isArray(generation.images)) {
+                for (const image of generation.images) {
+                  if (image.uri && image.uri.startsWith('indexeddb:')) {
+                    const imageId = image.uri.replace('indexeddb:', '');
+                    referencedImageIds.add(imageId);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Get all images in the database
+      const allImages = await this.db.images.toArray();
+      const unreferencedImages = allImages.filter(img => !referencedImageIds.has(img.id));
+
+      if (unreferencedImages.length === 0) {
+        console.log('[ImageDB] ✅ No unreferenced images found');
+        return { totalDeleted: 0, spaceSaved: 0 };
+      }
+
+      // Move unreferenced images to recycle bin
+      await recycleBinService.moveToRecycleBinBatch(unreferencedImages, 'unreferenced');
+
+      // Remove from main database
+      const imageIdsToDelete = unreferencedImages.map(img => img.id);
+      await this.db.images.bulkDelete(imageIdsToDelete);
+
+      const spaceSaved = unreferencedImages.reduce((sum, img) => sum + img.size, 0);
+
+      console.log('[ImageDB] 🗃️ Moved unreferenced images to recycle bin:');
+      console.log(`├── Total moved: ${unreferencedImages.length}`);
+      console.log(`└── Space saved: ${this.formatBytes(spaceSaved)}`);
+
+      return { totalDeleted: unreferencedImages.length, spaceSaved };
+
+    } catch (error) {
+      console.error('[ImageDB] ❌ Failed to cleanup unreferenced images:', error);
+      return { totalDeleted: 0, spaceSaved: 0 };
+    }
   }
 }
 
