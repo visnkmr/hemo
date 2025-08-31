@@ -37,7 +37,7 @@ export function ResolvedImage({ src, fallbackSrc, ...imgProps }: ResolvedImagePr
           throw new Error('Gemini service not available')
         }
 
-        const resolvedUrl = await imageService.resolveImageUrl(src)
+        const resolvedUrl = await imageService.resolveImageUrl(src,true)
         if (isMounted) {
           if (resolvedUrl) {
             setResolvedSrc(resolvedUrl)

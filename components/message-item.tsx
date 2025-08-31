@@ -160,7 +160,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                                     try {
                                       const imageService = GeminiImageService.createGeminiImageService();
                                       if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri);
+                                        const resolvedUri = await imageService.resolveImageUrl(image.uri,false);
                                         if (resolvedUri) {
                                           const link = document.createElement('a');
                                           link.href = resolvedUri;

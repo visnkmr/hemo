@@ -230,7 +230,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                                     try {
                                       const imageService = GeminiImageService.createGeminiImageService();
                                       if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri);
+                                        const resolvedUri = await imageService.resolveImageUrl(image.uri,true);
                                         if (resolvedUri) {
                                           const link = document.createElement('a');
                                           link.href = resolvedUri;

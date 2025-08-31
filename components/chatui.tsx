@@ -310,7 +310,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
               // Handle IndexedDB URLs by resolving them first
               if (message.imageUrl.startsWith('indexeddb:')) {
-                imageData = await geminiService.resolveImageUrl(message.imageUrl);
+                imageData = await geminiService.resolveImageUrl(message.imageUrl,false);
               } else if (message.imageUrl.startsWith('data:image/')) {
                 imageData = message.imageUrl;
               }
@@ -348,7 +348,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
                       // Handle IndexedDB URLs by resolving them first
                       if (image.uri.startsWith('indexeddb:')) {
-                        imageData = await geminiService.resolveImageUrl(image.uri);
+                        imageData = await geminiService.resolveImageUrl(image.uri,false);
                       } else if (image.uri.startsWith('data:image/')) {
                         imageData = image.uri;
                       }

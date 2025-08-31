@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "../components/ui/dialog"
 import { Button } from "../components/ui/button"
 import { Badge } from "../components/ui/badge"
-import { Trash2, Calendar, Eye, X, Settings, Zap, Archive } from "lucide-react"
+import { Trash2, Calendar, Eye, X, Settings, Zap, Archive, Download } from "lucide-react"
 import type { Chat } from "../lib/types"
 import { cn } from "../lib/utils"
 import { ResolvedImage } from "./resolved-image"
@@ -12,6 +12,8 @@ import { CompressionSettingsModal } from "./compression-settings-modal"
 import { BatchCompressionModal } from "./batch-compression-modal"
 import { imageDBService } from "../lib/image-db-service"
 import { CompressionSettingsService } from "../lib/compression-settings-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
+import ImageDownloadModal from "./image-download-modal"
 
 interface ImageData {
   uri: string
@@ -26,6 +28,7 @@ interface ImageData {
   generationIndex?: number // for imageGenerations array
   imageIndex?: number // for specific image in generation
   generationData?: any // full generation object for context
+  originalUri?: string // for original image viewing in modal
 }
 
 interface ImageGalleryModalProps {
@@ -60,6 +63,7 @@ export default function ImageGalleryModal({
     customSettings?: any;
   }>(getInitialCompressionSettings())
   const [compressingImages, setCompressingImages] = useState<Set<string>>(new Set())
+  const [showDownloadOptimized, setShowDownloadOptimized] = useState(false)
 
   // Handle responsive grid columns (client-side only)
   useEffect(() => {
@@ -182,8 +186,28 @@ export default function ImageGalleryModal({
     }
   }
 
-  const handleImageClick = (image: ImageData) => {
-    setSelectedImage(image)
+  const handleImageClick = async (image: ImageData) => {
+    if (image.uri.startsWith('indexeddb:')) {
+      const imageId = image.uri.replace('indexeddb:', '');
+
+      // For optimized images, get the original for modal viewing
+      if (imageId.startsWith('opt_')) {
+        const originalImageId = imageId.substring(4);
+        const originalResult = await imagePipelineUtility.getOriginalImageForModal(originalImageId);
+
+        const imageWithOriginal = {
+          ...image,
+          originalUri: originalResult.base64Data && originalResult.base64Data !== image.uri ?
+            `data:${originalResult.mimeType};base64,${originalResult.base64Data}` :
+            image.uri
+        };
+        setSelectedImage(imageWithOriginal);
+      } else {
+        setSelectedImage(image);
+      }
+    } else {
+      setSelectedImage(image);
+    }
   }
 
   const closeImageView = () => {
@@ -205,21 +229,8 @@ export default function ImageGalleryModal({
     setCompressingImages(prev => new Set(prev).add(compressId))
 
     try {
-      // Always use maximum space saving WebP compression for individual image compression
-      const result = await imageDBService.compressImagesBatch(
-        [imageId],
-        'webp-strong', // Always use maximum compression preset
-        {
-          updateOriginal: true // Replace original with compressed version
-        }
-      )
-
-      if (result.failed > 0) {
-        alert(`Failed to compress image: ${result.results[0]?.error}`)
-      } else {
-        const savings = Math.round(result.results[0]?.result?.savingsPercent || 0)
-        alert(`Image compressed with maximum space saving!\nSaved ${savings}% using WebP format (${image.width}x${image.height} → 512x512 max)`)
-      }
+      // Individual compression not yet implemented - for now just show alert
+      alert('Individual image compression is being implemented. Please use batch compression instead.')
     } catch (error) {
       console.error('Compression failed:', error)
       alert('Compression failed: ' + (error as Error).message)
@@ -381,38 +392,48 @@ export default function ImageGalleryModal({
                       {selectedImage.timestamp} • {selectedImage.width}×{selectedImage.height}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleCompressImage(selectedImage)}
-                      disabled={compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) || !selectedImage.uri.startsWith('indexeddb:')}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      {compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Compressing...' : 'Max Compress Image'}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteImage(selectedImage)}
-                      disabled={deletingIds.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {deletingIds.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Deleting...' : 'Delete Image'}
-                    </Button>
-                    <DialogClose asChild>
-                      <Button variant="ghost" size="icon">
-                        <X className="h-4 w-4" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDownloadOptimized(true)}
+                        disabled={!selectedImage.uri.startsWith('indexeddb:')}
+                        className="bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 border-green-300 dark:border-green-700"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Optimized
                       </Button>
-                    </DialogClose>
-                  </div>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleCompressImage(selectedImage)}
+                        disabled={compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) || !selectedImage.uri.startsWith('indexeddb:')}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        {compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Compressing...' : 'Max Compress Image'}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteImage(selectedImage)}
+                        disabled={deletingIds.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {deletingIds.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Deleting...' : 'Delete Image'}
+                      </Button>
+                      <DialogClose asChild>
+                        <Button variant="ghost" size="icon">
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </DialogClose>
+                    </div>
                 </DialogTitle>
               </DialogHeader>
 
               <div className="relative bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                 <ResolvedImage
-                  src={selectedImage.uri}
+                  src={selectedImage.originalUri || selectedImage.uri}
                   alt={`${selectedImage.chatTitle} - ${selectedImage.width}x${selectedImage.height}`}
                   className="w-full h-auto max-h-[70vh] object-contain"
                 />
@@ -434,6 +455,14 @@ export default function ImageGalleryModal({
       <BatchCompressionModal
         isOpen={showBatchCompression}
         onClose={() => setShowBatchCompression(false)}
+      />
+
+      {/* Image Download Optimized Modal */}
+      <ImageDownloadModal
+        isOpen={showDownloadOptimized}
+        onClose={() => setShowDownloadOptimized(false)}
+        imageId={selectedImage ? selectedImage.uri.replace('indexeddb:', '').replace(/^opt_/, '') : ''}
+        originalImageUri={selectedImage ? selectedImage.originalUri : null}
       />
     </>
   )
