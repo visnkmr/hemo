@@ -145,11 +145,8 @@ export interface ImageGenerationRequest {
 
 export interface ImageGenerationResponse {
   images: Array<{
-    uri: string;
-    mimeType: string;
-    width: number;
-    height: number;
-    generationParameters?: ImageGenerationParameters;
+    originalImageId: string; // ID from originalimage database
+    optimizedImageId: string; // ID from webuse database
   }>;
   model: string;
   timestamp: string;

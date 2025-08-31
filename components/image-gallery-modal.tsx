@@ -16,10 +16,12 @@ import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 import ImageDownloadModal from "./image-download-modal"
 
 interface ImageData {
-  uri: string
-  mimeType: string
-  width: number
-  height: number
+  uri?: string // Keep for backward compatibility, but prefer optimizedImageId/originalImageId
+  optimizedImageId?: string // New structure - ID from optimized image database
+  originalImageId?: string // New structure - ID from original image database
+  mimeType?: string
+  width?: number
+  height?: number
   chatTitle: string
   chatId: string
   messageId: string

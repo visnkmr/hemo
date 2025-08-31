@@ -147,13 +147,10 @@ export class GeminiImageService {
 
             console.log(`[GeminiImageService] 🎉 Pipeline processed image ${imageId} with ${pipelineResult.savingsPercent}% savings`);
 
-            // Use optimized image ID as URL instead of storing base64 data
+            // Store only the image IDs instead of duplicate metadata
             images.push({
-              uri: `indexeddb:${pipelineResult.optimizedId}`,
-              mimeType: "image/webp",
-              width: typeof width === 'number' ? width : parseInt(width) || 0,
-              height: typeof height === 'number' ? height : parseInt(height) || 0,
-              generationParameters: parameters,
+              originalImageId: imageId, // ID from originalimage database
+              optimizedImageId: pipelineResult.optimizedId, // ID from webuse database
             });
           }
         }
