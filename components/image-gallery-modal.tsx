@@ -205,11 +205,10 @@ export default function ImageGalleryModal({
     setCompressingImages(prev => new Set(prev).add(compressId))
 
     try {
-      // TODO: Implement individual image compression
-      // For now, we'll use the batch compression functionality
+      // Always use maximum space saving WebP compression for individual image compression
       const result = await imageDBService.compressImagesBatch(
         [imageId],
-        compressionSettings.preset,
+        'webp-strong', // Always use maximum compression preset
         {
           updateOriginal: true // Replace original with compressed version
         }
@@ -218,8 +217,8 @@ export default function ImageGalleryModal({
       if (result.failed > 0) {
         alert(`Failed to compress image: ${result.results[0]?.error}`)
       } else {
-        alert(`Image compressed! Saved ${Math.round(result.results[0]?.result?.savingsPercent || 0)}%`)
-        // Refresh the gallery might be needed here
+        const savings = Math.round(result.results[0]?.result?.savingsPercent || 0)
+        alert(`Image compressed with maximum space saving!\nSaved ${savings}% using WebP format (${image.width}x${image.height} → 512x512 max)`)
       }
     } catch (error) {
       console.error('Compression failed:', error)
@@ -320,7 +319,7 @@ export default function ImageGalleryModal({
                           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                         >
                           <Zap className="h-4 w-4" />
-                          {compressingImages.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) ? 'Compressing...' : 'Compress'}
+                          {compressingImages.has(`${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`) ? 'Compressing...' : 'Max Compress'}
                         </Button>
                         <Button
                           variant="destructive"
@@ -391,7 +390,7 @@ export default function ImageGalleryModal({
                       className="bg-blue-600 hover:bg-blue-700"
                     >
                       <Zap className="h-4 w-4 mr-2" />
-                      {compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Compressing...' : 'Compress Image'}
+                      {compressingImages.has(`${selectedImage.messageId}-${selectedImage.generationIndex || 0}-${selectedImage.imageIndex || 0}`) ? 'Compressing...' : 'Max Compress Image'}
                     </Button>
                     <Button
                       variant="destructive"
