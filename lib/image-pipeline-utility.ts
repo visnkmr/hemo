@@ -77,11 +77,11 @@ export class ImagePipelineUtility {
           height: compressionResult.dimensions.height || options?.height || 0,
           mimeType: 'image/webp',
           metadata: {
-            source: 'optimized',
+            source: 'generated',
             generationParams: options?.generationParams,
             compression: {
               preset: 'high-quality',
-              library: compressionResult.library,
+              library: compressionResult.library as 'browser-image-compression' | 'jimp' | 'pica' | undefined,
               quality: compressionResult.quality,
               originalSize: compressionResult.originalSize,
               compressionTime: compressionResult.processingTime,
@@ -180,6 +180,27 @@ export class ImagePipelineUtility {
     }
 
     return { base64Data: null, mimeType: 'image/jpeg' };
+  }
+
+  /**
+   * Transform image generation response to UI-compatible format
+   * Converts image IDs to IndexedDB URIs and adds metadata
+   */
+  transformImageGenerationResponse(images: Array<{
+    originalImageId: string;
+    optimizedImageId: string;
+  }>): Array<{
+    uri: string;
+    mimeType: string;
+    width: number;
+    height: number;
+  }> {
+    return images.map(image => ({
+      uri: `indexeddb:${image.optimizedImageId || image.originalImageId}`,
+      mimeType: 'image/webp', // Gemini images are WebP
+      width: 1024, // Default width for Gemini images
+      height: 1024, // Default height for Gemini images
+    }));
   }
 
   /**

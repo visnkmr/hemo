@@ -143,32 +143,34 @@ export default function ImageGalleryModal({
           message.imageGenerations.forEach((generation, genIndex) => {
             if (generation.images && generation.images.length > 0) {
               generation.images.forEach((image, imageIndex) => {
-                if (image.uri && (image.uri.startsWith('data:image/') || image.uri.startsWith('indexeddb:'))) {
-                  images.push({
-                    uri: image.uri,
-                    mimeType: image.mimeType,
-                    width: image.width || 1024,
-                    height: image.height || 1024,
-                    chatTitle: chat.title,
-                    chatId: chat.id,
-                    messageId: message.id,
-                    timestamp: formatTimestamp(message.timestamp),
-                    isSingleImage: false,
-                    generationIndex: genIndex,
-                    imageIndex,
-                    generationData: generation
-                  })
-                }
-              })
+                // Transform the image IDs to indexeddb URIs
+                const imageUri = `indexeddb:${image.optimizedImageId || image.originalImageId}`;
+                images.push({
+                  uri: imageUri,
+                  mimeType: 'image/webp', // Gemini images are WebP
+                  width: 1024, // Default width for Gemini images
+                  height: 1024, // Default height for Gemini images
+                  chatTitle: chat.title,
+                  chatId: chat.id,
+                  messageId: message.id,
+                  timestamp: formatTimestamp(message.timestamp),
+                  isSingleImage: false,
+                  generationIndex: genIndex,
+                  imageIndex,
+                  generationData: generation
+                });
+              });
             }
-          })
+          });
         }
-      })
+      });
     })
 
     // Sort by timestamp (newest first)
     return images.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   }, [chats])
+
+  const handleDeleteImage = async (image: ImageData) => {
 
   const handleDeleteImage = async (image: ImageData) => {
     const deleteId = `${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`
@@ -468,4 +470,5 @@ export default function ImageGalleryModal({
       />
     </>
   )
+}
 }

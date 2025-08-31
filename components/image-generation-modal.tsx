@@ -12,6 +12,7 @@ import { Badge } from "../components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Image as ImageIcon, Loader2, Settings, Sparkles } from "lucide-react"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 import type { ImageGenerationParameters, ImageGenerationRequest, ImageGenerationResponse } from "../lib/types"
 
 interface ImageGenerationModalProps {
@@ -306,7 +307,7 @@ export default function ImageGenerationModal({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {generatedImages.images.map((image, index) => (
+                  {imagePipelineUtility.transformImageGenerationResponse(generatedImages.images).map((image, index) => (
                     <div key={index} className="space-y-2">
                       <img
                         src={image.uri}

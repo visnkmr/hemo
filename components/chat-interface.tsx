@@ -21,6 +21,7 @@ import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
 import EditMessageModal from "./edit-message-modal"
 import ImageGenerationModal from "./image-generation-modal"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 import type { ImageGenerationResponse, ImageGenerationRequest } from "../lib/types"
 import { imageDBService } from "../lib/image-db-service"
 import { ResolvedImage } from "./resolved-image"
@@ -209,7 +210,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                     {/* Generated Images */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {message.imageGenerations.flatMap((generation, genIndex) =>
-                        generation.images.map((image, imgIndex) => (
+                        imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
                           <div key={`${genIndex}-${imgIndex}`} className="relative group">
                             <ResolvedImage
                               src={image.uri}
@@ -1400,7 +1401,7 @@ export default function ChatInterface({
   // Handle image generation
   const handleImageGenerated = async (response: ImageGenerationResponse) => {
     // Create a new assistant message with the generated images
-    const userPrompt = `Generate image: ${response.images[0]?.generationParameters?.prompt || "AI generated image"}`;
+    const userPrompt = `Generate image: ${response.generationParameters?.prompt || "AI generated image"}`;
     const assistantContent = `I've generated ${response.images.length} image${response.images.length > 1 ? 's' : ''} based on your prompt. Here ${response.images.length === 1 ? 'it is' : 'they are'}:`;
 
     // Generate unique message IDs
@@ -1434,7 +1435,7 @@ export default function ChatInterface({
       content: userPrompt,
       timestamp: new Date(response.timestamp).toISOString(),
       model: response.model,
-      generationParameters: response.images[0]?.generationParameters,
+      generationParameters: response.generationParameters,
     };
 
     const assistantMessage: Message = {

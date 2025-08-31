@@ -12,6 +12,7 @@ import { useEffect, useState } from "react"
 import { Button } from "../components/ui/button"
 import { ResolvedImage } from "./resolved-image"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 
 interface MessageItemProps {
   message: Message
@@ -139,7 +140,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                     {/* Generated Images */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {message.imageGenerations.flatMap((generation, genIndex) =>
-                        generation.images.map((image, imgIndex) => (
+                        imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
                           <div key={`${genIndex}-${imgIndex}`} className="relative group">
                             <ResolvedImage
                               src={image.uri}
