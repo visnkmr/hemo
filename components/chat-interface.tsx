@@ -1401,32 +1401,22 @@ export default function ChatInterface({
   // Handle image generation
   const handleImageGenerated = async (response: ImageGenerationResponse) => {
     // Create a new assistant message with the generated images
-    const userPrompt = `Generate image: ${response.generationParameters?.prompt || "AI generated image"}`;
+    const userPrompt = `Generate image: ${"AI generated image"}`;
     const assistantContent = `I've generated ${response.images.length} image${response.images.length > 1 ? 's' : ''} based on your prompt. Here ${response.images.length === 1 ? 'it is' : 'they are'}:`;
 
     // Generate unique message IDs
     const userMessageId = Date.now().toString();
     const assistantMessageId = (Date.now() + 1).toString();
 
-    // Update IndexedDB associations for all generated images
-    const imageIds = response.images.map(img => {
-      if (img.uri.startsWith('indexeddb:')) {
-        return img.uri.replace('indexeddb:', '');
-      }
-      return null;
-    }).filter(Boolean) as string[];
-
     // Update chat/message associations for all images
-    if (imageIds.length > 0) {
-      try {
-        const geminiService = GeminiImageService.createGeminiImageService();
-        if (geminiService) {
-          await geminiService.updateImageAssociations(`${chat.id}_${assistantMessageId}`, chat.id, assistantMessageId);
-          console.log(`[Image Generation] ✅ Updated associations for ${imageIds.length} images`);
-        }
-      } catch (error) {
-        console.warn('[Image Generation] Failed to update image associations:', error);
+    try {
+      const geminiService = GeminiImageService.createGeminiImageService();
+      if (geminiService) {
+        await geminiService.updateImageAssociations(`${chat.id}_${assistantMessageId}`, chat.id, assistantMessageId);
+        console.log(`[Image Generation] ✅ Updated associations for ${response.images.length} images`);
       }
+    } catch (error) {
+      console.warn('[Image Generation] Failed to update image associations:', error);
     }
 
     const userMessage: Message = {
@@ -1435,7 +1425,6 @@ export default function ChatInterface({
       content: userPrompt,
       timestamp: new Date(response.timestamp).toISOString(),
       model: response.model,
-      generationParameters: response.generationParameters,
     };
 
     const assistantMessage: Message = {
@@ -1523,7 +1512,7 @@ export default function ChatInterface({
     return !!((message.imageUrl && (message.imageUrl.startsWith('data:image/') || message.imageUrl.startsWith('indexeddb:'))) ||
               (message.imageGenerations && message.imageGenerations.length > 0 && message.imageGenerations.some(gen =>
                 gen.images && gen.images.length > 0 && gen.images.some(img =>
-                  img.uri && (img.uri.startsWith('data:image/') || img.uri.startsWith('indexeddb:'))
+                  (img.originalImageId || img.optimizedImageId)
                 )
               )));
   };

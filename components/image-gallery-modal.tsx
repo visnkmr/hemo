@@ -16,9 +16,7 @@ import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 import ImageDownloadModal from "./image-download-modal"
 
 interface ImageData {
-  uri?: string // Keep for backward compatibility, but prefer optimizedImageId/originalImageId
-  optimizedImageId?: string // New structure - ID from optimized image database
-  originalImageId?: string // New structure - ID from original image database
+  uri: string // IndexedDB URI format: indexeddb:${imageId}
   mimeType?: string
   width?: number
   height?: number
@@ -45,7 +43,7 @@ export default function ImageGalleryModal({
   onClose,
   chats,
   onDeleteImage
-}: ImageGalleryModalProps) {
+}: ImageGalleryModalProps): React.ReactElement | null {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null)
   const [gridColumns, setGridColumns] = useState(3) // Default to 3 columns
@@ -144,7 +142,9 @@ export default function ImageGalleryModal({
             if (generation.images && generation.images.length > 0) {
               generation.images.forEach((image, imageIndex) => {
                 // Transform the image IDs to indexeddb URIs
-                const imageUri = `indexeddb:${image.optimizedImageId || image.originalImageId}`;
+                // Use optimized image ID if available, otherwise original image ID
+                const imageId = image.optimizedImageId || image.originalImageId;
+                const imageUri = `indexeddb:${imageId}`;
                 images.push({
                   uri: imageUri,
                   mimeType: 'image/webp', // Gemini images are WebP
@@ -169,8 +169,6 @@ export default function ImageGalleryModal({
     // Sort by timestamp (newest first)
     return images.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   }, [chats])
-
-  const handleDeleteImage = async (image: ImageData) => {
 
   const handleDeleteImage = async (image: ImageData) => {
     const deleteId = `${image.messageId}-${image.generationIndex || 0}-${image.imageIndex || 0}`
@@ -201,13 +199,23 @@ export default function ImageGalleryModal({
 
         const imageWithOriginal = {
           ...image,
-          originalUri: originalResult.base64Data && originalResult.base64Data !== image.uri ?
-            `data:${originalResult.mimeType};base64,${originalResult.base64Data}` :
+          originalUri: originalResult.base64Data ?
+            originalResult.base64Data :
             image.uri
         };
         setSelectedImage(imageWithOriginal);
       } else {
-        setSelectedImage(image);
+        // For non-optimized images, we might still want to show them in the modal
+        const result = await imagePipelineUtility.getOriginalImageForModal(imageId);
+        if (result.base64Data) {
+          const imageWithOriginal = {
+            ...image,
+            originalUri: result.base64Data
+          };
+          setSelectedImage(imageWithOriginal);
+        } else {
+          setSelectedImage(image);
+        }
       }
     } else {
       setSelectedImage(image);
@@ -372,7 +380,7 @@ export default function ImageGalleryModal({
 
                     <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <Badge variant="secondary" className="text-xs">
-                        {image.mimeType.split('/')[1]?.toUpperCase()}
+                        {image.mimeType?.split('/')[1]?.toUpperCase()}
                       </Badge>
                     </div>
                   </div>
@@ -466,9 +474,8 @@ export default function ImageGalleryModal({
         isOpen={showDownloadOptimized}
         onClose={() => setShowDownloadOptimized(false)}
         imageId={selectedImage ? selectedImage.uri.replace('indexeddb:', '').replace(/^opt_/, '') : ''}
-        originalImageUri={selectedImage ? selectedImage.originalUri : null}
+        originalImageUri={selectedImage?.originalUri || null}
       />
     </>
   )
-}
 }

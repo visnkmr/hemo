@@ -206,7 +206,10 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
     setDedupeLoading(true);
     try {
       const result = await imageDBService.dedupeImages();
-      setDedupeResult(result);
+      setDedupeResult({
+        totalDeleted: result.duplicateCount,
+        spaceSaved: result.spaceSaved
+      });
       // Reload stats to reflect changes
       loadCompressionStats();
       console.log('Deduplication completed:', result);
@@ -220,8 +223,11 @@ export const CompressionDashboardModal: React.FC<CompressionDashboardModalProps>
   const handleCleanupUnreferenced = async () => {
     setCleanupLoading(true);
     try {
-      const result = await imageDBService.cleanupUnreferencedImages();
-      setCleanupResult(result);
+      const result = await imageDBService.cleanupUnreferencedImages([]);
+      setCleanupResult({
+        totalDeleted: result.cleanedCount,
+        spaceSaved: result.spaceSaved
+      });
       // Reload stats to reflect changes
       loadCompressionStats();
       console.log('Unreferenced cleanup completed:', result);

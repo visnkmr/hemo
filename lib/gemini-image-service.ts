@@ -255,25 +255,29 @@ export class GeminiImageService {
  /**
   * Resolve IndexedDB image URL to actual base64 data
   */
- async resolveImageUrl(url: string,isoptimised:boolean=false): Promise<string | null> {
+ async resolveImageUrl(url: string, isOptimised: boolean = false): Promise<string | null> {
    try {
      if (!url.startsWith('indexeddb:')) {
        return url; // Return as-is if not an IndexedDB URL
      }
 
-     var imageId = url.replace('indexeddb:', '');
+     const imageId = url.replace('indexeddb:', '');
 
-     // Check if it's an optimized image ID (prefixed with 'opt_')
-     if (isoptimised) {
-       // Get the original image ID by removing the 'opt_' prefix
-       const originalImageId = imageId.substring(4);
+     // If it's an optimized image ID (prefixed with 'opt_')
+     if (imageId.startsWith('opt_')) {
        // Use image pipeline utility to get UI-optimized image
-       const result = await imagePipelineUtility.getImageForUI(originalImageId);
+       const result = await imagePipelineUtility.getImageForUI(imageId.substring(4)); // Remove 'opt_' prefix
        return result.base64Data;
-     } else {
-      // imageId = url.replace('opt_', '');
-
-       // Assume it's an original image or use pipeline utility for fallback
+     } 
+     // If we specifically want the optimized version
+     else if (isOptimised) {
+       // Use image pipeline utility to get UI-optimized image
+       const result = await imagePipelineUtility.getImageForUI(imageId);
+       return result.base64Data;
+     } 
+     // Otherwise get the original image
+     else {
+       // Get original image for modal viewing
        const result = await imagePipelineUtility.getOriginalImageForModal(imageId);
        if (result.base64Data) {
          return result.base64Data;

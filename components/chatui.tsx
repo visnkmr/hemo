@@ -641,11 +641,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                      updatedGeneration.images = await Promise.all(updatedGeneration.images.map(async (image) => {
                        const updatedImage = { ...image }
 
-                       if (image.uri && image.uri.startsWith('indexeddb:')) {
-                         const imageData = await imageDBService.getImage(image.uri.replace('indexeddb:', ''))
-                         if (imageData) {
-                           updatedImage.uri = `indexeddb:${imageData.id}` // Ensure proper format
-                         }
+                       // If we have image IDs, ensure proper IndexedDB URI format
+                       if (image.originalImageId || image.optimizedImageId) {
+                         // Already in correct format with IDs, no change needed
                        }
 
                        return updatedImage
@@ -706,7 +704,8 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               ...generation,
               images: generation.images.map(image => ({
                 ...image,
-                uri: image.uri.startsWith('data:image/') ? image.uri : image.uri // Keep as-is if already IndexedDB reference
+                // Ensure URI format for IndexedDB references
+                uri: image.originalImageId ? `indexeddb:${image.optimizedImageId || image.originalImageId}` : ''
               }))
             }))
           }
