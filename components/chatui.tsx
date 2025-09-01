@@ -26,6 +26,7 @@ import DarkButton from './dark-button'
 import ImageGalleryModal from './image-gallery-modal'
 import CompressionDashboardModal from './compression-dashboard-modal'
 import RecycleBinModal from './recycle-bin-modal'
+import ImageManagementModal from './image-management-modal'
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -150,6 +151,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [isMigratingImages, setIsMigratingImages] = useState(false);
   const [showCompressionDashboard, setShowCompressionDashboard] = useState(false);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [showImageManagement, setShowImageManagement] = useState(false);
   const isMobile = useIsMobile();
 
   // Helper functions for compression settings
@@ -1298,6 +1300,10 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                     <Archive className="mr-2 h-4 w-4" />
                     <span>Recycle Bin</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowImageManagement(true)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    <span>Manage Images</span>
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
                   <div className="px-2 py-1 text-sm font-medium text-gray-500">Image Compression</div>
@@ -1339,6 +1345,22 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                   >
                     <Bug className="mr-2 h-4 w-4" />
                     <span>Test Pica</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        console.log('[UI] 🔄 Starting pipeline processing for all original images...');
+                        const result = await imageDBService.processAllOriginalImagesThroughPipeline();
+                        console.log('[UI] ✅ Pipeline processing complete:', result);
+                        alert(`Pipeline Processing Complete!\n\nProcessed: ${result.processed}\nSuccessful: ${result.successful}\nFailed: ${result.failed}\nSpace Saved: ${formatBytes(result.totalSavings)}\n\n${result.errors.length > 0 ? `Errors: ${result.errors.join(', ')}` : 'No errors'}`);
+                      } catch (error) {
+                        console.error('[UI] ❌ Pipeline processing failed:', error);
+                        alert('❌ Pipeline processing failed. Check console for details.');
+                      }
+                    }}
+                  >
+                    <Zap className="mr-2 h-4 w-4" />
+                    <span>Process Images Through Pipeline</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1466,6 +1488,12 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       <RecycleBinModal
         isOpen={showRecycleBin}
         onClose={() => setShowRecycleBin(false)}
+      />
+
+      {/* Image Management Modal */}
+      <ImageManagementModal
+        isOpen={showImageManagement}
+        onClose={() => setShowImageManagement(false)}
       />
 
       <Toaster />

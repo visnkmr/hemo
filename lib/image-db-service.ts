@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { recycleBinService } from './recycle-bin-db';
+import { imagePipelineUtility } from './image-pipeline-utility';
 
 export interface StoredImage {
   id: string; // Primary key (will be the key stored in message.imageUrl)
@@ -742,6 +743,116 @@ export class ImageDBService {
     const inCurrent = currentImages.some(img => img.id === image.id);
     if (inCurrent) {
       await this.deleteImageFromDb(currentDb, image.id);
+    }
+  }
+
+  /**
+   * Process all images from originalimage through pipeline and replace webuse images
+   */
+  async processAllOriginalImagesThroughPipeline(): Promise<{
+    processed: number;
+    successful: number;
+    failed: number;
+    totalSavings: number;
+    errors: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        processed: 0,
+        successful: 0,
+        failed: 0,
+        totalSavings: 0,
+        errors: ['IndexedDB not available']
+      };
+    }
+
+    const errors: string[] = [];
+    let processed = 0;
+    let successful = 0;
+    let failed = 0;
+    let totalSavings = 0;
+
+    try {
+      console.log('[ImagePipeline] 🚀 Starting pipeline processing for all original images...');
+
+      // Get all images from originalimage database
+      const originalImages = await this.getAllImagesFromDb('original');
+
+      if (originalImages.length === 0) {
+        console.log('[ImagePipeline] ℹ️ No images found in originalimage database');
+        return {
+          processed: 0,
+          successful: 0,
+          failed: 0,
+          totalSavings: 0,
+          errors: []
+        };
+      }
+
+      console.log(`[ImagePipeline] 📋 Found ${originalImages.length} images to process`);
+
+      // Process each image through the pipeline
+      for (const image of originalImages) {
+        try {
+          console.log(`[ImagePipeline] 🔄 Processing image ${image.id} (${image.mimeType})...`);
+
+          // Process through pipeline
+          const result = await imagePipelineUtility.processImageThroughPipeline(
+            image.id,
+            image.chatId,
+            image.messageId,
+            image.uri,
+            {
+              width: image.width,
+              height: image.height,
+              mimeType: image.mimeType,
+              generationParams: image.metadata?.generationParams
+            }
+          );
+
+          if (result.success) {
+            successful++;
+            totalSavings += result.originalSize - result.optimizedSize;
+            console.log(`[ImagePipeline] ✅ Successfully processed ${image.id}: ${Math.round(result.savingsPercent)}% savings`);
+          } else {
+            failed++;
+            errors.push(`Failed to process ${image.id}: ${result.error}`);
+            console.error(`[ImagePipeline] ❌ Failed to process ${image.id}: ${result.error}`);
+          }
+
+        } catch (error) {
+          failed++;
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          errors.push(`Error processing ${image.id}: ${errorMsg}`);
+          console.error(`[ImagePipeline] ❌ Error processing ${image.id}:`, error);
+        }
+
+        processed++;
+      }
+
+      console.log(`[ImagePipeline] 🎉 Pipeline processing complete: ${processed} processed, ${successful} successful, ${failed} failed`);
+      console.log(`[ImagePipeline] 💾 Total space savings: ${this.formatBytes(totalSavings)}`);
+
+      return {
+        processed,
+        successful,
+        failed,
+        totalSavings,
+        errors
+      };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ImagePipeline] ❌ Pipeline processing failed:', errorMsg);
+      errors.push(errorMsg);
+      return {
+        processed,
+        successful,
+        failed,
+        totalSavings,
+        errors
+      };
     }
   }
 
