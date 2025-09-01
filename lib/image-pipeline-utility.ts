@@ -62,7 +62,7 @@ export class ImagePipelineUtility {
       // Optimize image to WebP using high-quality preset for UI display
       const compressionResult = await this.compressionService.compressImageWithPreset(
         base64Uri,
-        'high-quality' // Use high-quality WebP preset
+        'webp-strong' // Use high-quality WebP preset
       );
 
       // Store optimized image
@@ -80,7 +80,7 @@ export class ImagePipelineUtility {
             source: 'generated',
             generationParams: options?.generationParams,
             compression: {
-              preset: 'high-quality',
+              preset: 'webp-strong',
               library: compressionResult.library as 'browser-image-compression' | 'jimp' | 'pica' | undefined,
               quality: compressionResult.quality,
               originalSize: compressionResult.originalSize,

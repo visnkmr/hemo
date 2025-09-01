@@ -125,8 +125,8 @@ export class GeminiImageService {
             const originalBase64 = `data:image/png;base64,${part.inlineData.data}`;
 
             // Optimize the generated image for better performance
-            const optimizationResult = await this.optimizeImageForGemini(originalBase64);
-            const optimizedUri = optimizationResult.optimizedBase64;
+            // const optimizationResult = await this.optimizeImageForGemini(originalBase64);
+            // const optimizedUri = optimizationResult.optimizedBase64;
 
             // Create a unique ID for this image in IndexedDB
             const imageId = `gen_${generationId}_img_${imageIndex++}`;

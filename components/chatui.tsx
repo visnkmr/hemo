@@ -252,6 +252,51 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           console.log(`│   └── Date Range: ${imageDBStats.oldestImage.toLocaleDateString()} - ${imageDBStats.newestImage.toLocaleDateString()}`);
         }
 
+        // Get individual database sizes and last 5 images
+        console.log(`│   ├── Database Breakdown:`);
+
+        // Original image database
+        try {
+          const originalImages = await imageDBService.getAllImagesFromDb('original');
+          const originalSize = originalImages.reduce((sum, img) => sum + img.size, 0);
+          console.log(`│   │   ├── originalimage:`);
+          console.log(`│   │   │   ├── Images: ${originalImages.length}`);
+          console.log(`│   │   │   ├── Size: ${formatBytes(originalSize)}`);
+          console.log(`│   │   │   └── Last 5 Images:`);
+
+          // Sort by lastAccessed (most recent first) and get last 5
+          const sortedOriginalImages = originalImages
+            .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+            .slice(0, 5);
+
+          sortedOriginalImages.forEach((img, index) => {
+            console.log(`│   │   │       ${index + 1}. ${img.messageId}... (${formatBytes(img.size)}) - ${img.mimeType}`);
+          });
+        } catch (originalError) {
+          console.log(`│   │   ├── originalimage: ❌ Error accessing database`);
+        }
+
+        // Webuse database
+        try {
+          const webuseImages = await imageDBService.getAllImagesFromDb('webuse');
+          const webuseSize = webuseImages.reduce((sum, img) => sum + img.size, 0);
+          console.log(`│   │   └── webuse:`);
+          console.log(`│   │       ├── Images: ${webuseImages.length}`);
+          console.log(`│   │       ├── Size: ${formatBytes(webuseSize)}`);
+          console.log(`│   │       └── Last 5 Images:`);
+
+          // Sort by lastAccessed (most recent first) and get last 5
+          const sortedWebuseImages = webuseImages
+            .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+            .slice(0, 5);
+
+          sortedWebuseImages.forEach((img, index) => {
+            console.log(`│   │           ${index + 1}.sfdsf ${img.messageId}... (${formatBytes(img.size)}) - ${img.mimeType}`);
+          });
+        } catch (webuseError) {
+          console.log(`│   │   └── webuse: ❌ Error accessing database`);
+        }
+
         // Combined total
         const totalStorage = totalLocalBytes + imageDBStats.totalSize;
         console.log(`└── Combined Total:`);
@@ -316,7 +361,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
               }
 
               if (imageData) {
-                console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${messageIndex})...`);
+                console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${message.id})...`);
                 const result = await geminiService.optimizeImageForGemini(imageData);
 
                 // Store optimized image in IndexedDB and get reference
@@ -354,7 +399,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                       }
 
                       if (imageData) {
-                        console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - generation ${genIndex}, image ${imgIndex}...`);
+                        console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - message ${message.id}, generation ${genIndex}, image ${imgIndex}...`);
                         const result = await geminiService.optimizeImageForGemini(imageData);
 
                         // Store optimized image in IndexedDB and get reference
@@ -379,7 +424,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           }
 
           if (messageModified) {
-            console.log(`[Chat Optimization] ✅ Optimized message ${messageIndex} in "${chat.title}"`);
+            console.log(`[Chat Optimization] ✅ Optimized message ${message.id} in "${chat.title}"`);
           }
         }
       }
@@ -1051,7 +1096,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           if (imageData.isSingleImage) {
             // Delete single imageUrl
             updatedMessage.imageUrl = undefined;
-            console.log('[Image Delete] Removed single imageUrl from message');
+            console.log(`[Image Delete] Removed single imageUrl from message ${imageData.messageId}`);
           } else {
             // Delete from imageGenerations array
             if (updatedMessage.imageGenerations && imageData.generationIndex !== undefined && imageData.imageIndex !== undefined) {
@@ -1063,9 +1108,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 // If this was the only image in the generation, remove the entire generation
                 if (generation.images.length === 0) {
                   updatedMessage.imageGenerations.splice(imageData.generationIndex, 1);
-                  console.log('[Image Delete] Removed entire generation (no images left)');
+                  console.log(`[Image Delete] Removed entire generation (no images left) from message ${imageData.messageId}`);
                 } else {
-                  console.log(`[Image Delete] Removed image ${imageData.imageIndex} from generation ${imageData.generationIndex}`);
+                  console.log(`[Image Delete] Removed image ${imageData.imageIndex} from generation ${imageData.generationIndex} in message ${imageData.messageId}`);
                 }
               }
             }
@@ -1168,6 +1213,32 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           // window.location.protocol = "https:"; // This would cause a full page reload
         }
       }
+    }
+  }, []);
+
+  // Check for WebP images in webuse database on startup and reorganize if needed
+  useEffect(() => {
+    const checkAndReorganizeImages = async () => {
+      try {
+        // Check if there are any WebP images in the webuse database
+        const webuseImages = await imageDBService.getAllImagesFromDb('webuse');
+        const webpImages = webuseImages.filter(img => img.mimeType === 'image/webp');
+
+        if (webpImages.length === 0) {
+          console.log('[Startup] No WebP images found in webuse database, running reorganization...');
+          const result = await imageDBService.reorganizeImages();
+          console.log('[Startup] Reorganization completed:', result);
+        } else {
+          console.log(`[Startup] Found ${webpImages.length} WebP images in webuse database, skipping reorganization`);
+        }
+      } catch (error) {
+        console.error('[Startup] Error during image reorganization check:', error);
+      }
+    };
+
+    // Only run if IndexedDB is available and we're in browser
+    if (typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined') {
+      checkAndReorganizeImages();
     }
   }, []);
 

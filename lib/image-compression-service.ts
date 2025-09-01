@@ -124,17 +124,17 @@ export const compressionPresets: Record<string, CompressionPreset> = {
     autoResize: true
   },
 
-  // Special formats
-  'png-lossless': {
-    name: 'PNG Lossless',
-    description: 'Lossless PNG compression (large files)',
-    maxWidth: 512,
-    maxHeight: 512,
-    quality: 1.0,
-    format: 'png',
-    library: 'jimp',
-    autoResize: true
-  },
+  // // Special formats
+  // 'png-lossless': {
+  //   name: 'PNG Lossless',
+  //   description: 'Lossless PNG compression (large files)',
+  //   maxWidth: 512,
+  //   maxHeight: 512,
+  //   quality: 1.0,
+  //   format: 'png',
+  //   library: 'jimp',
+  //   autoResize: true
+  // },
   'webp-strong': {
     name: 'WebP Strong',
     description: 'Strong compression with WebP format',

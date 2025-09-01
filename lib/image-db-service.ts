@@ -458,8 +458,8 @@ export class ImageDBService {
   }
 
   /**
-    * Get all images from database
-    */
+   * Get all images from database
+   */
   async getAllImages(): Promise<StoredImage[]> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -474,6 +474,274 @@ export class ImageDBService {
     } catch (error) {
       console.error('[ImageDB] ❌ Failed to get all images:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get all images from a specific database
+   */
+  async getAllImagesFromDb(dbType: 'original' | 'webuse'): Promise<StoredImage[]> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return [];
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+      const images = await db.images.toArray();
+      console.log(`[ImageDB] 📋 Found ${images.length} total images in ${dbType} database`);
+      return images;
+    } catch (error) {
+      console.error(`[ImageDB] ❌ Failed to get all images from ${dbType}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Store image in specific database
+   */
+  async storeImageInDb(
+    dbType: 'original' | 'webuse',
+    id: string,
+    chatId: string,
+    messageId: string,
+    base64Uri: string,
+    options?: {
+      width?: number;
+      height?: number;
+      mimeType?: string;
+      metadata?: StoredImage['metadata'];
+    }
+  ): Promise<void> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return;
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+
+      const size = this.getBase64Size(base64Uri);
+      const mimeType = options?.mimeType ||
+        (base64Uri.startsWith('data:image/') ?
+          base64Uri.split(';')[0].split(':')[1] || 'image/jpeg' :
+          'image/jpeg');
+
+      const existing = await db.images.get(id);
+      if (existing && size >= existing.size) {
+        console.log(`[${dbType}DB] 📏 New image (${this.formatBytes(size)}) is not smaller than existing (${this.formatBytes(existing.size)}), skipping save`);
+        return;
+      }
+
+      const imageRecord: StoredImage = {
+        id,
+        chatId,
+        messageId,
+        uri: base64Uri,
+        mimeType,
+        width: options?.width || 0,
+        height: options?.height || 0,
+        size,
+        createdAt: existing ? existing.createdAt : new Date(),
+        lastAccessed: new Date(),
+        metadata: options?.metadata
+      };
+
+      await db.images.put(imageRecord);
+      console.log(`[${dbType}DB] ✅ Stored image: ${id}`);
+    } catch (error) {
+      console.error(`[${dbType}DB] ❌ Failed to store image:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete image from specific database
+   */
+  async deleteImageFromDb(dbType: 'original' | 'webuse', id: string): Promise<boolean> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return false;
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+
+      const existingImage = await db.images.get(id);
+      if (!existingImage) {
+        console.warn(`[${dbType}DB] ⚠️ Image not found for deletion: ${id}`);
+        return false;
+      }
+
+      await db.images.delete(id);
+      console.log(`[${dbType}DB] 🗑️ Deleted image: ${id}`);
+      return true;
+    } catch (error) {
+      console.error(`[${dbType}DB] ❌ Failed to delete image:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Reorganize images: put WebP in webuse, others in originalimage, one per chat per DB
+   */
+  async reorganizeImages(): Promise<{
+    processed: number;
+    moved: number;
+    deleted: number;
+    errors: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        processed: 0,
+        moved: 0,
+        deleted: 0,
+        errors: ['IndexedDB not available']
+      };
+    }
+
+    const errors: string[] = [];
+    let processed = 0;
+    let moved = 0;
+    let deleted = 0;
+
+    try {
+      // Fetch all images from both databases
+      const originalImages = await this.getAllImagesFromDb('original');
+      const webuseImages = await this.getAllImagesFromDb('webuse');
+      const allImages = [...originalImages, ...webuseImages];
+
+      console.log(`[ImageDB] 🔄 Starting reorganization of ${allImages.length} images`);
+
+      // Group images by chatId
+      const imagesByChat: Record<string, StoredImage[]> = {};
+      allImages.forEach(image => {
+        if (!imagesByChat[image.chatId]) {
+          imagesByChat[image.chatId] = [];
+        }
+        imagesByChat[image.chatId].push(image);
+      });
+
+      // Process each chat
+      for (const [chatId, images] of Object.entries(imagesByChat)) {
+        console.log(`[ImageDB] 📂 Processing chat ${chatId} with ${images.length} images`);
+
+        // Separate WebP and non-WebP
+        const webpImages = images.filter(img => img.mimeType === 'image/webp');
+        const otherImages = images.filter(img => img.mimeType !== 'image/webp');
+
+        // Process WebP images for this chat
+        if (webpImages.length > 0) {
+          const bestWebp = this.selectBestImage(webpImages);
+          await this.ensureImageInDb('webuse', bestWebp);
+
+          // Delete other WebP images for this chat
+          for (const img of webpImages) {
+            if (img.id !== bestWebp.id) {
+              const dbType = originalImages.some(orig => orig.id === img.id) ? 'original' : 'webuse';
+              await this.deleteImageFromDb(dbType, img.id);
+              deleted++;
+            }
+          }
+
+          // If best WebP was moved, count as moved
+          const wasInOriginal = originalImages.some(orig => orig.id === bestWebp.id);
+          if (wasInOriginal) {
+            moved++;
+          }
+        }
+
+        // Process non-WebP images for this chat
+        if (otherImages.length > 0) {
+          const bestOther = this.selectBestImage(otherImages);
+          await this.ensureImageInDb('original', bestOther);
+
+          // Delete other non-WebP images for this chat
+          for (const img of otherImages) {
+            if (img.id !== bestOther.id) {
+              const dbType = originalImages.some(orig => orig.id === img.id) ? 'original' : 'webuse';
+              await this.deleteImageFromDb(dbType, img.id);
+              deleted++;
+            }
+          }
+
+          // If best non-WebP was moved, count as moved
+          const wasInWebuse = webuseImages.some(web => web.id === bestOther.id);
+          if (wasInWebuse) {
+            moved++;
+          }
+        }
+
+        processed += images.length;
+      }
+
+      console.log(`[ImageDB] ✅ Reorganization complete: ${processed} processed, ${moved} moved, ${deleted} deleted`);
+      return {
+        processed,
+        moved,
+        deleted,
+        errors
+      };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ImageDB] ❌ Reorganization failed:', errorMsg);
+      errors.push(errorMsg);
+      return {
+        processed,
+        moved,
+        deleted,
+        errors
+      };
+    }
+  }
+
+  /**
+   * Select the best image from a list (smallest size, or most recent if tie)
+   */
+  private selectBestImage(images: StoredImage[]): StoredImage {
+    return images.reduce((best, current) => {
+      if (current.size < best.size) {
+        return current;
+      } else if (current.size === best.size) {
+        // If same size, prefer more recent
+        return current.lastAccessed > best.lastAccessed ? current : best;
+      }
+      return best;
+    });
+  }
+
+  /**
+   * Ensure image is in the correct database
+   */
+  private async ensureImageInDb(targetDb: 'original' | 'webuse', image: StoredImage): Promise<void> {
+    const currentDb = targetDb === 'webuse' ? 'original' : 'webuse';
+
+    // Check if already in target DB
+    const targetImages = await this.getAllImagesFromDb(targetDb);
+    const alreadyInTarget = targetImages.some(img => img.id === image.id);
+
+    if (alreadyInTarget) {
+      return; // Already in correct DB
+    }
+
+    // Store in target DB
+    await this.storeImageInDb(targetDb, image.id, image.chatId, image.messageId, image.uri, {
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+      metadata: image.metadata
+    });
+
+    // Remove from current DB if it exists there
+    const currentImages = await this.getAllImagesFromDb(currentDb);
+    const inCurrent = currentImages.some(img => img.id === image.id);
+    if (inCurrent) {
+      await this.deleteImageFromDb(currentDb, image.id);
     }
   }
 
@@ -891,3 +1159,25 @@ export class ImagePipelineService {
 // Export services
 export const imageDBService = new ImageDBService();
 export const imagePipelineService = new ImagePipelineService();
+
+/*
+Usage example for reorganizeImages:
+
+import { imageDBService } from './lib/image-db-service';
+
+async function reorganizeImageDatabases() {
+  try {
+    const result = await imageDBService.reorganizeImages();
+    console.log('Reorganization complete:', result);
+  } catch (error) {
+    console.error('Reorganization failed:', error);
+  }
+}
+
+// Call this function when you want to reorganize the images
+// It will:
+// 1. Move all WebP images to the 'webuse' database
+// 2. Move all other image types to the 'originalimage' database
+// 3. Ensure each chat has at most one image in each database
+// 4. Keep the smallest image when there are duplicates
+*/
