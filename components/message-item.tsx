@@ -13,6 +13,7 @@ import { Button } from "../components/ui/button"
 import { ResolvedImage } from "./resolved-image"
 import { GeminiImageService } from "../lib/gemini-image-service"
 import { imagePipelineUtility } from "../lib/image-pipeline-utility"
+import { imageDBService } from "../lib/image-db-service"
 
 interface MessageItemProps {
   message: Message
@@ -159,20 +160,25 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                                   className="h-6 w-6"
                                   onClick={async () => {
                                     try {
-                                      const imageService = GeminiImageService.createGeminiImageService();
-                                      if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri,false);
-                                        if (resolvedUri) {
-                                          const link = document.createElement('a');
-                                          link.href = resolvedUri;
-                                          link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
-                                          document.body.appendChild(link);
-                                          link.click();
-                                          document.body.removeChild(link);
-                                        }
+                                      // Extract image ID from URI (format: indexeddb:imageId)
+                                      const imageId = image.uri.replace('indexeddb:', '').replace('opt_', '');
+
+                                      // Always download from originalimage database
+                                      const originalImage = await imageDBService.getImage(imageId);
+
+                                      if (originalImage) {
+                                        const link = document.createElement('a');
+                                        link.href = originalImage.uri;
+                                        link.download = `image-${imageId}.${originalImage.mimeType.split('/')[1] || 'png'}`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        console.log(`[ImageDownload] ✅ Downloaded original image: ${imageId}`);
+                                      } else {
+                                        console.error(`[ImageDownload] ❌ Original image not found: ${imageId}`);
                                       }
                                     } catch (error) {
-                                      console.error('Failed to resolve image for download:', error);
+                                      console.error(`[ImageDownload] ❌ Error downloading image:`, error);
                                     }
                                   }}
                                   title="Download image"
