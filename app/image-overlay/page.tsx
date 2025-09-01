@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback } from "react"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { cn } from "../../lib/utils"
+import { Download } from "lucide-react"
 
 interface ImageData {
   file: File
@@ -87,6 +88,65 @@ export default function ImageOverlayPage() {
   const removeDraggableImage = useCallback((index: number) => {
     setDraggableImages(prev => prev.filter((_, i) => i !== index))
   }, [])
+
+  const exportCompositeImage = useCallback(async () => {
+    if (!targetImage || placedImages.length === 0) return
+
+    // Create canvas with target image dimensions
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = targetImage.width
+    canvas.height = targetImage.height
+
+    // Load target image
+    const targetImg = new Image()
+    targetImg.crossOrigin = 'anonymous'
+
+    return new Promise<void>((resolve) => {
+      targetImg.onload = async () => {
+        // Draw target image
+        ctx.drawImage(targetImg, 0, 0, targetImage.width, targetImage.height)
+
+        // Draw each placed image
+        for (const placedImage of placedImages) {
+          const overlayImg = new Image()
+          overlayImg.crossOrigin = 'anonymous'
+
+          await new Promise<void>((overlayResolve) => {
+            overlayImg.onload = () => {
+              ctx.drawImage(
+                overlayImg,
+                placedImage.x,
+                placedImage.y,
+                placedImage.width,
+                placedImage.height
+              )
+              overlayResolve()
+            }
+            overlayImg.src = placedImage.imageData.url
+          })
+        }
+
+        // Convert to blob and download
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `composite-image-${Date.now()}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+          }
+          resolve()
+        }, 'image/png')
+      }
+      targetImg.src = targetImage.url
+    })
+  }, [targetImage, placedImages])
 
   const handleDragStart = useCallback((event: React.DragEvent, imageData: ImageData) => {
     setDraggedImage(imageData)
@@ -571,6 +631,14 @@ export default function ImageOverlayPage() {
         <div className="flex justify-center gap-4">
           <Button onClick={clearPlacedImages} variant="outline">
             Clear Overlays
+          </Button>
+          <Button
+            onClick={exportCompositeImage}
+            disabled={!targetImage || placedImages.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Composite Image
           </Button>
         </div>
 
