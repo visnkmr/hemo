@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download, MessageSquarePlus } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download, MessageSquarePlus, Eye, Image } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -1397,12 +1397,12 @@ export default function ChatInterface({
 
         // Check if we should generate an image automatically for Gemini models
         if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
-          const shouldGenerateImage = checkForImageGenerationIntent(
-            userMessage.content,
-            accumulatedContent
-          );
+          // const shouldGenerateImage = checkForImageGenerationIntent(
+          //   userMessage.content,
+          //   accumulatedContent
+          // );
 
-          if (shouldGenerateImage) {
+          // if (shouldGenerateImage) {
             try {
               const imageService = GeminiImageService.createGeminiImageService();
               if (imageService) {
@@ -1431,7 +1431,7 @@ export default function ChatInterface({
               console.warn("Automatic image generation failed:", imageError);
               // Don't fail the entire response if image generation fails
             }
-          }
+          // }
         }
         else{
           for await (const contentChunk of sendMessageStream({
@@ -2209,6 +2209,13 @@ export default function ChatInterface({
 
       {/* Input Area */}
       <div className={`absolute bottom-0 left-0 right-0 pl-4 pr-4 ${isInputFocused ? '' : ''}`} >
+         {/* Image Generation Badge */}
+         {ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel) && (
+                  <div className="flex justify-center md:justify-end md:mr-32 mb-2 w-10 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+                    <Image className="h-4 w-4"  />
+                    {/* <span className="font-medium">Image Gen</span> */}
+                  </div>
+                )}
       {showScrollToBottom && (
                 <div className="flex justify-center md:justify-end md:mr-32 mb-2">
                   <Button
@@ -2237,7 +2244,9 @@ export default function ChatInterface({
           {/* Text Input & Send Button */}
 
           <div className="flex flex-grow items-center gap-2">
+            
             <div className="flex flex-col flex-grow">
+             
 
               {/* Quoted Message Display */}
               {quotedMessage && (
@@ -2264,17 +2273,20 @@ export default function ChatInterface({
                 </div>
               )}
 
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-                placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
-                className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
+                  className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
+                  disabled={isLoading}
+                />
+                
+              </div>
               <Progress value={contextUsage} className="h-1" />
             </div>
 
