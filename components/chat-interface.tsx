@@ -501,6 +501,165 @@ function checkForImageGenerationIntent(userMessage: string, assistantMessage: st
   return imageKeywords.some(keyword => combinedText.includes(keyword));
 }
 
+// Message Debug Info Component
+interface MessageDebugInfoProps {
+  message: Message
+  forceExpanded?: boolean
+}
+
+function MessageDebugInfo({ message, forceExpanded = false }: MessageDebugInfoProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Use forceExpanded if provided, otherwise use local state
+  const expanded = forceExpanded || isExpanded
+
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) return 'null'
+    if (typeof value === 'string') return `"${value}"`
+    if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+    if (Array.isArray(value)) return `[${value.length} items]`
+    if (typeof value === 'object') return `{${Object.keys(value).length} properties}`
+    return String(value)
+  }
+
+  const renderObject = (obj: any, level = 0): React.ReactElement => {
+    if (obj === null || obj === undefined) {
+      return <span className="text-gray-500">null</span>
+    }
+
+    if (typeof obj === 'string') {
+      return <span className="text-green-600">"{obj}"</span>
+    }
+
+    if (typeof obj === 'boolean') {
+      return <span className="text-blue-600">{String(obj)}</span>
+    }
+
+    if (typeof obj === 'number') {
+      return <span className="text-purple-600">{obj}</span>
+    }
+
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) {
+        return <span className="text-gray-500">[]</span>
+      }
+
+      return (
+        <div className="ml-4">
+          <span className="text-gray-500">[</span>
+          {obj.map((item, index) => (
+            <div key={index} className="ml-4">
+              {renderObject(item, level + 1)}
+              {index < obj.length - 1 && <span className="text-gray-500">,</span>}
+            </div>
+          ))}
+          <span className="text-gray-500">]</span>
+        </div>
+      )
+    }
+
+    if (typeof obj === 'object') {
+      const entries = Object.entries(obj)
+      if (entries.length === 0) {
+        return <span className="text-gray-500">{"{}"}</span>
+      }
+
+      return (
+        <div className="ml-4">
+          <span className="text-gray-500">{"{"}</span>
+          {entries.map(([key, value], index) => (
+            <div key={key} className="ml-4">
+              <span className="text-blue-400">"{key}"</span>
+              <span className="text-gray-500">: </span>
+              {renderObject(value, level + 1)}
+              {index < entries.length - 1 && <span className="text-gray-500">,</span>}
+            </div>
+          ))}
+          <span className="text-gray-500">{"}"}</span>
+        </div>
+      )
+    }
+
+    return <span className="text-red-600">{String(obj)}</span>
+  }
+
+  const handleToggle = () => {
+    if (!forceExpanded) {
+      setIsExpanded(!isExpanded)
+    }
+  }
+
+  return (
+    <div className="mt-2 border-t border-gray-200 dark:border-gray-600 pt-2">
+      <button
+        onClick={handleToggle}
+        className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        disabled={forceExpanded}
+      >
+        <span className="text-xs">🔍</span>
+        <span>Message Debug Info</span>
+        <span className="text-xs">{expanded ? '▼' : '▶'}</span>
+        {forceExpanded && <span className="text-xs text-blue-500">(locked)</span>}
+      </button>
+
+      {expanded && (
+        <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md border text-xs font-mono overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="space-y-1">
+            <div>
+              <span className="text-blue-400">id</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.id}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">role</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.role}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">content</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.content.length > 100 ? message.content.substring(0, 100) + '...' : message.content}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">timestamp</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.timestamp}"</span>
+            </div>
+            {message.model && (
+              <div>
+                <span className="text-blue-400">model</span>
+                <span className="text-gray-500">: </span>
+                <span className="text-green-600">"{message.model}"</span>
+              </div>
+            )}
+            {message.imageUrl && (
+              <div>
+                <span className="text-blue-400">imageUrl</span>
+                <span className="text-gray-500">: </span>
+                <span className="text-green-600">"{message.imageUrl}"</span>
+              </div>
+            )}
+            {message.imageGenerations && (
+              <div>
+                <span className="text-blue-400">imageGenerations</span>
+                <span className="text-gray-500">: </span>
+                {renderObject(message.imageGenerations)}
+              </div>
+            )}
+            {message.generationParameters && (
+              <div>
+                <span className="text-blue-400">generationParameters</span>
+                <span className="text-gray-500">: </span>
+                {renderObject(message.generationParameters)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Helper function to get a display name from model ID
 function getModelDisplayName(modelId: string): string {
   // Extract the model name from the provider/model format
@@ -708,6 +867,7 @@ interface ChatInterfaceProps {
   geminiModels: any[];
   handleSelectModel: (modelId: string) => void;
   isLoadingModels: boolean;
+  debugMode?: boolean;
 }
 
 // async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,local_model: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
@@ -1043,7 +1203,8 @@ export default function ChatInterface({
   allModels,
   geminiModels,
   handleSelectModel,
-  isLoadingModels
+  isLoadingModels,
+  debugMode = false
 }: ChatInterfaceProps) {
   // const [filePaths, setFilePaths] = useState([message?message.path:""]);
 
@@ -1614,6 +1775,9 @@ export default function ChatInterface({
   // Image generation state
   const [isImageGenerationOpen, setIsImageGenerationOpen] = useState(false);
 
+  // Debug expansion state
+  const [allDebugExpanded, setAllDebugExpanded] = useState(false);
+
   // Group messages for Grok-style display
   const groupedMessages = React.useMemo(() => {
     const groups: Array<{
@@ -1955,51 +2119,66 @@ export default function ChatInterface({
                         hideQuoteButton={hasMessageImages(group.message!)}
                       />
                     ) : (
-                      <MessageItem
-                        message={group.message}
-                        isStreaming={streamingMessageId === group.message.id}
-                        onCopy={() => handleCopyMessage(group.message!.content)}
-                        onBranch={() => handleBranchFromMessage(group.message!.id)}
-                        onQuote={() => handleQuoteMessage(group.message!)}
-                        setdsm={setdsm}
-                        setmts={setmts}
-                        isQuoted={quotedMessage?.id === group.message.id}
-                      />
+                      group.message && (
+                        <>
+                          <MessageItem
+                            message={group.message}
+                            isStreaming={streamingMessageId === group.message.id}
+                            onCopy={() => handleCopyMessage(group.message!.content)}
+                            onBranch={() => handleBranchFromMessage(group.message!.id)}
+                            onQuote={() => handleQuoteMessage(group.message!)}
+                            setdsm={setdsm}
+                            setmts={setmts}
+                            isQuoted={quotedMessage?.id === group.message.id}
+                          />
+                          {debugMode && <MessageDebugInfo message={group.message} forceExpanded={allDebugExpanded} />}
+                        </>
+                      )
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
                     (() => {
                       const questionKey = getQuestionKey(group.question);
                       const currentIndex = questionGroupAnswerIndices.get(questionKey) ?? group.answers.length - 1; // Default to latest answer
                       return (
-                        <QuestionGroup
-                          vendor={vendor}
-                          setvendor={setvendor}
-                          ollamastate={ollamastate}
-                          setollamastate={setollamastate}
-                          allModels={allModels}
-                          selectedModel={selectedModel}
-                          handleSelectModel={handleSelectModel}
-                          isLoadingModels={isLoadingModels}
-                          setsendwithhistory={setsendwithhistory}
-                          sendwithhistory={sendwithhistory}
-                          geminiModels={geminiModels}
-                          question={group.question}
-                          answers={group.answers}
-                          onCopy={handleCopyMessage}
-                          onBranch={handleBranchFromMessage}
-                          onQuote={handleQuoteMessage}
-                          onEdit={() => handleEditMessage(group.question!.id)}
-                          setmts={setmts}
-                          setdsm={setdsm}
-                          isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
-                          streamingMessageId={streamingMessageId}
-                          isQuestionExpanded={expandedMessages.has(group.question.id)}
-                          onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
-                          currentAnswerIndex={currentIndex}
-                          onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
-                          quotedMessage={quotedMessage}
-                          hasMessageImages={hasMessageImages}
-                        />
+                        <div>
+                          <QuestionGroup
+                            vendor={vendor}
+                            setvendor={setvendor}
+                            ollamastate={ollamastate}
+                            setollamastate={setollamastate}
+                            allModels={allModels}
+                            selectedModel={selectedModel}
+                            handleSelectModel={handleSelectModel}
+                            isLoadingModels={isLoadingModels}
+                            setsendwithhistory={setsendwithhistory}
+                            sendwithhistory={sendwithhistory}
+                            geminiModels={geminiModels}
+                            question={group.question}
+                            answers={group.answers}
+                            onCopy={handleCopyMessage}
+                            onBranch={handleBranchFromMessage}
+                            onQuote={handleQuoteMessage}
+                            onEdit={() => handleEditMessage(group.question!.id)}
+                            setmts={setmts}
+                            setdsm={setdsm}
+                            isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
+                            streamingMessageId={streamingMessageId}
+                            isQuestionExpanded={expandedMessages.has(group.question.id)}
+                            onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
+                            currentAnswerIndex={currentIndex}
+                            onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
+                            quotedMessage={quotedMessage}
+                            hasMessageImages={hasMessageImages}
+                          />
+                          {debugMode && (
+                            <div className="ml-4 space-y-2">
+                              <MessageDebugInfo message={group.question} forceExpanded={allDebugExpanded} />
+                              {group.answers.map((answer, index) => (
+                                <MessageDebugInfo key={answer.id} message={answer} forceExpanded={allDebugExpanded} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       );
                     })()
                   ) : null}
@@ -2292,6 +2471,23 @@ export default function ChatInterface({
         onImageGenerated={handleImageGenerated}
         selectedModel={selectedModel}
       />
+
+      {/* Floating Debug Toggle Button */}
+      {debugMode && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            onClick={() => setAllDebugExpanded(!allDebugExpanded)}
+            className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white border-2 border-white dark:border-gray-800"
+            title={allDebugExpanded ? "Collapse all debug info" : "Expand all debug info"}
+          >
+            {allDebugExpanded ? (
+              <span className="text-lg">🔽</span>
+            ) : (
+              <span className="text-lg">🔼</span>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

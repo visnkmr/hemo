@@ -16,7 +16,7 @@ import { imageDBService } from "../lib/image-db-service"
 import { CompressionSettingsService, compressionSettingsService } from "../lib/compression-settings-service"
 import { Button } from "../components/ui/button"
 import { Database } from "lucide-react"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings, Archive, BarChart3 } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings, Archive, BarChart3, Info } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 
 import ExportDialog from "../components/export-dialog"
@@ -152,6 +152,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [showCompressionDashboard, setShowCompressionDashboard] = useState(false);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [showImageManagement, setShowImageManagement] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const isMobile = useIsMobile();
 
   // Helper functions for compression settings
@@ -1304,6 +1305,10 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                     <Eye className="mr-2 h-4 w-4" />
                     <span>Manage Images</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDebugMode(!debugMode)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>{debugMode ? 'Disable' : 'Enable'} Message Debug Info</span>
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
                   <div className="px-2 py-1 text-sm font-medium text-gray-500">Image Compression</div>
@@ -1461,6 +1466,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             geminiModels={geminiModels}
             handleSelectModel={handleSelectModel}
             isLoadingModels={isLoadingModels}
+            debugMode={debugMode}
           />
         )}
       </div>
