@@ -1017,7 +1017,7 @@ export async function* sendMessageStream({
       "Content-Type": "application/json",
       Authorization: `Bearer ${storedApiKey}`,
       "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
-      "X-Title": "Batu",
+      "X-Title": "Hemo",
     };
     let headers_ollama = { 'Content-Type': 'application/json' };
 
