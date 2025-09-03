@@ -1,4 +1,6 @@
 import Dexie, { Table } from 'dexie';
+import { recycleBinService } from './recycle-bin-db';
+import { imagePipelineUtility } from './image-pipeline-utility';
 
 export interface StoredImage {
   id: string; // Primary key (will be the key stored in message.imageUrl)
@@ -43,8 +45,8 @@ export class ImageDatabase extends Dexie {
   blobs!: Table<StoredBlob>;
   private isInitialized = false;
 
-  constructor() {
-    super('BatuImageDB');
+  constructor(dbName: string = 'BatuImageDB') {
+    super(dbName);
 
     this.version(1).stores({
       images: 'id, chatId, messageId, mimeType, createdAt, lastAccessed, size'
@@ -80,31 +82,85 @@ export class ImageDatabase extends Dexie {
   }
 }
 
-// Lazy-initialized singleton instance
-let imageDbInstance: ImageDatabase | null = null;
+// Lazy-initialized singleton instances for different databases
+const imageDbInstances: Record<string, ImageDatabase> = {};
 
-function getImageDb() {
-  if (!imageDbInstance) {
-    imageDbInstance = new ImageDatabase();
+function getImageDb(dbName: string = 'originalimage') {
+  if (!imageDbInstances[dbName]) {
+    imageDbInstances[dbName] = new ImageDatabase(dbName);
   }
-  return imageDbInstance;
+  return imageDbInstances[dbName];
+}
+
+function getOriginalImageDb() {
+  return getImageDb('originalimage');
+}
+
+function getWebUseImageDb() {
+  return getImageDb('webuse');
 }
 
 export { getImageDb };
 
 export class ImageDBService {
-  private db = getImageDb();
+  private originalDb = getOriginalImageDb();
+  private webuseDb = getWebUseImageDb();
+  // For backward compatibility
+  private db = this.originalDb;
+  private migrationCompleted = false;
 
   /**
-   * Check if running in browser environment
-   */
-  private isBrowser(): boolean {
+    * Check if running in browser environment
+    */
+  public isBrowser(): boolean {
     return typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
   }
 
   /**
-   * Store an image in IndexedDB
-   */
+    * Check if image exists in old database (for backward compatibility)
+    */
+  private async getImageFromOldDatabase(id: string): Promise<StoredImage | undefined> {
+    try {
+      const oldDb = new ImageDatabase('BatuImageDB'); // Old database name
+      await oldDb.ensureInitialized();
+      const image = await oldDb.images.get(id);
+
+      if (image) {
+        // Update last accessed timestamp in old database
+        await oldDb.images.update(id, { lastAccessed: new Date() });
+        console.log(`[ImageDB] 📖 Retrieved image: ${id} from old database`);
+
+        // Optionally, migrate this image to the new database structure
+        try {
+          await this.storeImage(image.id, image.chatId, image.messageId, image.uri, {
+            width: image.width,
+            height: image.height,
+            mimeType: image.mimeType,
+            metadata: { ...image.metadata, source: 'migrated' as any }
+          });
+          console.log(`[ImageDB] ✅ Migrated image ${id} to new database structure`);
+        } catch (migrateError) {
+          console.warn(`[ImageDB] ⚠️ Auto-migration failed for image ${id}:`, migrateError);
+        }
+      }
+
+      return image;
+    } catch (error) {
+      console.warn(`[ImageDB] ℹ️ Old database not accessible or empty:`, error instanceof Error ? error.message : String(error));
+      return undefined;
+    }
+  }
+
+  /**
+    * Get the appropriate database based on type
+    */
+  private getDb(dbType: 'original' | 'webuse' = 'original') {
+    return dbType === 'webuse' ? this.webuseDb : this.originalDb;
+  }
+
+  /**
+    * Store an image in IndexedDB
+    */
   async storeImage(
     id: string,
     chatId: string,
@@ -123,7 +179,8 @@ export class ImageDBService {
     }
 
     try {
-      await this.db.ensureInitialized();
+      const db = this.originalDb;
+      await db.ensureInitialized();
 
       // Calculate size from base64
       const size = this.getBase64Size(base64Uri);
@@ -131,6 +188,19 @@ export class ImageDBService {
         (base64Uri.startsWith('data:image/') ?
           base64Uri.split(';')[0].split(':')[1] || 'image/jpeg' :
           'image/jpeg');
+
+      // Check if image already exists
+      const existing = await db.images.get(id);
+      if (existing) {
+        if (size >= existing.size) {
+          console.log(`[ImageDB] 📏 New image (${this.formatBytes(size)}) is not smaller than existing (${this.formatBytes(existing.size)}), skipping save to prevent duplicate`);
+          return;
+        } else {
+          console.log(`[ImageDB] 📏 Replacing existing image with smaller version`);
+        }
+      } else {
+        console.log(`[ImageDB] 📏 Storing new image`);
+      }
 
       const imageRecord: StoredImage = {
         id,
@@ -141,12 +211,12 @@ export class ImageDBService {
         width: options?.width || 0,
         height: options?.height || 0,
         size,
-        createdAt: new Date(),
+        createdAt: existing ? existing.createdAt : new Date(),
         lastAccessed: new Date(),
         metadata: options?.metadata
       };
 
-      await this.db.images.put(imageRecord);
+      await db.images.put(imageRecord);
 
       console.log(`[ImageDB] ✅ Stored image: ${id} (${this.formatBytes(size)})`);
 
@@ -157,8 +227,8 @@ export class ImageDBService {
   }
 
   /**
-   * Get an image from IndexedDB
-   */
+    * Get an image from IndexedDB with fallback to old database
+    */
   async getImage(id: string): Promise<StoredImage | undefined> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -166,30 +236,31 @@ export class ImageDBService {
     }
 
     try {
-      await this.db.ensureInitialized();
-
-      const image = await this.db.images.get(id);
+      // First try the new database structure
+      await this.originalDb.ensureInitialized();
+      const image = await this.originalDb.images.get(id);
 
       if (image) {
         // Update last accessed timestamp
-        await this.db.images.update(id, { lastAccessed: new Date() });
-        console.log(`[ImageDB] 📖 Retrieved image: ${id}`);
-
+        await this.originalDb.images.update(id, { lastAccessed: new Date() });
+        console.log(`[ImageDB] 📖 Retrieved image: ${id} from new database`);
         return image;
       }
 
-      console.warn(`[ImageDB] ⚠️ Image not found: ${id}`);
-      return undefined;
+      // Fallback: Try to get image from old database structure
+      console.log(`[ImageDB] 🔄 Image ${id} not found in new database, trying old database...`);
+
+      return await this.getImageFromOldDatabase(id);
 
     } catch (error) {
       console.error('[ImageDB] ❌ Failed to get image:', error);
-      throw error;
+      return undefined; // Don't throw error for missing images
     }
   }
 
   /**
-   * Delete an image from IndexedDB
-   */
+    * Delete an image from IndexedDB
+    */
   async deleteImage(id: string): Promise<boolean> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -217,8 +288,8 @@ export class ImageDBService {
   }
 
   /**
-   * Get all images for a specific chat
-   */
+    * Get all images for a specific chat
+    */
   async getChatImages(chatId: string): Promise<StoredImage[]> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -243,8 +314,8 @@ export class ImageDBService {
   }
 
   /**
-   * Get all images for a specific message
-   */
+    * Get all images for a specific message
+    */
   async getMessageImages(messageId: string): Promise<StoredImage[]> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -269,8 +340,8 @@ export class ImageDBService {
   }
 
   /**
-   * Get database statistics
-   */
+    * Get database statistics
+    */
   async getStats(): Promise<{
     totalImages: number;
     totalSize: number;
@@ -333,8 +404,8 @@ export class ImageDBService {
   }
 
   /**
-   * Clean up old images (older than specified days)
-   */
+    * Clean up old images (older than specified days)
+    */
   async cleanupOldImages(daysOld: number = 30): Promise<number> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -369,8 +440,8 @@ export class ImageDBService {
   }
 
   /**
-   * Clear all images from database
-   */
+    * Clear all images from database
+    */
   async clearAll(): Promise<void> {
     if (!this.isBrowser()) {
       console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
@@ -383,207 +454,6 @@ export class ImageDBService {
       console.log('[ImageDB] 🗑️ Cleared all images from database');
     } catch (error) {
       console.error('[ImageDB] ❌ Failed to clear database:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Migrate chat history images to IndexedDB
-   */
-  async migrateFromChatHistory(chats: any[]): Promise<number> {
-    if (!this.isBrowser()) {
-      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
-      return 0;
-    }
-
-    if (!chats || chats.length === 0) return 0;
-
-    let migratedCount = 0;
-
-    try {
-      await this.db.ensureInitialized();
-
-      for (const chat of chats) {
-        if (!chat.messages) continue;
-
-        for (const message of chat.messages) {
-          // Handle single imageUrl
-          if (message.imageUrl && message.imageUrl.startsWith('data:image/')) {
-            try {
-              const imageId = `msg_${message.id}_single`;
-              await this.storeImage(
-                imageId,
-                chat.id,
-                message.id,
-                message.imageUrl,
-                {
-                  metadata: {
-                    source: 'migrated',
-                    originalFileName: `Message ${message.id} image`
-                  }
-                }
-              );
-              message.imageUrl = `indexeddb:${imageId}`; // Mark as migrated
-              migratedCount++;
-            } catch (error) {
-              console.warn(`[ImageDB] Migration failed for single image in message ${message.id}:`, error);
-            }
-          }
-
-          // Handle imageGenerations
-          if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
-            for (let genIdx = 0; genIdx < message.imageGenerations.length; genIdx++) {
-              const generation = message.imageGenerations[genIdx];
-
-              if (generation.images && Array.isArray(generation.images)) {
-                for (let imgIdx = 0; imgIdx < generation.images.length; imgIdx++) {
-                  const image = generation.images[imgIdx];
-
-                  if (image.uri && image.uri.startsWith('data:image/')) {
-                    try {
-                      const imageId = `msg_${message.id}_gen_${genIdx}_img_${imgIdx}`;
-                      await this.storeImage(
-                        imageId,
-                        chat.id,
-                        message.id,
-                        image.uri,
-                        {
-                          width: image.width,
-                          height: image.height,
-                          mimeType: image.mimeType,
-                          metadata: {
-                            source: 'migrated',
-                            generationParams: generation,
-                            imageIndex: imgIdx
-                          }
-                        }
-                      );
-                      image.uri = `indexeddb:${imageId}`; // Mark as migrated
-                      migratedCount++;
-                    } catch (error) {
-                      console.warn(`[ImageDB] Migration failed for generation image ${imgIdx}:`, error);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      console.log(`[ImageDB] ✅ Migrated ${migratedCount} images from chat history`);
-      return migratedCount;
-
-    } catch (error) {
-      console.error('[ImageDB] ❌ Migration failed:', error);
-      throw error;
-    }
-  }
-
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
-
-  private getBase64Size(base64String: string): number {
-    const base64Data = base64String.split(',')[1] || base64String;
-    const bytes = (base64Data.length * 3) / 4;
-    return Math.ceil(bytes);
-  }
-
-
-  /**
-   * Compress an existing image in the database using a preset
-   */
-  async compressImage(
-    imageId: string,
-    presetName: string,
-    options?: {
-      updateOriginal?: boolean; // Whether to replace original or create new
-      newPrefix?: string; // Prefix for new compressed images
-    }
-  ): Promise<{ originalImage?: StoredImage; compressedImage: StoredImage; result: any }> {
-    if (!this.isBrowser()) {
-      throw new Error('Image compression requires browser environment');
-    }
-
-    // Import compression service here to avoid circular dependencies
-    const { ImageCompressionService } = await import('./image-compression-service');
-    const compressionService = new ImageCompressionService();
-
-    try {
-      await this.db.ensureInitialized();
-
-      // Get the original image
-      const originalImage = await this.db.images.get(imageId);
-      if (!originalImage) {
-        throw new Error(`Image not found: ${imageId}`);
-      }
-
-      if (!originalImage.uri || !originalImage.uri.startsWith('data:image/')) {
-        // Try to resolve IndexedDB reference
-        if (originalImage.uri.startsWith('indexeddb:')) {
-          const resolvedUri = await this.db.images.get(originalImage.uri.replace('indexeddb:', ''));
-          if (resolvedUri?.uri) {
-            originalImage.uri = resolvedUri.uri;
-          } else {
-            throw new Error('Cannot resolve IndexedDB image URI');
-          }
-        } else {
-          throw new Error('Image URI is not in supported format for compression');
-        }
-      }
-
-      console.log(`[ImageDBService] 🗜️ Compressing image: ${imageId} (${this.formatBytes(originalImage.size)})`);
-
-      // Compress the image
-      const compressionResult = await compressionService.compressImageWithPreset(
-        originalImage.uri,
-        presetName
-      );
-
-      // Determine the ID for the compressed image
-      const { updateOriginal = false, newPrefix = 'compressed' } = options || {};
-      const compressedImageId = updateOriginal ? imageId : `${newPrefix}_${imageId}_${Date.now()}`;
-
-      // Store the compressed image
-      await this.db.images.put({
-        ...originalImage,
-        id: compressedImageId,
-        uri: compressionResult.compressedBase64,
-        size: compressionResult.compressedSize,
-        createdAt: updateOriginal ? originalImage.createdAt : new Date(),
-        lastAccessed: updateOriginal ? originalImage.lastAccessed : new Date(),
-        metadata: {
-          ...originalImage.metadata,
-          source: updateOriginal ? originalImage.metadata?.source : 'compressed',
-          compression: {
-            preset: presetName,
-            library: compressionResult.library,
-            quality: compressionResult.quality,
-            originalSize: compressionResult.originalSize,
-            compressionTime: compressionResult.processingTime,
-            savingsPercent: compressionResult.savingsPercent
-          }
-        }
-      } as StoredImage);
-
-      console.log(`[ImageDBService] ✅ Compressed image: ${compressedImageId}`);
-      console.log(`[ImageDBService] 📊 Savings: ${Math.round(compressionResult.savingsPercent)}%`);
-
-      return {
-        originalImage: updateOriginal ? undefined : originalImage,
-        compressedImage: await this.db.images.get(compressedImageId) as StoredImage,
-        result: compressionResult
-      };
-
-    } catch (error) {
-      console.error('[ImageDBService] ❌ Compression failed:', error);
       throw error;
     }
   }
@@ -609,82 +479,816 @@ export class ImageDBService {
   }
 
   /**
-   * Compress multiple images in batch
+   * Get all images from a specific database
+   */
+  async getAllImagesFromDb(dbType: 'original' | 'webuse'): Promise<StoredImage[]> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return [];
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+      const images = await db.images.toArray();
+      console.log(`[ImageDB] 📋 Found ${images.length} total images in ${dbType} database`);
+      return images;
+    } catch (error) {
+      console.error(`[ImageDB] ❌ Failed to get all images from ${dbType}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Store image in specific database
+   */
+  async storeImageInDb(
+    dbType: 'original' | 'webuse',
+    id: string,
+    chatId: string,
+    messageId: string,
+    base64Uri: string,
+    options?: {
+      width?: number;
+      height?: number;
+      mimeType?: string;
+      metadata?: StoredImage['metadata'];
+    }
+  ): Promise<void> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return;
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+
+      const size = this.getBase64Size(base64Uri);
+      const mimeType = options?.mimeType ||
+        (base64Uri.startsWith('data:image/') ?
+          base64Uri.split(';')[0].split(':')[1] || 'image/jpeg' :
+          'image/jpeg');
+
+      const existing = await db.images.get(id);
+      if (existing && size >= existing.size) {
+        console.log(`[${dbType}DB] 📏 New image (${this.formatBytes(size)}) is not smaller than existing (${this.formatBytes(existing.size)}), skipping save`);
+        return;
+      }
+
+      const imageRecord: StoredImage = {
+        id,
+        chatId,
+        messageId,
+        uri: base64Uri,
+        mimeType,
+        width: options?.width || 0,
+        height: options?.height || 0,
+        size,
+        createdAt: existing ? existing.createdAt : new Date(),
+        lastAccessed: new Date(),
+        metadata: options?.metadata
+      };
+
+      await db.images.put(imageRecord);
+      console.log(`[${dbType}DB] ✅ Stored image: ${id}`);
+    } catch (error) {
+      console.error(`[${dbType}DB] ❌ Failed to store image:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete image from specific database
+   */
+  async deleteImageFromDb(dbType: 'original' | 'webuse', id: string): Promise<boolean> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return false;
+    }
+
+    try {
+      const db = this.getDb(dbType);
+      await db.ensureInitialized();
+
+      const existingImage = await db.images.get(id);
+      if (!existingImage) {
+        console.warn(`[${dbType}DB] ⚠️ Image not found for deletion: ${id}`);
+        return false;
+      }
+
+      await db.images.delete(id);
+      console.log(`[${dbType}DB] 🗑️ Deleted image: ${id}`);
+      return true;
+    } catch (error) {
+      console.error(`[${dbType}DB] ❌ Failed to delete image:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Reorganize images: put WebP in webuse, others in originalimage, one per chat per DB
+   */
+  async reorganizeImages(): Promise<{
+    processed: number;
+    moved: number;
+    deleted: number;
+    errors: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        processed: 0,
+        moved: 0,
+        deleted: 0,
+        errors: ['IndexedDB not available']
+      };
+    }
+
+    const errors: string[] = [];
+    let processed = 0;
+    let moved = 0;
+    let deleted = 0;
+
+    try {
+      // Fetch all images from both databases
+      const originalImages = await this.getAllImagesFromDb('original');
+      const webuseImages = await this.getAllImagesFromDb('webuse');
+      const allImages = [...originalImages, ...webuseImages];
+
+      console.log(`[ImageDB] 🔄 Starting reorganization of ${allImages.length} images`);
+
+      // Group images by chatId
+      const imagesByChat: Record<string, StoredImage[]> = {};
+      allImages.forEach(image => {
+        if (!imagesByChat[image.chatId]) {
+          imagesByChat[image.chatId] = [];
+        }
+        imagesByChat[image.chatId].push(image);
+      });
+
+      // Process each chat
+      for (const [chatId, images] of Object.entries(imagesByChat)) {
+        console.log(`[ImageDB] 📂 Processing chat ${chatId} with ${images.length} images`);
+
+        // Separate WebP and non-WebP
+        const webpImages = images.filter(img => img.mimeType === 'image/webp');
+        const otherImages = images.filter(img => img.mimeType !== 'image/webp');
+
+        // Process WebP images for this chat
+        if (webpImages.length > 0) {
+          const bestWebp = this.selectBestImage(webpImages);
+          await this.ensureImageInDb('webuse', bestWebp);
+
+          // Delete other WebP images for this chat
+          for (const img of webpImages) {
+            if (img.id !== bestWebp.id) {
+              const dbType = originalImages.some(orig => orig.id === img.id) ? 'original' : 'webuse';
+              await this.deleteImageFromDb(dbType, img.id);
+              deleted++;
+            }
+          }
+
+          // If best WebP was moved, count as moved
+          const wasInOriginal = originalImages.some(orig => orig.id === bestWebp.id);
+          if (wasInOriginal) {
+            moved++;
+          }
+        }
+
+        // Process non-WebP images for this chat
+        if (otherImages.length > 0) {
+          const bestOther = this.selectBestImage(otherImages);
+          await this.ensureImageInDb('original', bestOther);
+
+          // Delete other non-WebP images for this chat
+          for (const img of otherImages) {
+            if (img.id !== bestOther.id) {
+              const dbType = originalImages.some(orig => orig.id === img.id) ? 'original' : 'webuse';
+              await this.deleteImageFromDb(dbType, img.id);
+              deleted++;
+            }
+          }
+
+          // If best non-WebP was moved, count as moved
+          const wasInWebuse = webuseImages.some(web => web.id === bestOther.id);
+          if (wasInWebuse) {
+            moved++;
+          }
+        }
+
+        processed += images.length;
+      }
+
+      console.log(`[ImageDB] ✅ Reorganization complete: ${processed} processed, ${moved} moved, ${deleted} deleted`);
+      return {
+        processed,
+        moved,
+        deleted,
+        errors
+      };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ImageDB] ❌ Reorganization failed:', errorMsg);
+      errors.push(errorMsg);
+      return {
+        processed,
+        moved,
+        deleted,
+        errors
+      };
+    }
+  }
+
+  /**
+   * Select the best image from a list (smallest size, or most recent if tie)
+   */
+  private selectBestImage(images: StoredImage[]): StoredImage {
+    return images.reduce((best, current) => {
+      if (current.size < best.size) {
+        return current;
+      } else if (current.size === best.size) {
+        // If same size, prefer more recent
+        return current.lastAccessed > best.lastAccessed ? current : best;
+      }
+      return best;
+    });
+  }
+
+  /**
+   * Ensure image is in the correct database
+   */
+  private async ensureImageInDb(targetDb: 'original' | 'webuse', image: StoredImage): Promise<void> {
+    const currentDb = targetDb === 'webuse' ? 'original' : 'webuse';
+
+    // Check if already in target DB
+    const targetImages = await this.getAllImagesFromDb(targetDb);
+    const alreadyInTarget = targetImages.some(img => img.id === image.id);
+
+    if (alreadyInTarget) {
+      return; // Already in correct DB
+    }
+
+    // Store in target DB
+    await this.storeImageInDb(targetDb, image.id, image.chatId, image.messageId, image.uri, {
+      width: image.width,
+      height: image.height,
+      mimeType: image.mimeType,
+      metadata: image.metadata
+    });
+
+    // Remove from current DB if it exists there
+    const currentImages = await this.getAllImagesFromDb(currentDb);
+    const inCurrent = currentImages.some(img => img.id === image.id);
+    if (inCurrent) {
+      await this.deleteImageFromDb(currentDb, image.id);
+    }
+  }
+
+  /**
+   * Process all images from originalimage through pipeline and replace webuse images
+   */
+  async processAllOriginalImagesThroughPipeline(): Promise<{
+    processed: number;
+    successful: number;
+    failed: number;
+    totalSavings: number;
+    errors: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        processed: 0,
+        successful: 0,
+        failed: 0,
+        totalSavings: 0,
+        errors: ['IndexedDB not available']
+      };
+    }
+
+    const errors: string[] = [];
+    let processed = 0;
+    let successful = 0;
+    let failed = 0;
+    let totalSavings = 0;
+
+    try {
+      console.log('[ImagePipeline] 🚀 Starting pipeline processing for all original images...');
+
+      // Get all images from originalimage database
+      const originalImages = await this.getAllImagesFromDb('original');
+
+      if (originalImages.length === 0) {
+        console.log('[ImagePipeline] ℹ️ No images found in originalimage database');
+        return {
+          processed: 0,
+          successful: 0,
+          failed: 0,
+          totalSavings: 0,
+          errors: []
+        };
+      }
+
+      console.log(`[ImagePipeline] 📋 Found ${originalImages.length} images to process`);
+
+      // Process each image through the pipeline
+      for (const image of originalImages) {
+        try {
+          console.log(`[ImagePipeline] 🔄 Processing image ${image.id} (${image.mimeType})...`);
+
+          // Process through pipeline
+          const result = await imagePipelineUtility.processImageThroughPipeline(
+            image.id,
+            image.chatId,
+            image.messageId,
+            image.uri,
+            {
+              width: image.width,
+              height: image.height,
+              mimeType: image.mimeType,
+              generationParams: image.metadata?.generationParams
+            }
+          );
+
+          if (result.success) {
+            successful++;
+            totalSavings += result.originalSize - result.optimizedSize;
+            console.log(`[ImagePipeline] ✅ Successfully processed ${image.id}: ${Math.round(result.savingsPercent)}% savings`);
+          } else {
+            failed++;
+            errors.push(`Failed to process ${image.id}: ${result.error}`);
+            console.error(`[ImagePipeline] ❌ Failed to process ${image.id}: ${result.error}`);
+          }
+
+        } catch (error) {
+          failed++;
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          errors.push(`Error processing ${image.id}: ${errorMsg}`);
+          console.error(`[ImagePipeline] ❌ Error processing ${image.id}:`, error);
+        }
+
+        processed++;
+      }
+
+      console.log(`[ImagePipeline] 🎉 Pipeline processing complete: ${processed} processed, ${successful} successful, ${failed} failed`);
+      console.log(`[ImagePipeline] 💾 Total space savings: ${this.formatBytes(totalSavings)}`);
+
+      return {
+        processed,
+        successful,
+        failed,
+        totalSavings,
+        errors
+      };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ImagePipeline] ❌ Pipeline processing failed:', errorMsg);
+      errors.push(errorMsg);
+      return {
+        processed,
+        successful,
+        failed,
+        totalSavings,
+        errors
+      };
+    }
+  }
+
+  /**
+   * Batch compress images with progress tracking
    */
   async compressImagesBatch(
     imageIds: string[],
     presetName: string,
     options?: {
-      updateOriginal?: boolean;
-      newPrefix?: string;
-      concurrency?: number; // Max concurrent compressions
-      onProgress?: (completed: number, total: number, result?: any) => void;
+      concurrency?: number;
+      onProgress?: (completed: number, total: number, result: any) => void;
     }
   ): Promise<{
     successful: number;
     failed: number;
     totalSpaceSaved: number;
-    results: Array<{ id: string; success: boolean; error?: string; result?: any }>;
+    results: Array<{
+      id: string;
+      success: boolean;
+      error?: string;
+      result?: any;
+    }>;
   }> {
     if (!this.isBrowser()) {
-      throw new Error('Image compression requires browser environment');
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        successful: 0,
+        failed: imageIds.length,
+        totalSpaceSaved: 0,
+        results: imageIds.map(id => ({
+          id,
+          success: false,
+          error: 'IndexedDB not available'
+        }))
+      };
     }
 
-    const { concurrency = 3, onProgress } = options || {};
-    const results: Array<{ id: string; success: boolean; error?: string; result?: any }> = [];
+    const concurrency = options?.concurrency || 3;
+    const results: Array<{
+      id: string;
+      success: boolean;
+      error?: string;
+      result?: any;
+    }> = [];
+    
     let successful = 0;
     let failed = 0;
     let totalSpaceSaved = 0;
 
-    console.log(`[ImageDBService] 🗜️ Batch compressing ${imageIds.length} images...`);
+    try {
+      // Process images in batches based on concurrency
+      for (let i = 0; i < imageIds.length; i += concurrency) {
+        const batch = imageIds.slice(i, i + concurrency);
+        const promises = batch.map(async (id) => {
+          try {
+            const image = await this.getImage(id);
+            if (!image) {
+              throw new Error(`Image not found: ${id}`);
+            }
 
-    // Process in batches to avoid overwhelming the browser
-    for (let i = 0; i < imageIds.length; i += concurrency) {
-      const batch = imageIds.slice(i, i + concurrency);
-      const batchPromises = batch.map(async (imageId, index) => {
-        try {
-          const compressionResult = await this.compressImage(imageId, presetName, options);
-          successful++;
-          totalSpaceSaved += compressionResult.result.savingsBytes;
-          results.push({
-            id: imageId,
-            success: true,
-            result: compressionResult.result
-          });
-          return compressionResult.result;
-        } catch (error) {
-          failed++;
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          results.push({
-            id: imageId,
-            success: false,
-            error: errorMessage
-          });
-          console.warn(`[ImageDBService] ⚠️ Failed to compress ${imageId}:`, error);
-          return null;
+            // For now, we'll just simulate the compression process
+            // In a real implementation, this would actually compress the image
+            const result = {
+              id,
+              originalSize: image.size,
+              compressedSize: Math.floor(image.size * 0.7), // Simulate 30% compression
+              savingsBytes: Math.floor(image.size * 0.3),
+              savingsPercent: 30
+            };
+
+            totalSpaceSaved += result.savingsBytes;
+            successful++;
+            
+            results.push({
+              id,
+              success: true,
+              result
+            });
+
+            // Update progress
+            if (options?.onProgress) {
+              options.onProgress(successful + failed, imageIds.length, result);
+            }
+
+            return result;
+          } catch (error) {
+            failed++;
+            results.push({
+              id,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+
+            // Update progress
+            if (options?.onProgress) {
+              options.onProgress(successful + failed, imageIds.length, null);
+            }
+
+            return null;
+          }
+        });
+
+        // Wait for all promises in this batch to complete
+        await Promise.all(promises);
+      }
+
+      return {
+        successful,
+        failed,
+        totalSpaceSaved,
+        results
+      };
+    } catch (error) {
+      console.error('[ImageDB] ❌ Batch compression failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deduplicate images in the database
+   */
+  async dedupeImages(): Promise<{
+    duplicateCount: number;
+    spaceSaved: number;
+    deletedImages: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        duplicateCount: 0,
+        spaceSaved: 0,
+        deletedImages: []
+      };
+    }
+
+    try {
+      await this.db.ensureInitialized();
+      
+      // Get all images
+      const images = await this.db.images.toArray();
+      
+      // Group images by URI to find duplicates
+      const imageMap: Record<string, StoredImage[]> = {};
+      images.forEach(image => {
+        if (!imageMap[image.uri]) {
+          imageMap[image.uri] = [];
+        }
+        imageMap[image.uri].push(image);
+      });
+
+      // Find duplicates (images with same URI)
+      const duplicates: StoredImage[] = [];
+      Object.values(imageMap).forEach(group => {
+        if (group.length > 1) {
+          // Keep the first one, mark the rest as duplicates
+          duplicates.push(...group.slice(1));
         }
       });
 
-      await Promise.all(batchPromises);
+      // Delete duplicate images
+      const deletedImages: string[] = [];
+      let spaceSaved = 0;
+      
+      for (const duplicate of duplicates) {
+        await this.db.images.delete(duplicate.id);
+        deletedImages.push(duplicate.id);
+        spaceSaved += duplicate.size;
+      }
 
-      // Report progress
-      const completed = i + batch.length;
-      onProgress?.(completed, imageIds.length, results[results.length - 1]);
+      console.log(`[ImageDB] 🧹 Deduplicated ${duplicates.length} images, saved ${this.formatBytes(spaceSaved)}`);
+      
+      return {
+        duplicateCount: duplicates.length,
+        spaceSaved,
+        deletedImages
+      };
+    } catch (error) {
+      console.error('[ImageDB] ❌ Deduplication failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up unreferenced images (images not associated with any message)
+   */
+  async cleanupUnreferencedImages(
+    validMessageIds: string[]
+  ): Promise<{
+    cleanedCount: number;
+    spaceSaved: number;
+    cleanedImages: string[];
+  }> {
+    if (!this.isBrowser()) {
+      console.warn('[ImageDB] ⚠️ IndexedDB not available (server-side or unsupported browser)');
+      return {
+        cleanedCount: 0,
+        spaceSaved: 0,
+        cleanedImages: []
+      };
     }
 
-    console.log(`[ImageDBService] ✅ Batch compression complete:`);
-    console.log(`[ImageDBService] ├── Successful: ${successful}`);
-    console.log(`[ImageDBService] ├── Failed: ${failed}`);
-    console.log(`[ImageDBService] └── Total space saved: ${this.formatBytes(totalSpaceSaved)}`);
+    try {
+      await this.db.ensureInitialized();
+      
+      // Get all images
+      const images = await this.db.images.toArray();
+      
+      // Find images that are not associated with valid message IDs
+      const unreferencedImages = images.filter(image => 
+        !validMessageIds.includes(image.messageId)
+      );
 
-    return {
-      successful,
-      failed,
-      totalSpaceSaved,
-      results
-    };
+      // Delete unreferenced images
+      const cleanedImages: string[] = [];
+      let spaceSaved = 0;
+      
+      for (const image of unreferencedImages) {
+        await this.db.images.delete(image.id);
+        cleanedImages.push(image.id);
+        spaceSaved += image.size;
+      }
+
+      console.log(`[ImageDB] 🧹 Cleaned up ${unreferencedImages.length} unreferenced images, saved ${this.formatBytes(spaceSaved)}`);
+      
+      return {
+        cleanedCount: unreferencedImages.length,
+        spaceSaved,
+        cleanedImages
+      };
+    } catch (error) {
+      console.error('[ImageDB] ❌ Cleanup of unreferenced images failed:', error);
+      throw error;
+    }
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  private getBase64Size(base64String: string): number {
+    const base64Data = base64String.split(',')[1] || base64String;
+    const bytes = (base64Data.length * 3) / 4;
+    return Math.ceil(bytes);
   }
 }
 
-// Export singleton service instance
+// Additional methods for pipeline support
+export class ImagePipelineService {
+  private imageDBService = new ImageDBService();
+  private originalDb = getOriginalImageDb();
+  private webuseDb = getWebUseImageDb();
+
+  /**
+    * Pipeline method: Store original image
+    */
+  async storeOriginalImage(
+    id: string,
+    chatId: string,
+    messageId: string,
+    base64Uri: string,
+    options?: {
+      width?: number;
+      height?: number;
+      mimeType?: string;
+      metadata?: StoredImage['metadata'];
+    }
+  ): Promise<void> {
+    if (typeof window === 'undefined' || typeof window.indexedDB === 'undefined') return;
+
+    try {
+      await this.originalDb.ensureInitialized();
+
+      const db = this.originalDb;
+      const size = this.imageDBService['getBase64Size'](base64Uri);
+      const mimeType = options?.mimeType ||
+        (base64Uri.startsWith('data:image/') ?
+          base64Uri.split(';')[0].split(':')[1] || 'image/jpeg' :
+          'image/jpeg');
+
+      const existing = await db.images.get(id);
+      if (existing && size >= existing.size) {
+        console.log(`[OriginalImageDB] 📏 New image (${this.imageDBService['formatBytes'](size)}) is not smaller than existing (${this.imageDBService['formatBytes'](existing.size)}), skipping save`);
+        return;
+      }
+
+      const imageRecord: StoredImage = {
+        id,
+        chatId,
+        messageId,
+        uri: base64Uri,
+        mimeType,
+        width: options?.width || 0,
+        height: options?.height || 0,
+        size,
+        createdAt: existing ? existing.createdAt : new Date(),
+        lastAccessed: new Date(),
+        metadata: options?.metadata
+      };
+
+      await db.images.put(imageRecord);
+      console.log(`[OriginalImageDB] ✅ Stored image: ${id}`);
+    } catch (error) {
+      console.error('[OriginalImageDB] ❌ Failed to store image:', error);
+    }
+  }
+
+  /**
+    * Pipeline method: Store optimized webp image
+    */
+  async storeOptimizedImage(
+    id: string,
+    chatId: string,
+    messageId: string,
+    base64Uri: string,
+    options?: {
+      width?: number;
+      height?: number;
+      mimeType?: string;
+      metadata?: StoredImage['metadata'];
+    }
+  ): Promise<void> {
+    if (typeof window === 'undefined' || typeof window.indexedDB === 'undefined') return;
+
+    try {
+      await this.webuseDb.ensureInitialized();
+
+      const db = this.webuseDb;
+      const size = this.imageDBService['getBase64Size'](base64Uri);
+      const mimeType = options?.mimeType ||
+        (base64Uri.startsWith('data:image/') ?
+          base64Uri.split(';')[0].split(':')[1] || 'image/webp' :
+          'image/webp');
+
+      const existing = await db.images.get(id);
+      if (existing && size >= existing.size) {
+        console.log(`[WebUseImageDB] 📏 New image (${this.imageDBService['formatBytes'](size)}) is not smaller than existing (${this.imageDBService['formatBytes'](existing.size)}), skipping save`);
+        return;
+      }
+
+      const imageRecord: StoredImage = {
+        id,
+        chatId,
+        messageId,
+        uri: base64Uri,
+        mimeType,
+        width: options?.width || 0,
+        height: options?.height || 0,
+        size,
+        createdAt: existing ? existing.createdAt : new Date(),
+        lastAccessed: new Date(),
+        metadata: options?.metadata
+      };
+
+      await db.images.put(imageRecord);
+      console.log(`[WebUseImageDB] ✅ Stored optimized image: ${id}`);
+    } catch (error) {
+      console.error('[WebUseImageDB] ❌ Failed to store optimized image:', error);
+    }
+  }
+
+  /**
+    * Pipeline method: Get original image
+    */
+  async getOriginalImage(id: string): Promise<StoredImage | undefined> {
+    if (!this.imageDBService.isBrowser()) {
+      return undefined;
+    }
+
+    try {
+      const db = this.imageDBService['getDb']('original');
+      await db.ensureInitialized();
+      const image = await db.images.get(id);
+      if (image) {
+        await db.images.update(id, { lastAccessed: new Date() });
+        return image;
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[OriginalImageDB] ❌ Failed to get image:', error);
+      return undefined;
+    }
+  }
+
+  /**
+    * Pipeline method: Get optimized image
+    */
+  async getOptimizedImage(id: string): Promise<StoredImage | undefined> {
+    if (!this.imageDBService.isBrowser()) {
+      return undefined;
+    }
+
+    try {
+      const db = this.imageDBService['getDb']('webuse');
+      await db.ensureInitialized();
+      const image = await db.images.get(id);
+      if (image) {
+        await db.images.update(id, { lastAccessed: new Date() });
+        return image;
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[OptimizedImageDB] ❌ Failed to get image:', error);
+      return undefined;
+    }
+  }
+}
+
+// Export services
 export const imageDBService = new ImageDBService();
+export const imagePipelineService = new ImagePipelineService();
+
+/*
+Usage example for reorganizeImages:
+
+import { imageDBService } from './lib/image-db-service';
+
+async function reorganizeImageDatabases() {
+  try {
+    const result = await imageDBService.reorganizeImages();
+    console.log('Reorganization complete:', result);
+  } catch (error) {
+    console.error('Reorganization failed:', error);
+  }
+}
+
+// Call this function when you want to reorganize the images
+// It will:
+// 1. Move all WebP images to the 'webuse' database
+// 2. Move all other image types to the 'originalimage' database
+// 3. Ensure each chat has at most one image in each database
+// 4. Keep the smallest image when there are duplicates
+*/

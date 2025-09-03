@@ -124,17 +124,17 @@ export const compressionPresets: Record<string, CompressionPreset> = {
     autoResize: true
   },
 
-  // Special formats
-  'png-lossless': {
-    name: 'PNG Lossless',
-    description: 'Lossless PNG compression (large files)',
-    maxWidth: 512,
-    maxHeight: 512,
-    quality: 1.0,
-    format: 'png',
-    library: 'jimp',
-    autoResize: true
-  },
+  // // Special formats
+  // 'png-lossless': {
+  //   name: 'PNG Lossless',
+  //   description: 'Lossless PNG compression (large files)',
+  //   maxWidth: 512,
+  //   maxHeight: 512,
+  //   quality: 1.0,
+  //   format: 'png',
+  //   library: 'jimp',
+  //   autoResize: true
+  // },
   'webp-strong': {
     name: 'WebP Strong',
     description: 'Strong compression with WebP format',
@@ -211,7 +211,7 @@ export class ImageCompressionService {
         dimensions: { width: 0, height: 0 }, // Will be updated below
         processingTime
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('[browser-image-compression] Compression failed:', error);
       throw new Error(`browser-image-compression failed: ${error.message}`);
     }
@@ -220,7 +220,7 @@ export class ImageCompressionService {
   /**
    * Compress image using Jimp library for PNG/GIF/legacy format support
    */
-  private async compressWithJimp(
+  /*private async compressWithJimp(
     base64Image: string,
     preset: CompressionPreset
   ): Promise<CompressionResult> {
@@ -300,11 +300,11 @@ export class ImageCompressionService {
         processingTime
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Jimp] Compression failed:', error);
       throw new Error(`Jimp compression failed: ${error.message}`);
     }
-  }
+  }*/
 
   /**
    * Compress image using existing Pica library
@@ -343,7 +343,7 @@ export class ImageCompressionService {
         processingTime
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Pica] Compression failed:', error);
       throw new Error(`Pica compression failed: ${error.message}`);
     }
@@ -365,8 +365,8 @@ export class ImageCompressionService {
     switch (preset.library) {
       case 'browser-image-compression':
         return await this.compressWithBrowserImageCompression(base64Image, preset);
-      case 'jimp':
-        return await this.compressWithJimp(base64Image, preset);
+      // case 'jimp':
+      //   return await this.compressWithJimp(base64Image, preset);
       case 'pica':
         return await this.compressWithPica(base64Image, preset);
       default:
@@ -429,7 +429,7 @@ export class ImageCompressionService {
         console.log(`Testing ${presetName}...`);
         const result = await this.compressImage(base64Image, preset);
         results[presetName] = result;
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Failed ${presetName}:`, error.message);
         // Skip failed methods
       }

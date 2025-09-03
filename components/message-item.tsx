@@ -1,7 +1,7 @@
 "use client"
 
 import type { Message } from "../lib/types"
-import { CopyIcon, GitBranchIcon, RefreshCw, FileIcon, Download, MessageSquarePlus } from "lucide-react"
+import { CopyIcon, GitBranchIcon, RefreshCw, FileIcon, Download, MessageSquarePlus, ChevronDown } from "lucide-react"
 import { cn } from "../lib/utils"
 
 // import ReactMarkdown from "react-markdown"
@@ -10,8 +10,11 @@ import { Markdown } from "./markdown"
 // import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { useEffect, useState } from "react"
 import { Button } from "../components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 import { ResolvedImage } from "./resolved-image"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
+import { imageDBService } from "../lib/image-db-service"
 
 interface MessageItemProps {
   message: Message
@@ -31,6 +34,92 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
   const isUser = message.role === "user"
   const [showCursor, setShowCursor] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [imageSizes, setImageSizes] = useState<{[key: string]: {original?: number, optimized?: number}}>({})
+
+  // Helper function to format bytes
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Function to get image sizes for a specific image
+  const getImageSizes = async (imageId: string) => {
+    try {
+      const sizes: {original?: number, optimized?: number} = {};
+
+      // Get original image size
+      const originalImage = await imageDBService.getImage(imageId);
+      if (originalImage) {
+        sizes.original = originalImage.size;
+      }
+
+      // Get optimized image size
+      const geminiService = GeminiImageService.createGeminiImageService();
+      if (geminiService) {
+        const imageUri = `indexeddb:${imageId}`;
+        const resolvedImage = await geminiService.resolveImageUrl(imageUri, true);
+        if (resolvedImage) {
+          // Calculate size from base64 string
+          const base64Data = resolvedImage.split(',')[1] || resolvedImage;
+          sizes.optimized = (base64Data.length * 3) / 4;
+        }
+      }
+
+      setImageSizes(prev => ({...prev, [imageId]: sizes}));
+      return sizes;
+    } catch (error) {
+      console.warn(`[ImageSizes] Failed to get sizes for image ${imageId}:`, error);
+      return {};
+    }
+  };
+
+  // Function to download image from specific database
+  const downloadImage = async (imageId: string, useOptimized: boolean = false) => {
+    try {
+      let imageData: string | null = null;
+      let fileName: string = `image-${imageId}.png`; // Default filename
+
+      if (useOptimized) {
+        // Try to get optimized image from webuse database
+        const geminiService = GeminiImageService.createGeminiImageService();
+        if (geminiService) {
+          const imageUri = `indexeddb:${imageId}`;
+          const resolvedImage = await geminiService.resolveImageUrl(imageUri, true);
+          if (resolvedImage) {
+            imageData = resolvedImage;
+            fileName = `image-optimized-${imageId}.webp`;
+          }
+        }
+      }
+
+      // Fallback to original image if optimized not available or not requested
+      if (!imageData) {
+        const originalImage = await imageDBService.getImage(imageId);
+        if (originalImage) {
+          imageData = originalImage.uri;
+          const extension = originalImage.mimeType.split('/')[1] || 'png';
+          fileName = `image-original-${imageId}.${extension}`;
+        }
+      }
+
+      if (imageData) {
+        const link = document.createElement('a');
+        link.href = imageData;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log(`[ImageDownload] ✅ Downloaded ${useOptimized ? 'optimized' : 'original'} image: ${imageId}`);
+      } else {
+        console.error(`[ImageDownload] ❌ Image not found: ${imageId}`);
+      }
+    } catch (error) {
+      console.error(`[ImageDownload] ❌ Error downloading image:`, error);
+    }
+  };
 
   // Blinking cursor effect for streaming messages
   useEffect(() => {
@@ -42,6 +131,26 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
 
     return () => clearInterval(interval)
   }, [isStreaming])
+
+  // Load image sizes for download dropdown
+  useEffect(() => {
+    const loadImageSizes = async () => {
+      if (message.imageGenerations && message.imageGenerations.length > 0) {
+        for (const generation of message.imageGenerations) {
+          if (generation.images && generation.images.length > 0) {
+            for (const image of generation.images) {
+              const imageId = image.originalImageId || image.optimizedImageId || '';
+              if (imageId && !imageSizes[imageId]) {
+                await getImageSizes(imageId);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    loadImageSizes();
+  }, [message.imageGenerations])
 
   // Custom renderer for code blocks
   // const components = {
@@ -139,7 +248,7 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                     {/* Generated Images */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {message.imageGenerations.flatMap((generation, genIndex) =>
-                        generation.images.map((image, imgIndex) => (
+                        imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
                           <div key={`${genIndex}-${imgIndex}`} className="relative group">
                             <ResolvedImage
                               src={image.uri}
@@ -151,34 +260,52 @@ export default function MessageItem({ message, isStreaming = false, onCopy, onBr
                                 {image.width}×{image.height}
                               </div> */}
                               <div className="flex gap-1">
-                                {/* Download button */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6"
-                                  onClick={async () => {
-                                    try {
-                                      const imageService = GeminiImageService.createGeminiImageService();
-                                      if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri);
-                                        if (resolvedUri) {
-                                          const link = document.createElement('a');
-                                          link.href = resolvedUri;
-                                          link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
-                                          document.body.appendChild(link);
-                                          link.click();
-                                          document.body.removeChild(link);
-                                        }
-                                      }
-                                    } catch (error) {
-                                      console.error('Failed to resolve image for download:', error);
-                                    }
-                                  }}
-                                  title="Download image"
-                                >
-                                  <Download className="h-3 w-3" />
+                                {/* Download dropdown */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      title="Download image options"
+                                    >
+                                      <Download className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    {(() => {
+                                      const imageId = image.uri.replace('indexeddb:', '').replace('opt_', '');
+                                      const sizes = imageSizes[imageId];
 
-                                </Button>
+                                      return (
+                                        <>
+                                          <DropdownMenuItem
+                                            onClick={async () => {
+                                              await downloadImage(imageId, false);
+                                            }}
+                                            className="flex items-center justify-between"
+                                          >
+                                            <span>Original Quality</span>
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              {sizes?.original ? formatBytes(sizes.original) : 'Loading...'}
+                                            </span>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={async () => {
+                                              await downloadImage(imageId, true);
+                                            }}
+                                            className="flex items-center justify-between"
+                                          >
+                                            <span>Optimized (WebP)</span>
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              {sizes?.optimized ? formatBytes(sizes.optimized) : 'Loading...'}
+                                            </span>
+                                          </DropdownMenuItem>
+                                        </>
+                                      );
+                                    })()}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
                           </div>

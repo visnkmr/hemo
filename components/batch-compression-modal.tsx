@@ -141,7 +141,7 @@ export const BatchCompressionModal: React.FC<BatchCompressionModalProps> = ({
         selectedPreset,
         {
           concurrency,
-          onProgress: (completed, total, result) => {
+          onProgress: (completed: number, total: number, result: any) => {
             setProgress({ completed, total, currentItem: imageIds[completed - 1] });
           }
         }

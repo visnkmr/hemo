@@ -16,7 +16,7 @@ import { imageDBService } from "../lib/image-db-service"
 import { CompressionSettingsService, compressionSettingsService } from "../lib/compression-settings-service"
 import { Button } from "../components/ui/button"
 import { Database } from "lucide-react"
-import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings, Archive, BarChart3 } from "lucide-react"
+import { PlusIcon, MenuIcon, XIcon, Download, Bot, Zap, Eye, Bug, Settings, Archive, BarChart3, Info } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "../components/ui/dropdown-menu"
 
 import ExportDialog from "../components/export-dialog"
@@ -25,6 +25,8 @@ import { cn } from "../lib/utils"
 import DarkButton from './dark-button'
 import ImageGalleryModal from './image-gallery-modal'
 import CompressionDashboardModal from './compression-dashboard-modal'
+import RecycleBinModal from './recycle-bin-modal'
+import ImageManagementModal from './image-management-modal'
 // import axios from "axios"
 // import { fetchEventSource } from "@microsoft/fetch-event-source"
 import bigDecimal from "js-big-decimal"
@@ -148,6 +150,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   const [isImageGalleryOpen, setIsImageGalleryOpen] = useState(false);
   const [isMigratingImages, setIsMigratingImages] = useState(false);
   const [showCompressionDashboard, setShowCompressionDashboard] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [showImageManagement, setShowImageManagement] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   const isMobile = useIsMobile();
 
   // Helper functions for compression settings
@@ -227,9 +232,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
         totalLocalBytes += pairSize;
 
-        if (itemsReport.length < 5) {
+        // if (itemsReport.length < 5) {
           itemsReport.push(`${key}: ${formatBytes(pairSize)}`);
-        }
+        // }
       }
 
       console.log(`│   ├── Items: ${totalItems}`);
@@ -248,6 +253,51 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
         console.log(`│   ├── Image Types:`, imageDBStats.imagesByType);
         if (imageDBStats.oldestImage && imageDBStats.newestImage) {
           console.log(`│   └── Date Range: ${imageDBStats.oldestImage.toLocaleDateString()} - ${imageDBStats.newestImage.toLocaleDateString()}`);
+        }
+
+        // Get individual database sizes and last 5 images
+        console.log(`│   ├── Database Breakdown:`);
+
+        // Original image database
+        try {
+          const originalImages = await imageDBService.getAllImagesFromDb('original');
+          const originalSize = originalImages.reduce((sum, img) => sum + img.size, 0);
+          console.log(`│   │   ├── originalimage:`);
+          console.log(`│   │   │   ├── Images: ${originalImages.length}`);
+          console.log(`│   │   │   ├── Size: ${formatBytes(originalSize)}`);
+          console.log(`│   │   │   └── Last 5 Images:`);
+
+          // Sort by lastAccessed (most recent first) and get last 5
+          const sortedOriginalImages = originalImages
+            .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+            .slice(0, 5);
+
+          sortedOriginalImages.forEach((img, index) => {
+            console.log(`│   │   │       ${index + 1}. ${img.messageId}... (${formatBytes(img.size)}) - ${img.mimeType}`);
+          });
+        } catch (originalError) {
+          console.log(`│   │   ├── originalimage: ❌ Error accessing database`);
+        }
+
+        // Webuse database
+        try {
+          const webuseImages = await imageDBService.getAllImagesFromDb('webuse');
+          const webuseSize = webuseImages.reduce((sum, img) => sum + img.size, 0);
+          console.log(`│   │   └── webuse:`);
+          console.log(`│   │       ├── Images: ${webuseImages.length}`);
+          console.log(`│   │       ├── Size: ${formatBytes(webuseSize)}`);
+          console.log(`│   │       └── Last 5 Images:`);
+
+          // Sort by lastAccessed (most recent first) and get last 5
+          const sortedWebuseImages = webuseImages
+            .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+            .slice(0, 5);
+
+          sortedWebuseImages.forEach((img, index) => {
+            console.log(`│   │           ${index + 1}.sfdsf ${img.messageId}... (${formatBytes(img.size)}) - ${img.mimeType}`);
+          });
+        } catch (webuseError) {
+          console.log(`│   │   └── webuse: ❌ Error accessing database`);
         }
 
         // Combined total
@@ -308,21 +358,20 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
               // Handle IndexedDB URLs by resolving them first
               if (message.imageUrl.startsWith('indexeddb:')) {
-                imageData = await geminiService.resolveImageUrl(message.imageUrl);
+                imageData = await geminiService.resolveImageUrl(message.imageUrl,false);
               } else if (message.imageUrl.startsWith('data:image/')) {
                 imageData = message.imageUrl;
               }
 
               if (imageData) {
-                console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${messageIndex})...`);
+                console.log(`[Chat Optimization] 📸 Optimizing ${chat.title} - imageUrl (${message.id})...`);
                 const result = await geminiService.optimizeImageForGemini(imageData);
 
-                // Store optimized image in IndexedDB and update message reference
-                await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
+                // Store optimized image in IndexedDB and get reference
+                const indexedDBUrl = await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
 
-                // For optimization, we keep the optimized base64 in the message
-                // Migration will happen later when user clicks migrate button
-                message.imageUrl = result.optimizedBase64;
+                // Update message to use IndexedDB reference instead of base64
+                message.imageUrl = indexedDBUrl;
                 totalSavings += result.savings.savingsBytes;
                 imagesProcessed++;
                 messageModified = true;
@@ -347,20 +396,20 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
 
                       // Handle IndexedDB URLs by resolving them first
                       if (image.uri.startsWith('indexeddb:')) {
-                        imageData = await geminiService.resolveImageUrl(image.uri);
+                        imageData = await geminiService.resolveImageUrl(image.uri,false);
                       } else if (image.uri.startsWith('data:image/')) {
                         imageData = image.uri;
                       }
 
                       if (imageData) {
-                        console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - generation ${genIndex}, image ${imgIndex}...`);
+                        console.log(`[Chat Optimization] 🖼️ Optimizing ${chat.title} - message ${message.id}, generation ${genIndex}, image ${imgIndex}...`);
                         const result = await geminiService.optimizeImageForGemini(imageData);
 
-                        // Store optimized image in IndexedDB and update image reference
-                        await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
+                        // Store optimized image in IndexedDB and get reference
+                        const indexedDBUrl = await geminiService.convertToIndexedDB(result.optimizedBase64, chat.id, message.id);
 
-                        // For optimization, we keep the optimized base64 in the message
-                        image.uri = result.optimizedBase64;
+                        // Update image to use IndexedDB reference instead of base64
+                        image.uri = indexedDBUrl;
                         totalSavings += result.savings.savingsBytes;
                         imagesProcessed++;
                         messageModified = true;
@@ -378,12 +427,12 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           }
 
           if (messageModified) {
-            console.log(`[Chat Optimization] ✅ Optimized message ${messageIndex} in "${chat.title}"`);
+            console.log(`[Chat Optimization] ✅ Optimized message ${message.id} in "${chat.title}"`);
           }
         }
       }
 
-      // Save optimized chats back to localStorage
+      // Save optimized chats back to localStorage (with IndexedDB references maintained)
       localStorage.setItem("chat_history", JSON.stringify(optimizedChats));
 
       // Update state to reflect changes
@@ -413,21 +462,64 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     if (isMigratingImages) return;
 
     setIsMigratingImages(true);
-    console.log('[UI Migration] 🔄 Starting image migration to IndexedDB...');
+    console.log('[UI Migration] 🔄 Checking for any remaining base64 images to migrate to IndexedDB...');
 
     try {
-      // Migrate all images from chat history to IndexedDB
-      const migratedCount = await imageDBService.migrateFromChatHistory(chats);
-
-      // Update localStorage with migrated chat data
+      let totalBase64Images = 0;
       const updatedChats = JSON.parse(JSON.stringify(chats));
-      localStorage.setItem("chat_history", JSON.stringify(updatedChats));
 
-      // Refresh the chat state to show the updated data
-      setChats(updatedChats);
+      // Scan for any base64 images that need to be migrated
+      for (const chat of updatedChats) {
+        for (const message of chat.messages) {
+          if (message.imageUrl && message.imageUrl.startsWith('data:image/')) {
+            try {
+              // Convert base64 to IndexedDB
+              const geminiService = GeminiImageService.createGeminiImageService();
+              if (geminiService) {
+                const indexedDBUrl = await geminiService.convertToIndexedDB(message.imageUrl, chat.id, message.id);
+                message.imageUrl = indexedDBUrl;
+                totalBase64Images++;
+              }
+            } catch (error) {
+              console.warn(`[UI Migration] Failed to convert base64 image in message ${message.id}:`, error);
+            }
+          }
 
-      console.log(`[UI Migration] ✅ Successfully migrated ${migratedCount} images to IndexedDB`);
-      alert(`✅ Migration Complete!\n${migratedCount} images have been moved to IndexedDB for better performance.`);
+          // Handle images in imageGenerations
+          if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
+            for (const generation of message.imageGenerations) {
+              if (generation.images && Array.isArray(generation.images)) {
+                for (const image of generation.images) {
+                  if (image.uri && image.uri.startsWith('data:image/')) {
+                    try {
+                      const geminiService = GeminiImageService.createGeminiImageService();
+                      if (geminiService) {
+                        const indexedDBUrl = await geminiService.convertToIndexedDB(image.uri, chat.id, message.id);
+                        image.uri = indexedDBUrl;
+                        totalBase64Images++;
+                      }
+                    } catch (error) {
+                      console.warn(`[UI Migration] Failed to convert base64 image in generation for message ${message.id}:`, error);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (totalBase64Images > 0) {
+        // Save updated chats with IndexedDB references to localStorage
+        localStorage.setItem("chat_history", JSON.stringify(updatedChats));
+        setChats(updatedChats);
+
+        console.log(`[UI Migration] ✅ Successfully migrated ${totalBase64Images} base64 images to IndexedDB`);
+        alert(`✅ Migration Complete!\n${totalBase64Images} base64 images have been converted to IndexedDB for better performance.`);
+      } else {
+        console.log(`[UI Migration] ✅ No base64 images found to migrate - all images are already in IndexedDB`);
+        alert(`✅ No Migration Needed!\nAll images are already stored in IndexedDB efficiently.`);
+      }
 
     } catch (error) {
       console.error('[UI Migration] ❌ Migration failed:', error);
@@ -564,33 +656,117 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
   // console.log(model_name)
 
   //Chat history loader
-  useEffect(() => {
-    
-    const storedChats = localStorage.getItem("chat_history")
-    if (storedChats) {
-      try {
-        const parsedChats = JSON.parse(storedChats)
-        setChats(parsedChats)
+   useEffect(() => {
+     // Function to load chats from localStorage but resolve image references from IndexedDB
+     const loadChats = async () => {
+       const storedChats = localStorage.getItem("chat_history")
+       if (storedChats) {
+         try {
+           const parsedChats = JSON.parse(storedChats)
 
-        // Set current chat to the most recent one if it exists
-        if (parsedChats.length > 0) {
-          setCurrentChatId(parsedChats[0].id)
-        } else {
-          createNewChat()
-        }
-      } catch (error) {
-        console.error("Failed to parse stored chats:", error)
-        createNewChat()
-      }
-    } else {
-      createNewChat()
-    }
-  }, [])
+           // Resolve all image references from IndexedDB
+           const resolvedChats = await Promise.all(parsedChats.map(async (chat: Chat) => {
+             const updatedChat = { ...chat }
+             updatedChat.messages = []
 
-  // Save chats to localStorage whenever they change
+             for (const message of chat.messages) {
+               const updatedMessage = { ...message }
+
+               // Resolve single imageUrl
+               if (message.imageUrl && message.imageUrl.startsWith('indexeddb:')) {
+                 const imageData = await imageDBService.getImage(message.imageUrl.replace('indexeddb:', ''))
+                 if (imageData) {
+                   updatedMessage.imageUrl = `indexeddb:${imageData.id}` // Ensure proper format
+                 }
+               }
+
+               // Resolve images in imageGenerations
+               if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
+                 updatedMessage.imageGenerations = await Promise.all(message.imageGenerations.map(async (generation) => {
+                   const updatedGeneration = { ...generation }
+
+                   if (updatedGeneration.images && Array.isArray(updatedGeneration.images)) {
+                     updatedGeneration.images = await Promise.all(updatedGeneration.images.map(async (image) => {
+                       const updatedImage = { ...image }
+
+                       // If we have image IDs, ensure proper IndexedDB URI format
+                       if (image.originalImageId || image.optimizedImageId) {
+                         // Already in correct format with IDs, no change needed
+                       }
+
+                       return updatedImage
+                     }))
+                   }
+
+                   return updatedGeneration
+                 }))
+               }
+
+               updatedChat.messages.push(updatedMessage)
+             }
+
+             return updatedChat
+           }))
+
+           setChats(resolvedChats)
+
+           // Set current chat to the most recent one if it exists
+           if (resolvedChats.length > 0) {
+             setCurrentChatId(resolvedChats[0].id)
+           } else {
+             createNewChat()
+           }
+         } catch (error) {
+           console.error("Failed to parse stored chats:", error)
+           createNewChat()
+         }
+       } else {
+         createNewChat()
+       }
+     }
+
+     loadChats()
+   }, [])
+
+  // Save chats to localStorage whenever they change (minimal data, images via IndexedDB)
   useEffect(() => {
     if (chats.length > 0) {
-      localStorage.setItem("chat_history", JSON.stringify(chats))
+      // Create a minimal version for localStorage with only metadata
+      const chatsToSave = chats.map(chat => ({
+        id: chat.id,
+        title: chat.title,
+        messages: chat.messages.map(message => {
+          const minimalMessage = { ...message }
+
+          // Ensure imageUrl is saved as IndexedDB reference
+          if (message.imageUrl) {
+            if (message.imageUrl.startsWith('data:image/')) {
+              // If it's still base64, it should have been converted by now
+              console.warn('Saving base64 image to localStorage - should be IndexedDB reference')
+            }
+          }
+
+          // Ensure images in generations are saved as IndexedDB references
+          if (message.imageGenerations && Array.isArray(message.imageGenerations)) {
+            minimalMessage.imageGenerations = message.imageGenerations.map(generation => ({
+              ...generation,
+              images: generation.images.map(image => ({
+                ...image,
+                // Ensure URI format for IndexedDB references
+                uri: image.originalImageId ? `indexeddb:${image.optimizedImageId || image.originalImageId}` : ''
+              }))
+            }))
+          }
+
+          return minimalMessage
+        }),
+        createdAt: chat.createdAt,
+        lastModelUsed: chat.lastModelUsed,
+        branchedFrom: chat.branchedFrom
+      }))
+
+      localStorage.setItem("chat_history", JSON.stringify(chatsToSave))
+      console.log(`[ChatUI] 💾 Saved ${chatsToSave.length} chats to localStorage (images via IndexedDB)`)
     }
   }, [chats])
 
@@ -923,7 +1099,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
           if (imageData.isSingleImage) {
             // Delete single imageUrl
             updatedMessage.imageUrl = undefined;
-            console.log('[Image Delete] Removed single imageUrl from message');
+            console.log(`[Image Delete] Removed single imageUrl from message ${imageData.messageId}`);
           } else {
             // Delete from imageGenerations array
             if (updatedMessage.imageGenerations && imageData.generationIndex !== undefined && imageData.imageIndex !== undefined) {
@@ -935,9 +1111,9 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                 // If this was the only image in the generation, remove the entire generation
                 if (generation.images.length === 0) {
                   updatedMessage.imageGenerations.splice(imageData.generationIndex, 1);
-                  console.log('[Image Delete] Removed entire generation (no images left)');
+                  console.log(`[Image Delete] Removed entire generation (no images left) from message ${imageData.messageId}`);
                 } else {
-                  console.log(`[Image Delete] Removed image ${imageData.imageIndex} from generation ${imageData.generationIndex}`);
+                  console.log(`[Image Delete] Removed image ${imageData.imageIndex} from generation ${imageData.generationIndex} in message ${imageData.messageId}`);
                 }
               }
             }
@@ -1043,6 +1219,32 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
     }
   }, []);
 
+  // Check for WebP images in webuse database on startup and reorganize if needed
+  useEffect(() => {
+    const checkAndReorganizeImages = async () => {
+      try {
+        // Check if there are any WebP images in the webuse database
+        const webuseImages = await imageDBService.getAllImagesFromDb('webuse');
+        const webpImages = webuseImages.filter(img => img.mimeType === 'image/webp');
+
+        if (webpImages.length === 0) {
+          console.log('[Startup] No WebP images found in webuse database, running reorganization...');
+          const result = await imageDBService.reorganizeImages();
+          console.log('[Startup] Reorganization completed:', result);
+        } else {
+          console.log(`[Startup] Found ${webpImages.length} WebP images in webuse database, skipping reorganization`);
+        }
+      } catch (error) {
+        console.error('[Startup] Error during image reorganization check:', error);
+      }
+    };
+
+    // Only run if IndexedDB is available and we're in browser
+    if (typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined') {
+      checkAndReorganizeImages();
+    }
+  }, []);
+
   return (
     <div className="absolute min-h-svh flex flex-col inset-0 w-screen bg-gray-50 dark:bg-gray-900">
       {(
@@ -1095,6 +1297,18 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                     <Database className="mr-2 h-4 w-4" />
                     <span>{isMigratingImages ? "Migrating..." : "Migrate to IndexedDB"}</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowRecycleBin(true)}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    <span>Recycle Bin</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowImageManagement(true)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    <span>Manage Images</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDebugMode(!debugMode)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>{debugMode ? 'Disable' : 'Enable'} Message Debug Info</span>
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
                   <div className="px-2 py-1 text-sm font-medium text-gray-500">Image Compression</div>
@@ -1136,6 +1350,22 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
                   >
                     <Bug className="mr-2 h-4 w-4" />
                     <span>Test Pica</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        console.log('[UI] 🔄 Starting pipeline processing for all original images...');
+                        const result = await imageDBService.processAllOriginalImagesThroughPipeline();
+                        console.log('[UI] ✅ Pipeline processing complete:', result);
+                        alert(`Pipeline Processing Complete!\n\nProcessed: ${result.processed}\nSuccessful: ${result.successful}\nFailed: ${result.failed}\nSpace Saved: ${formatBytes(result.totalSavings)}\n\n${result.errors.length > 0 ? `Errors: ${result.errors.join(', ')}` : 'No errors'}`);
+                      } catch (error) {
+                        console.error('[UI] ❌ Pipeline processing failed:', error);
+                        alert('❌ Pipeline processing failed. Check console for details.');
+                      }
+                    }}
+                  >
+                    <Zap className="mr-2 h-4 w-4" />
+                    <span>Process Images Through Pipeline</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1236,6 +1466,7 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
             geminiModels={geminiModels}
             handleSelectModel={handleSelectModel}
             isLoadingModels={isLoadingModels}
+            debugMode={debugMode}
           />
         )}
       </div>
@@ -1257,6 +1488,18 @@ export default function ChatUI({ message, fgptendpoint = "localhost", setasollam
       <CompressionDashboardModal
         isOpen={showCompressionDashboard}
         onClose={() => setShowCompressionDashboard(false)}
+      />
+
+      {/* Recycle Bin Modal */}
+      <RecycleBinModal
+        isOpen={showRecycleBin}
+        onClose={() => setShowRecycleBin(false)}
+      />
+
+      {/* Image Management Modal */}
+      <ImageManagementModal
+        isOpen={showImageManagement}
+        onClose={() => setShowImageManagement(false)}
       />
 
       <Toaster />

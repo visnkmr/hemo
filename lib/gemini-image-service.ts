@@ -6,6 +6,7 @@ import {
   type SpaceSavings
 } from "./image-optimization-service";
 import { imageDBService } from "./image-db-service";
+import { imagePipelineUtility } from "./image-pipeline-utility";
 
 export class GeminiImageService {
   private readonly baseUrl = "https://generativelanguage.googleapis.com";
@@ -124,39 +125,32 @@ export class GeminiImageService {
             const originalBase64 = `data:image/png;base64,${part.inlineData.data}`;
 
             // Optimize the generated image for better performance
-            const optimizationResult = await this.optimizeImageForGemini(originalBase64);
-            const optimizedUri = optimizationResult.optimizedBase64;
+            // const optimizationResult = await this.optimizeImageForGemini(originalBase64);
+            // const optimizedUri = optimizationResult.optimizedBase64;
 
             // Create a unique ID for this image in IndexedDB
             const imageId = `gen_${generationId}_img_${imageIndex++}`;
 
-            // Store the optimized image in IndexedDB
-            await this.imageDBService.storeImage(
+            // Use the new image pipeline to store both original and optimized images
+            const pipelineResult = await imagePipelineUtility.processImageThroughPipeline(
               imageId,
               'temp', // Will be updated when image is associated with chat/message
               generationId,
-              optimizedUri,
+              originalBase64,
               {
                 width: typeof width === 'number' ? width : parseInt(width) || 0,
                 height: typeof height === 'number' ? height : parseInt(height) || 0,
-                mimeType: "image/jpeg",
-                metadata: {
-                  source: 'generated',
-                  compression: {
-                    quality: 0.85 // Convert to percentage (0-1)
-                  },
-                  generationParams: parameters
-                }
+                mimeType: "image/png",
+                generationParams: parameters
               }
             );
 
-            // Use IndexedDB key as URL instead of storing base64 data
+            console.log(`[GeminiImageService] 🎉 Pipeline processed image ${imageId} with ${pipelineResult.savingsPercent}% savings`);
+
+            // Store only the image IDs instead of duplicate metadata
             images.push({
-              uri: `indexeddb:${imageId}`,
-              mimeType: "image/jpeg",
-              width: typeof width === 'number' ? width : parseInt(width) || 0,
-              height: typeof height === 'number' ? height : parseInt(height) || 0,
-              generationParameters: parameters,
+              originalImageId: imageId, // ID from originalimage database
+              optimizedImageId: pipelineResult.optimizedId, // ID from webuse database
             });
           }
         }
@@ -261,16 +255,37 @@ export class GeminiImageService {
  /**
   * Resolve IndexedDB image URL to actual base64 data
   */
- async resolveImageUrl(url: string): Promise<string | null> {
+ async resolveImageUrl(url: string, isOptimised: boolean = false): Promise<string | null> {
    try {
      if (!url.startsWith('indexeddb:')) {
        return url; // Return as-is if not an IndexedDB URL
      }
 
      const imageId = url.replace('indexeddb:', '');
-     const storedImage = await this.imageDBService.getImage(imageId);
 
-     return storedImage ? storedImage.uri : null;
+     // If it's an optimized image ID (prefixed with 'opt_')
+     if (imageId.startsWith('opt_')) {
+       // Use image pipeline utility to get UI-optimized image
+       const result = await imagePipelineUtility.getImageForUI(imageId.substring(4)); // Remove 'opt_' prefix
+       return result.base64Data;
+     } 
+     // If we specifically want the optimized version
+     else if (isOptimised) {
+       // Use image pipeline utility to get UI-optimized image
+       const result = await imagePipelineUtility.getImageForUI(imageId);
+       return result.base64Data;
+     } 
+     // Otherwise get the original image
+     else {
+       // Get original image for modal viewing
+       const result = await imagePipelineUtility.getOriginalImageForModal(imageId);
+       if (result.base64Data) {
+         return result.base64Data;
+       }
+       // Last resort fallback
+       const storedImage = await this.imageDBService.getImage(imageId);
+       return storedImage ? storedImage.uri : null;
+     }
    } catch (error) {
      console.error('[GeminiImageService] ❌ Failed to resolve image URL:', error);
      return null;

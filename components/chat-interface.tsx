@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu"
 import type { Chat, Message, BranchPoint, FileItem } from "../lib/types"
-import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download, MessageSquarePlus } from "lucide-react"
+import { SendIcon, Loader2, MenuIcon, Bot, FileIcon, ArrowDownAZ, MoveDown, Scroll, FileCheck, FileMinus, FileClock, BookX, File, FileStack, FilePlus, MessageSquareIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronRightIcon as ChevronRightIconCollapse, CopyIcon, GitBranchIcon, RefreshCw, EditIcon, Download, MessageSquarePlus, Eye, Image } from "lucide-react"
 import { ScrollArea } from "../components/ui/scroll-area"
 
 import MessageItem from "../components/message-item"
@@ -21,6 +21,7 @@ import GeminiModelSelectionDialog from "./gemini-model-selection-dialog"
 import EditMessageModal from "./edit-message-modal"
 import ImageGenerationModal from "./image-generation-modal"
 import { GeminiImageService } from "../lib/gemini-image-service"
+import { imagePipelineUtility } from "../lib/image-pipeline-utility"
 import type { ImageGenerationResponse, ImageGenerationRequest } from "../lib/types"
 import { imageDBService } from "../lib/image-db-service"
 import { ResolvedImage } from "./resolved-image"
@@ -209,7 +210,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                     {/* Generated Images */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {message.imageGenerations.flatMap((generation, genIndex) =>
-                        generation.images.map((image, imgIndex) => (
+                        imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
                           <div key={`${genIndex}-${imgIndex}`} className="relative group">
                             <ResolvedImage
                               src={image.uri}
@@ -230,7 +231,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                                     try {
                                       const imageService = GeminiImageService.createGeminiImageService();
                                       if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri);
+                                        const resolvedUri = await imageService.resolveImageUrl(image.uri,true);
                                         if (resolvedUri) {
                                           const link = document.createElement('a');
                                           link.href = resolvedUri;
@@ -500,6 +501,165 @@ function checkForImageGenerationIntent(userMessage: string, assistantMessage: st
   return imageKeywords.some(keyword => combinedText.includes(keyword));
 }
 
+// Message Debug Info Component
+interface MessageDebugInfoProps {
+  message: Message
+  forceExpanded?: boolean
+}
+
+function MessageDebugInfo({ message, forceExpanded = false }: MessageDebugInfoProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Use forceExpanded if provided, otherwise use local state
+  const expanded = forceExpanded || isExpanded
+
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) return 'null'
+    if (typeof value === 'string') return `"${value}"`
+    if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+    if (Array.isArray(value)) return `[${value.length} items]`
+    if (typeof value === 'object') return `{${Object.keys(value).length} properties}`
+    return String(value)
+  }
+
+  const renderObject = (obj: any, level = 0): React.ReactElement => {
+    if (obj === null || obj === undefined) {
+      return <span className="text-gray-500">null</span>
+    }
+
+    if (typeof obj === 'string') {
+      return <span className="text-green-600">"{obj}"</span>
+    }
+
+    if (typeof obj === 'boolean') {
+      return <span className="text-blue-600">{String(obj)}</span>
+    }
+
+    if (typeof obj === 'number') {
+      return <span className="text-purple-600">{obj}</span>
+    }
+
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) {
+        return <span className="text-gray-500">[]</span>
+      }
+
+      return (
+        <div className="ml-4">
+          <span className="text-gray-500">[</span>
+          {obj.map((item, index) => (
+            <div key={index} className="ml-4">
+              {renderObject(item, level + 1)}
+              {index < obj.length - 1 && <span className="text-gray-500">,</span>}
+            </div>
+          ))}
+          <span className="text-gray-500">]</span>
+        </div>
+      )
+    }
+
+    if (typeof obj === 'object') {
+      const entries = Object.entries(obj)
+      if (entries.length === 0) {
+        return <span className="text-gray-500">{"{}"}</span>
+      }
+
+      return (
+        <div className="ml-4">
+          <span className="text-gray-500">{"{"}</span>
+          {entries.map(([key, value], index) => (
+            <div key={key} className="ml-4">
+              <span className="text-blue-400">"{key}"</span>
+              <span className="text-gray-500">: </span>
+              {renderObject(value, level + 1)}
+              {index < entries.length - 1 && <span className="text-gray-500">,</span>}
+            </div>
+          ))}
+          <span className="text-gray-500">{"}"}</span>
+        </div>
+      )
+    }
+
+    return <span className="text-red-600">{String(obj)}</span>
+  }
+
+  const handleToggle = () => {
+    if (!forceExpanded) {
+      setIsExpanded(!isExpanded)
+    }
+  }
+
+  return (
+    <div className="mt-2 border-t border-gray-200 dark:border-gray-600 pt-2">
+      <button
+        onClick={handleToggle}
+        className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        disabled={forceExpanded}
+      >
+        <span className="text-xs">🔍</span>
+        <span>Message Debug Info</span>
+        <span className="text-xs">{expanded ? '▼' : '▶'}</span>
+        {forceExpanded && <span className="text-xs text-blue-500">(locked)</span>}
+      </button>
+
+      {expanded && (
+        <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md border text-xs font-mono overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="space-y-1">
+            <div>
+              <span className="text-blue-400">id</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.id}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">role</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.role}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">content</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.content.length > 100 ? message.content.substring(0, 100) + '...' : message.content}"</span>
+            </div>
+            <div>
+              <span className="text-blue-400">timestamp</span>
+              <span className="text-gray-500">: </span>
+              <span className="text-green-600">"{message.timestamp}"</span>
+            </div>
+            {message.model && (
+              <div>
+                <span className="text-blue-400">model</span>
+                <span className="text-gray-500">: </span>
+                <span className="text-green-600">"{message.model}"</span>
+              </div>
+            )}
+            {message.imageUrl && (
+              <div>
+                <span className="text-blue-400">imageUrl</span>
+                <span className="text-gray-500">: </span>
+                <span className="text-green-600">"{message.imageUrl}"</span>
+              </div>
+            )}
+            {message.imageGenerations && (
+              <div>
+                <span className="text-blue-400">imageGenerations</span>
+                <span className="text-gray-500">: </span>
+                {renderObject(message.imageGenerations)}
+              </div>
+            )}
+            {message.generationParameters && (
+              <div>
+                <span className="text-blue-400">generationParameters</span>
+                <span className="text-gray-500">: </span>
+                {renderObject(message.generationParameters)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Helper function to get a display name from model ID
 function getModelDisplayName(modelId: string): string {
   // Extract the model name from the provider/model format
@@ -707,6 +867,7 @@ interface ChatInterfaceProps {
   geminiModels: any[];
   handleSelectModel: (modelId: string) => void;
   isLoadingModels: boolean;
+  debugMode?: boolean;
 }
 
 // async function fileloader(setIsLoading,chat: Chat,updateChat: (chat: Chat) => void,ollamastate: number,selectedModel: string,local_model: string,filegptendpoint:string,filePaths:string[]):Promise<boolean>{
@@ -856,7 +1017,7 @@ export async function* sendMessageStream({
       "Content-Type": "application/json",
       Authorization: `Bearer ${storedApiKey}`,
       "HTTP-Referer": typeof window !== "undefined" ? window.location.href : "",
-      "X-Title": "Batu",
+      "X-Title": "Hemo",
     };
     let headers_ollama = { 'Content-Type': 'application/json' };
 
@@ -1042,7 +1203,8 @@ export default function ChatInterface({
   allModels,
   geminiModels,
   handleSelectModel,
-  isLoadingModels
+  isLoadingModels,
+  debugMode = false
 }: ChatInterfaceProps) {
   // const [filePaths, setFilePaths] = useState([message?message.path:""]);
 
@@ -1235,12 +1397,12 @@ export default function ChatInterface({
 
         // Check if we should generate an image automatically for Gemini models
         if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
-          const shouldGenerateImage = checkForImageGenerationIntent(
-            userMessage.content,
-            accumulatedContent
-          );
+          // const shouldGenerateImage = checkForImageGenerationIntent(
+          //   userMessage.content,
+          //   accumulatedContent
+          // );
 
-          if (shouldGenerateImage) {
+          // if (shouldGenerateImage) {
             try {
               const imageService = GeminiImageService.createGeminiImageService();
               if (imageService) {
@@ -1269,7 +1431,7 @@ export default function ChatInterface({
               console.warn("Automatic image generation failed:", imageError);
               // Don't fail the entire response if image generation fails
             }
-          }
+          // }
         }
         else{
           for await (const contentChunk of sendMessageStream({
@@ -1398,27 +1560,41 @@ export default function ChatInterface({
   // --- Other Handlers ---
 
   // Handle image generation
-  const handleImageGenerated = (response: ImageGenerationResponse) => {
+  const handleImageGenerated = async (response: ImageGenerationResponse) => {
     // Create a new assistant message with the generated images
-    const userPrompt = `Generate image: ${response.images[0]?.generationParameters?.prompt || "AI generated image"}`;
+    const userPrompt = `Generate image: ${"AI generated image"}`;
     const assistantContent = `I've generated ${response.images.length} image${response.images.length > 1 ? 's' : ''} based on your prompt. Here ${response.images.length === 1 ? 'it is' : 'they are'}:`;
 
+    // Generate unique message IDs
+    const userMessageId = Date.now().toString();
+    const assistantMessageId = (Date.now() + 1).toString();
+
+    // Update chat/message associations for all images
+    try {
+      const geminiService = GeminiImageService.createGeminiImageService();
+      if (geminiService) {
+        await geminiService.updateImageAssociations(`${chat.id}_${assistantMessageId}`, chat.id, assistantMessageId);
+        console.log(`[Image Generation] ✅ Updated associations for ${response.images.length} images`);
+      }
+    } catch (error) {
+      console.warn('[Image Generation] Failed to update image associations:', error);
+    }
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: userMessageId,
       role: "user",
       content: userPrompt,
       timestamp: new Date(response.timestamp).toISOString(),
       model: response.model,
-      generationParameters: response.images[0]?.generationParameters,
     };
 
     const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
+      id: assistantMessageId,
       role: "assistant",
       content: assistantContent,
       timestamp: new Date(response.timestamp).toISOString(),
       model: response.model,
-      imageGenerations: [response],
+      imageGenerations: [response], // Contains IndexedDB references, not base64
     };
 
     const updatedMessages = [...chat.messages, userMessage, assistantMessage];
@@ -1431,6 +1607,8 @@ export default function ChatInterface({
 
     updateChat(updatedChat);
     setIsImageGenerationOpen(false);
+
+    console.log(`[Image Generation] 🎨 Generated ${response.images.length} images, saved to IndexedDB`);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -1495,7 +1673,7 @@ export default function ChatInterface({
     return !!((message.imageUrl && (message.imageUrl.startsWith('data:image/') || message.imageUrl.startsWith('indexeddb:'))) ||
               (message.imageGenerations && message.imageGenerations.length > 0 && message.imageGenerations.some(gen =>
                 gen.images && gen.images.length > 0 && gen.images.some(img =>
-                  img.uri && (img.uri.startsWith('data:image/') || img.uri.startsWith('indexeddb:'))
+                  (img.originalImageId || img.optimizedImageId)
                 )
               )));
   };
@@ -1596,6 +1774,9 @@ export default function ChatInterface({
 
   // Image generation state
   const [isImageGenerationOpen, setIsImageGenerationOpen] = useState(false);
+
+  // Debug expansion state
+  const [allDebugExpanded, setAllDebugExpanded] = useState(false);
 
   // Group messages for Grok-style display
   const groupedMessages = React.useMemo(() => {
@@ -1938,51 +2119,66 @@ export default function ChatInterface({
                         hideQuoteButton={hasMessageImages(group.message!)}
                       />
                     ) : (
-                      <MessageItem
-                        message={group.message}
-                        isStreaming={streamingMessageId === group.message.id}
-                        onCopy={() => handleCopyMessage(group.message!.content)}
-                        onBranch={() => handleBranchFromMessage(group.message!.id)}
-                        onQuote={() => handleQuoteMessage(group.message!)}
-                        setdsm={setdsm}
-                        setmts={setmts}
-                        isQuoted={quotedMessage?.id === group.message.id}
-                      />
+                      group.message && (
+                        <>
+                          <MessageItem
+                            message={group.message}
+                            isStreaming={streamingMessageId === group.message.id}
+                            onCopy={() => handleCopyMessage(group.message!.content)}
+                            onBranch={() => handleBranchFromMessage(group.message!.id)}
+                            onQuote={() => handleQuoteMessage(group.message!)}
+                            setdsm={setdsm}
+                            setmts={setmts}
+                            isQuoted={quotedMessage?.id === group.message.id}
+                          />
+                          {debugMode && <MessageDebugInfo message={group.message} forceExpanded={allDebugExpanded} />}
+                        </>
+                      )
                     )
                   ) : group.type === 'question-group' && group.question && group.answers ? (
                     (() => {
                       const questionKey = getQuestionKey(group.question);
                       const currentIndex = questionGroupAnswerIndices.get(questionKey) ?? group.answers.length - 1; // Default to latest answer
                       return (
-                        <QuestionGroup
-                          vendor={vendor}
-                          setvendor={setvendor}
-                          ollamastate={ollamastate}
-                          setollamastate={setollamastate}
-                          allModels={allModels}
-                          selectedModel={selectedModel}
-                          handleSelectModel={handleSelectModel}
-                          isLoadingModels={isLoadingModels}
-                          setsendwithhistory={setsendwithhistory}
-                          sendwithhistory={sendwithhistory}
-                          geminiModels={geminiModels}
-                          question={group.question}
-                          answers={group.answers}
-                          onCopy={handleCopyMessage}
-                          onBranch={handleBranchFromMessage}
-                          onQuote={handleQuoteMessage}
-                          onEdit={() => handleEditMessage(group.question!.id)}
-                          setmts={setmts}
-                          setdsm={setdsm}
-                          isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
-                          streamingMessageId={streamingMessageId}
-                          isQuestionExpanded={expandedMessages.has(group.question.id)}
-                          onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
-                          currentAnswerIndex={currentIndex}
-                          onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
-                          quotedMessage={quotedMessage}
-                          hasMessageImages={hasMessageImages}
-                        />
+                        <div>
+                          <QuestionGroup
+                            vendor={vendor}
+                            setvendor={setvendor}
+                            ollamastate={ollamastate}
+                            setollamastate={setollamastate}
+                            allModels={allModels}
+                            selectedModel={selectedModel}
+                            handleSelectModel={handleSelectModel}
+                            isLoadingModels={isLoadingModels}
+                            setsendwithhistory={setsendwithhistory}
+                            sendwithhistory={sendwithhistory}
+                            geminiModels={geminiModels}
+                            question={group.question}
+                            answers={group.answers}
+                            onCopy={handleCopyMessage}
+                            onBranch={handleBranchFromMessage}
+                            onQuote={handleQuoteMessage}
+                            onEdit={() => handleEditMessage(group.question!.id)}
+                            setmts={setmts}
+                            setdsm={setdsm}
+                            isStreaming={group.answers.some(answer => streamingMessageId === answer.id)}
+                            streamingMessageId={streamingMessageId}
+                            isQuestionExpanded={expandedMessages.has(group.question.id)}
+                            onToggleQuestionExpand={() => toggleMessageExpansion(group.question!.id)}
+                            currentAnswerIndex={currentIndex}
+                            onAnswerIndexChange={(newIndex) => handleAnswerIndexChange(questionKey, newIndex)}
+                            quotedMessage={quotedMessage}
+                            hasMessageImages={hasMessageImages}
+                          />
+                          {debugMode && (
+                            <div className="ml-4 space-y-2">
+                              <MessageDebugInfo message={group.question} forceExpanded={allDebugExpanded} />
+                              {group.answers.map((answer, index) => (
+                                <MessageDebugInfo key={answer.id} message={answer} forceExpanded={allDebugExpanded} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       );
                     })()
                   ) : null}
@@ -2013,6 +2209,13 @@ export default function ChatInterface({
 
       {/* Input Area */}
       <div className={`absolute bottom-0 left-0 right-0 pl-4 pr-4 ${isInputFocused ? '' : ''}`} >
+         {/* Image Generation Badge */}
+         {ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel) && (
+                  <div className="flex justify-center md:justify-end md:mr-32 mb-2 w-10 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+                    <Image className="h-4 w-4"  />
+                    {/* <span className="font-medium">Image Gen</span> */}
+                  </div>
+                )}
       {showScrollToBottom && (
                 <div className="flex justify-center md:justify-end md:mr-32 mb-2">
                   <Button
@@ -2041,7 +2244,9 @@ export default function ChatInterface({
           {/* Text Input & Send Button */}
 
           <div className="flex flex-grow items-center gap-2">
+            
             <div className="flex flex-col flex-grow">
+             
 
               {/* Quoted Message Display */}
               {quotedMessage && (
@@ -2068,17 +2273,20 @@ export default function ChatInterface({
                 </div>
               )}
 
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-                placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
-                className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
+                  className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
+                  disabled={isLoading}
+                />
+                
+              </div>
               <Progress value={contextUsage} className="h-1" />
             </div>
 
@@ -2275,6 +2483,23 @@ export default function ChatInterface({
         onImageGenerated={handleImageGenerated}
         selectedModel={selectedModel}
       />
+
+      {/* Floating Debug Toggle Button */}
+      {debugMode && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            onClick={() => setAllDebugExpanded(!allDebugExpanded)}
+            className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white border-2 border-white dark:border-gray-800"
+            title={allDebugExpanded ? "Collapse all debug info" : "Expand all debug info"}
+          >
+            {allDebugExpanded ? (
+              <span className="text-lg">🔽</span>
+            ) : (
+              <span className="text-lg">🔼</span>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
