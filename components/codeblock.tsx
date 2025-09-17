@@ -42,7 +42,8 @@ function CodeBlockCode({
   useEffect(() => {
     async function highlight() {
       const html = await codeToHtml(code, { lang: language, theme });
-      setHighlightedHtml(html);
+      const wrappedHtml = html.replace('<pre ', '<pre style="white-space: pre-wrap; word-break: break-word;" ');
+      setHighlightedHtml(wrappedHtml);
     }
     highlight();
   }, [code, language, theme]);
@@ -52,12 +53,12 @@ function CodeBlockCode({
   // SSR fallback: render plain code if not hydrated yet
   return highlightedHtml ? (
     <div
-      className={cn(classNames, "overflow-x-auto max-w-full")}
+      className={cn(classNames, "overflow-x-hidden")}
       dangerouslySetInnerHTML={{ __html: highlightedHtml }}
       {...props}
     />
   ) : (
-    <div className={cn(classNames, "overflow-x-auto max-w-full")} {...props}>
+    <div className={cn(classNames, "overflow-x-hidden")} {...props}>
       <pre className="whitespace-pre-wrap break-words">
         <code>{code}</code>
       </pre>
