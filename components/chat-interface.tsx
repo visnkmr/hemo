@@ -22,10 +22,11 @@ import EditMessageModal from "./edit-message-modal"
 import ImageGenerationModal from "./image-generation-modal"
 import { GeminiImageService } from "../lib/gemini-image-service"
 import { imagePipelineUtility } from "../lib/image-pipeline-utility"
-import type { ImageGenerationResponse, ImageGenerationRequest } from "../lib/types"
+import type { ImageGenerationResponse, ImageGenerationRequest, UploadedImageData } from "../lib/types"
 import { imageDBService } from "../lib/image-db-service"
 import { ResolvedImage } from "./resolved-image"
 import { useIsMobile } from "../hooks/use-mobile"
+import ImageUpload, { type UploadedImage } from "./image-upload"
 // import axios from "axios"
 // import { invoke } from "@tauri-apps/api/tauri";
 import { Label } from "./ui/label"
@@ -177,87 +178,111 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
             </div>
 
             <div className="prose dark:prose-invert prose-sm break-words w-full overflow-hidden">
-              {message.imageUrl && (
-                <div className="mt-2">
-                  <ResolvedImage src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
-                </div>
-              )}
+             {message.imageUrl && (
+               <div className="mt-2">
+                 <ResolvedImage src={message.imageUrl} alt="Generated image" className="rounded-lg max-w-full h-auto" />
+               </div>
+             )}
 
-              {/* Display generated images from imageGenerations */}
-              {message.imageGenerations && message.imageGenerations.length > 0 && (
-                <div className="mt-2 space-y-3">
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {/* Show generation parameters if available */}
-                    {/* {message.generationParameters && (
-                      <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
-                        <div className="text-xs space-y-1">
-                          {message.generationParameters.aspectRatio && (
-                            <div>Aspect Ratio: {message.generationParameters.aspectRatio}</div>
-                          )}
-                          {message.generationParameters.style && (
-                            <div>Style: {message.generationParameters.style}</div>
-                          )}
-                          {message.generationParameters.quality && (
-                            <div>Quality: {message.generationParameters.quality}</div>
-                          )}
-                          {message.generationParameters.prompt && (
-                            <div>Prompt: {message.generationParameters.prompt}</div>
-                          )}
-                        </div>
-                      </div>
-                    )} */}
+             {/* Display generated images from imageGenerations */}
+             {message.imageGenerations && message.imageGenerations.length > 0 && (
+               <div className="mt-2 space-y-3">
+                 <div className="text-sm text-gray-600 dark:text-gray-400">
+                   {/* Show generation parameters if available */}
+                   {/* {message.generationParameters && (
+                     <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
+                       <div className="text-xs space-y-1">
+                         {message.generationParameters.aspectRatio && (
+                           <div>Aspect Ratio: {message.generationParameters.aspectRatio}</div>
+                         )}
+                         {message.generationParameters.style && (
+                           <div>Style: {message.generationParameters.style}</div>
+                         )}
+                         {message.generationParameters.quality && (
+                           <div>Quality: {message.generationParameters.quality}</div>
+                         )}
+                         {message.generationParameters.prompt && (
+                           <div>Prompt: {message.generationParameters.prompt}</div>
+                         )}
+                       </div>
+                     </div>
+                   )} */}
 
-                    {/* Generated Images */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {message.imageGenerations.flatMap((generation, genIndex) =>
-                        imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
-                          <div key={`${genIndex}-${imgIndex}`} className="relative group">
-                            <ResolvedImage
-                              src={image.uri}
-                              alt={`Generated image ${genIndex + 1}.${imgIndex + 1}`}
-                              className="w-full h-auto rounded-lg shadow-md border"
-                            />
-                            <div className="mt-2 flex justify-between items-center">
-                              {/* <div className="text-xs text-gray-500">
-                                {image.width}×{image.height}
-                              </div> */}
-                              <div className="flex gap-1">
-                                {/* Download button */}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={async () => {
-                                    try {
-                                      const imageService = GeminiImageService.createGeminiImageService();
-                                      if (imageService) {
-                                        const resolvedUri = await imageService.resolveImageUrl(image.uri,true);
-                                        if (resolvedUri) {
-                                          const link = document.createElement('a');
-                                          link.href = resolvedUri;
-                                          link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
-                                          document.body.appendChild(link);
-                                          link.click();
-                                          document.body.removeChild(link);
-                                        }
-                                      }
-                                    } catch (error) {
-                                      console.error('Failed to resolve image for download:', error);
-                                    }
-                                  }}
-                                  title="Download image"
-                                >
-                                  <Download className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                   {/* Generated Images */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                     {message.imageGenerations.flatMap((generation, genIndex) =>
+                       imagePipelineUtility.transformImageGenerationResponse(generation.images).map((image, imgIndex) => (
+                         <div key={`${genIndex}-${imgIndex}`} className="relative group">
+                           <ResolvedImage
+                             src={image.uri}
+                             alt={`Generated image ${genIndex + 1}.${imgIndex + 1}`}
+                             className="w-full h-auto rounded-lg shadow-md border"
+                           />
+                           <div className="mt-2 flex justify-between items-center">
+                             {/* <div className="text-xs text-gray-500">
+                               {image.width}×{image.height}
+                             </div> */}
+                             <div className="flex gap-1">
+                               {/* Download button */}
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                 onClick={async () => {
+                                   try {
+                                     const imageService = GeminiImageService.createGeminiImageService();
+                                     if (imageService) {
+                                       const resolvedUri = await imageService.resolveImageUrl(image.uri,true);
+                                       if (resolvedUri) {
+                                         const link = document.createElement('a');
+                                         link.href = resolvedUri;
+                                         link.download = `gemini-generated-image-${Date.now()}.${image.mimeType.split('/')[1]}`;
+                                         document.body.appendChild(link);
+                                         link.click();
+                                         document.body.removeChild(link);
+                                       }
+                                     }
+                                   } catch (error) {
+                                     console.error('Failed to resolve image for download:', error);
+                                   }
+                                 }}
+                                 title="Download image"
+                               >
+                                 <Download className="h-3 w-3" />
+                               </Button>
+                             </div>
+                           </div>
+                         </div>
+                       ))
+                     )}
+                   </div>
+                 </div>
+               </div>
+             )}
+
+             {/* Display uploaded images */}
+             {message.uploadedImages && message.uploadedImages.length > 0 && (
+               <div className="mt-2 space-y-3">
+                 <div className="text-sm text-gray-600 dark:text-gray-400">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                     {message.uploadedImages.map((image, index) => (
+                       <div key={image.id} className="relative group">
+                         <img
+                           src={image.base64Data}
+                           alt={`Uploaded image ${index + 1}`}
+                           className="w-full h-auto rounded-lg shadow-md border max-w-sm"
+                         />
+                         <div className="mt-2 flex justify-between items-center">
+                           <div className="text-xs text-gray-500">
+                             {image.fileName} ({(image.fileSize / 1024).toFixed(1)} KB)
+                           </div>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+             )}
               <div className="overflow-x-auto break-words hyphens-auto">
                 {isEditing ? (
                   <div className="flex flex-col gap-2">
@@ -361,6 +386,32 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
                 <Input  id="picture" type="file" />
               </Button> */}
               </div>
+            )}
+
+            {/* Image Selector Button - Only show for Gemini vision-capable models */}
+            {ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel) && (
+              <HoverCard>
+                <HoverCardTrigger>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      // Scroll to the image upload area
+                      const imageUploadElement = document.querySelector('[data-image-upload]');
+                      if (imageUploadElement) {
+                        imageUploadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
+                    title="Upload images with Gemini"
+                  >
+                    <Image className="h-4 w-4" />
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                  Upload images to analyze with Gemini
+                </HoverCardContent>
+              </HoverCard>
             )}
 
             <Button variant={"outline"} onClick={handleSaveEdit}
@@ -1007,8 +1058,8 @@ export async function* sendMessageStream({
            topK: 1,
            topP: 1.0,
            maxOutputTokens: 2048,
-            responseModalities: ["TEXT"]
-         }
+           responseModalities: ["TEXT"]
+          }
       }),
     });
   } else {
@@ -1395,8 +1446,51 @@ export default function ChatInterface({
 
         
 
+        // Handle uploaded images for Gemini models that support vision
+        if (ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel) && uploadedImages.length > 0) {
+          try {
+            const imageService = GeminiImageService.createGeminiImageService();
+            if (imageService) {
+              const imageData = await convertUploadedImagesToData(uploadedImages);
+
+              // Send message with images to Gemini
+              const response = await imageService.sendMessageWithImages(
+                userMessage.content,
+                imageData,
+                selectedModel
+              );
+
+              accumulatedContent = response;
+
+              // Update the assistant message with the response content
+              const finalMessages = [...currentChatState.messages];
+              finalMessages[finalMessages.length - 1] = {
+                ...finalMessages[finalMessages.length - 1],
+                content: accumulatedContent,
+              };
+
+              // Store uploaded images data in the user message for reference
+              finalMessages[finalMessages.length - 2] = {
+                ...finalMessages[finalMessages.length - 2],
+                uploadedImages: imageData,
+              };
+
+              currentChatState = {
+                ...currentChatState,
+                messages: finalMessages,
+              };
+              updateChat(currentChatState);
+
+              // Clear uploaded images after successful send
+              setUploadedImages([]);
+            }
+          } catch (imageError) {
+            console.warn("Image upload to Gemini failed:", imageError);
+            // Fall back to regular text-only message
+          }
+        }
         // Check if we should generate an image automatically for Gemini models
-        if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
+        else if (ollamastate === 5 && GeminiImageService.isModelImageCapable(selectedModel)) {
           // const shouldGenerateImage = checkForImageGenerationIntent(
           //   userMessage.content,
           //   accumulatedContent
@@ -1622,6 +1716,11 @@ export default function ChatInterface({
     }
   };
 
+  // Update handleSendMessage to use input instead of hardcoded value
+  const handleSendMessageWithInput = () => {
+    handleSendMessage(input);
+  };
+
   const handleCopyMessage = (content: string) => {
     navigator.clipboard.writeText(content);
     // Add toast logic here if needed
@@ -1756,6 +1855,40 @@ export default function ChatInterface({
       setTimeout(() => handleSendMessage(), 100);
     }
   };
+
+  // Handle image upload selection
+  const handleImageUpload = (images: UploadedImage[]) => {
+    setUploadedImages(images);
+  };
+
+  // Convert uploaded images to UploadedImageData format for API
+  const convertUploadedImagesToData = async (uploadedImages: UploadedImage[]): Promise<UploadedImageData[]> => {
+    const imageData: UploadedImageData[] = [];
+
+    for (const uploadedImage of uploadedImages) {
+      try {
+        // Read file as base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(uploadedImage.file);
+        });
+
+        imageData.push({
+          id: uploadedImage.id,
+          fileName: uploadedImage.file.name,
+          fileSize: uploadedImage.file.size,
+          mimeType: uploadedImage.file.type,
+          base64Data: base64Data,
+        });
+      } catch (error) {
+        console.error('Error reading image file:', error);
+      }
+    }
+
+    return imageData;
+  };
   const [autoscroll, setautoscroll] = useState(false);
   const [fullfileascontext, setfullfileascontext] = useState(false);
   const [sendwithhistory, setsendwithhistory] = useState(false);
@@ -1774,6 +1907,9 @@ export default function ChatInterface({
 
   // Image generation state
   const [isImageGenerationOpen, setIsImageGenerationOpen] = useState(false);
+
+  // Uploaded images state
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
 
   // Debug expansion state
   const [allDebugExpanded, setAllDebugExpanded] = useState(false);
@@ -2243,52 +2379,90 @@ export default function ChatInterface({
 
           {/* Text Input & Send Button */}
 
-          <div className="flex flex-grow items-center gap-2">
-            
-            <div className="flex flex-col flex-grow">
-             
+      <div className="flex flex-grow items-center gap-2">
 
-              {/* Quoted Message Display */}
-              {quotedMessage && (
-                <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-md relative">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                      Replying to {quotedMessage.role === 'user' ? 'your message' : 'AI response'}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearQuotedMessage}
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                  <div className="text-sm text-blue-900 dark:text-blue-100 line-clamp-3">
-                    {quotedMessage.content.length > 150
-                      ? `${quotedMessage.content.substring(0, 150)}...`
-                      : quotedMessage.content
-                    }
-                  </div>
-                </div>
-              )}
+        <div className="flex flex-col flex-grow">
 
-              <div className="relative">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  placeholder="Type a message... (Enter to send, Ctrl+Enter for new line)"
-                  className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
-                  disabled={isLoading}
-                />
-                
+
+          {/* Quoted Message Display */}
+          {quotedMessage && (
+            <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-md relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Replying to {quotedMessage.role === 'user' ? 'your message' : 'AI response'}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearQuotedMessage}
+                  className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                >
+                  ×
+                </Button>
               </div>
-              <Progress value={contextUsage} className="h-1" />
+              <div className="text-sm text-blue-900 dark:text-blue-100 line-clamp-3">
+                {quotedMessage.content.length > 150
+                  ? `${quotedMessage.content.substring(0, 150)}...`
+                  : quotedMessage.content
+                }
+              </div>
             </div>
+          )}
+
+          {/* Image upload indicator */}
+          {uploadedImages.length > 0 && (
+            <div className="mb-2 flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+              <div className="flex items-center gap-2">
+                <Image className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-700 dark:text-blue-300">
+                  {uploadedImages.length} image{uploadedImages.length > 1 ? 's' : ''} ready to send
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  uploadedImages.forEach(img => URL.revokeObjectURL(img.preview));
+                  setUploadedImages([]);
+                }}
+                className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
+
+          {/* Image Upload Component - Only show for Gemini vision-capable models */}
+          {ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel) && (
+            <div className="mb-3" data-image-upload>
+              <ImageUpload
+                onImageSelect={handleImageUpload}
+                maxImages={5}
+                className="w-full"
+              />
+            </div>
+          )}
+
+          <div className="relative">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              placeholder={
+                ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel)
+                  ? "Type a message or upload images... (Enter to send, Ctrl+Enter for new line)"
+                  : "Type a message... (Enter to send, Ctrl+Enter for new line)"
+              }
+              className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
+              disabled={isLoading}
+            />
+
+          </div>
+          <Progress value={contextUsage} className="h-1" />
+        </div>
 
           </div>
           <div className="mt-4 flex flex-row gap-4 w-full">
@@ -2386,7 +2560,7 @@ export default function ChatInterface({
               </div>
             )}
 
-            <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || !input.trim()} className="text-black dark:text-white ">
+            <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || (!input.trim() && uploadedImages.length === 0)} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
             </Button>
             {answerfromfile ? (<HoverCard>

@@ -1,4 +1,4 @@
-import type { ImageGenerationParameters, ImageGenerationRequest, ImageGenerationResponse } from "./types";
+import type { ImageGenerationParameters, ImageGenerationRequest, ImageGenerationResponse, UploadedImageData } from "./types";
 import type { StoredImage } from "./image-db-service";
 import {
   ImageOptimizationService,
@@ -58,8 +58,12 @@ export class GeminiImageService {
         }],
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
-         },
-       };
+          temperature: 0.9,
+          topK: 1,
+          topP: 1.0,
+          maxOutputTokens: 2048,
+        },
+      };
 
        // Add generation config parameters if provided
       //  if (parameters) {
@@ -176,7 +180,106 @@ export class GeminiImageService {
   }
 
   /**
-   * Checks if a model supports image generation
+   * Sends a message with uploaded images to Gemini API
+   */
+  async sendMessageWithImages(text: string, images: UploadedImageData[], model: string): Promise<string> {
+    if (!this.apiKey.trim()) {
+      throw new Error("Gemini API key is required");
+    }
+
+    if (!text.trim() && images.length === 0) {
+      throw new Error("Either text or images are required");
+    }
+
+    try {
+      const url = `${this.baseUrl}/v1beta/models/${model}:generateContent`;
+
+      const headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.apiKey,
+      };
+
+      // Build parts array for the request
+      const parts: any[] = [];
+
+      // Add text if provided
+      if (text.trim()) {
+        parts.push({ text: text.trim() });
+      }
+
+      // Add images if provided
+      for (const image of images) {
+        // Remove data URL prefix to get just the base64 data
+        const base64Data = image.base64Data.split(',')[1];
+        parts.push({
+          inline_data: {
+            mime_type: image.mimeType,
+            data: base64Data
+          }
+        });
+      }
+
+      const requestBody = {
+        contents: [{
+          parts: parts
+        }],
+        generationConfig: {
+          temperature: 0.9,
+          topK: 1,
+          topP: 1.0,
+          maxOutputTokens: 2048,
+          responseModalities: ["TEXT", "IMAGE"],
+        }
+      };
+
+      console.log('[GeminiImageService] 📤 Sending request with', images.length, 'images');
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+        try {
+          const jsonError = JSON.parse(errorData);
+          errorMessage = jsonError.error?.message || jsonError.message || errorMessage;
+        } catch {
+          if (errorData) {
+            errorMessage += ` - ${errorData}`;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const responseData = await response.json();
+      console.log('[GeminiImageService] 📥 Raw API response:', responseData);
+
+      // Extract text response from Gemini
+      const textResponse = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textResponse) {
+        console.error('[GeminiImageService] ❌ No text response found in:', responseData);
+        throw new Error("No text response received from Gemini");
+      }
+
+      console.log('[GeminiImageService] ✅ Extracted text response:', textResponse);
+      return textResponse;
+
+    } catch (error) {
+      console.error("Gemini message with images error:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("An unexpected error occurred while sending message with images");
+    }
+  }
+
+  /**
+   * Checks if a model supports image understanding/generation
    */
   static isModelImageCapable(modelName: string): boolean {
     return modelName.includes("image") || modelName.toLowerCase().includes("Banana");
@@ -194,6 +297,42 @@ export class GeminiImageService {
 
     return imageCapableModels.some(capableModel =>
       modelName.includes(capableModel) || modelName === capableModel
+    );
+  }
+
+  /**
+   * Checks if a model supports image uploads (vision capabilities)
+   */
+  static isModelVisionCapable(modelName: string): boolean {
+    return modelName.includes("image") || modelName.toLowerCase().includes("Banana");
+    const visionCapableModels = [
+      "models/gemini-1.5-pro-002",
+      "models/gemini-1.5-pro",
+      "models/gemini-1.5-flash-002",
+      "models/gemini-1.5-flash",
+      "models/gemini-pro-vision",
+      "models/gemini-1.5-pro-latest",
+      "models/gemini-1.5-flash-latest",
+      "models/gemini-2.0-flash-exp",
+      "models/gemini-2.0-flash-preview-image-generation",
+    ];
+
+    return visionCapableModels.some(capableModel =>
+      modelName.includes(capableModel) || modelName === capableModel
+    );
+  }
+
+  /**
+   * Checks if a model is specifically for image generation
+   */
+  static isModelImageGenerationOnly(modelName: string): boolean {
+    return false;
+    const imageGenerationOnlyModels = [
+      "models/gemini-2.0-flash-preview-image-generation",
+    ];
+
+    return imageGenerationOnlyModels.some(model =>
+      modelName.includes(model) || modelName === model
     );
   }
 

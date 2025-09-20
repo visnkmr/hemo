@@ -19,9 +19,20 @@ export interface Message {
   model: string;
   imageUrl?: string;
   imageGenerations?: ImageGenerationResponse[];
+  uploadedImages?: UploadedImageData[];
   isGeneratingImage?: boolean;
   imageGenerationError?: string;
   generationParameters?: ImageGenerationParameters;
+}
+
+export interface UploadedImageData {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  base64Data: string;
+  width?: number;
+  height?: number;
 }
 
 export interface BranchPoint {
