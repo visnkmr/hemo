@@ -388,28 +388,39 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
               </div>
             )}
 
-            {/* Image Selector Button - Only show for Gemini vision-capable models */}
-            {ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel) && (
+            {/* Image Upload Toggle Button - Always show for Gemini models */}
+            {ollamastate === 5 && (
               <HoverCard>
                 <HoverCardTrigger>
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      // Scroll to the image upload area
-                      const imageUploadElement = document.querySelector('[data-image-upload]');
-                      if (imageUploadElement) {
-                        imageUploadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      setShowImageUpload(!showImageUpload);
+                      // Scroll to the image upload area if showing
+                      if (!showImageUpload) {
+                        setTimeout(() => {
+                          const imageUploadElement = document.querySelector('[data-image-upload]');
+                          if (imageUploadElement) {
+                            imageUploadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }
+                        }, 100);
                       }
                     }}
-                    className="rounded-full shadow-md bg-gray-100 dark:bg-gray-800"
-                    title="Upload images with Gemini"
+                    className={`rounded-full shadow-md transition-all duration-200 ${
+                      showImageUpload
+                        ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600'
+                        : 'bg-gray-100 dark:bg-gray-800'
+                    }`}
+                    title={showImageUpload ? "Hide image upload" : "Show image upload"}
                   >
-                    <Image className="h-4 w-4" />
+                    <Image className={`h-4 w-4 transition-transform duration-200 ${
+                      showImageUpload ? 'rotate-45' : ''
+                    }`} />
                   </Button>
                 </HoverCardTrigger>
                 <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                  Upload images to analyze with Gemini
+                  {showImageUpload ? "Hide image upload area" : "Show image upload area"}
                 </HoverCardContent>
               </HoverCard>
             )}
@@ -1859,6 +1870,10 @@ export default function ChatInterface({
   // Handle image upload selection
   const handleImageUpload = (images: UploadedImage[]) => {
     setUploadedImages(images);
+    // Auto-show image upload section if images are uploaded and it's currently hidden
+    if (images.length > 0 && !showImageUpload) {
+      setShowImageUpload(true);
+    }
   };
 
   // Convert uploaded images to UploadedImageData format for API
@@ -1910,6 +1925,9 @@ export default function ChatInterface({
 
   // Uploaded images state
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+
+  // Image upload section visibility state - default to true so it's visible by default
+  const [showImageUpload, setShowImageUpload] = useState(true);
 
   // Debug expansion state
   const [allDebugExpanded, setAllDebugExpanded] = useState(false);
@@ -2432,8 +2450,8 @@ export default function ChatInterface({
             </div>
           )}
 
-          {/* Image Upload Component - Only show for Gemini vision-capable models */}
-          {ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel) && (
+          {/* Image Upload Component - Always show for Gemini models when toggled on */}
+          {ollamastate === 5 && showImageUpload && (
             <div className="mb-3" data-image-upload>
               <ImageUpload
                 onImageSelect={handleImageUpload}
@@ -2452,8 +2470,10 @@ export default function ChatInterface({
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
               placeholder={
-                ollamastate === 5 && GeminiImageService.isModelVisionCapable(selectedModel)
-                  ? "Type a message or upload images... (Enter to send, Ctrl+Enter for new line)"
+                ollamastate === 5
+                  ? showImageUpload
+                    ? "Type a message or drag images here... (Enter to send, Ctrl+Enter for new line)"
+                    : "Type a message... Click image button to upload images (Enter to send, Ctrl+Enter for new line)"
                   : "Type a message... (Enter to send, Ctrl+Enter for new line)"
               }
               className={`flex-1 dark:bg-gray-900 border bg-gray-50 min-h-[80px] max-h-[200px] ${isInputFocused ? '' : ''}`}
@@ -2560,7 +2580,7 @@ export default function ChatInterface({
               </div>
             )}
 
-            <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || (!input.trim() && uploadedImages.length === 0)} className="text-black dark:text-white ">
+            <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || (!input.trim() && uploadedImages.length === 0 && !showImageUpload)} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
             </Button>
             {answerfromfile ? (<HoverCard>
