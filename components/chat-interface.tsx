@@ -388,42 +388,7 @@ function ExpandableMessageItem({ vendor,setvendor,ollamastate,setollamastate,all
               </div>
             )}
 
-            {/* Image Upload Toggle Button - Always show for Gemini models */}
-            {ollamastate === 5 && (
-              <HoverCard>
-                <HoverCardTrigger>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setShowImageUpload(!showImageUpload);
-                      // Scroll to the image upload area if showing
-                      if (!showImageUpload) {
-                        setTimeout(() => {
-                          const imageUploadElement = document.querySelector('[data-image-upload]');
-                          if (imageUploadElement) {
-                            imageUploadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }
-                        }, 100);
-                      }
-                    }}
-                    className={`rounded-full shadow-md transition-all duration-200 ${
-                      showImageUpload
-                        ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600'
-                        : 'bg-gray-100 dark:bg-gray-800'
-                    }`}
-                    title={showImageUpload ? "Hide image upload" : "Show image upload"}
-                  >
-                    <Image className={`h-4 w-4 transition-transform duration-200 ${
-                      showImageUpload ? 'rotate-45' : ''
-                    }`} />
-                  </Button>
-                </HoverCardTrigger>
-                <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
-                  {showImageUpload ? "Hide image upload area" : "Show image upload area"}
-                </HoverCardContent>
-              </HoverCard>
-            )}
+
 
             <Button variant={"outline"} onClick={handleSaveEdit}
                         disabled={!editedContent.trim() || editedContent.trim() === message.content} className="text-black dark:text-white ">
@@ -1926,8 +1891,8 @@ export default function ChatInterface({
   // Uploaded images state
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
 
-  // Image upload section visibility state - default to true so it's visible by default
-  const [showImageUpload, setShowImageUpload] = useState(true);
+  // Image upload section visibility state - default to false so it's hidden by default
+  const [showImageUpload, setShowImageUpload] = useState(false);
 
   // Debug expansion state
   const [allDebugExpanded, setAllDebugExpanded] = useState(false);
@@ -2583,6 +2548,43 @@ export default function ChatInterface({
             <Button variant={"outline"} onClick={() => handleSendMessage(input)} disabled={isLoading || (!input.trim() && uploadedImages.length === 0 && !showImageUpload)} className="text-black dark:text-white ">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
             </Button>
+
+            {/* Image Upload Toggle Button - Only show for Gemini models */}
+            {ollamastate === 5 && (
+              <HoverCard>
+                <HoverCardTrigger>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setShowImageUpload(!showImageUpload);
+                      // Scroll to the image upload area if showing
+                      if (!showImageUpload) {
+                        setTimeout(() => {
+                          const imageUploadElement = document.querySelector('[data-image-upload]');
+                          if (imageUploadElement) {
+                            imageUploadElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }
+                        }, 100);
+                      }
+                    }}
+                    className={`rounded-full shadow-md transition-all duration-200 ${
+                      showImageUpload
+                        ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600'
+                        : 'bg-gray-100 dark:bg-gray-800'
+                    }`}
+                    title={showImageUpload ? "Hide image upload" : "Show image upload"}
+                  >
+                    <Image className={`h-4 w-4 transition-transform duration-200 ${
+                      showImageUpload ? 'rotate-45' : ''
+                    }`} />
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent className={`flex flex-col ${setcolorpertheme}`}>
+                  {showImageUpload ? "Hide image upload area" : "Show image upload area"}
+                </HoverCardContent>
+              </HoverCard>
+            )}
             {answerfromfile ? (<HoverCard>
               <HoverCardTrigger>
                 <Button
