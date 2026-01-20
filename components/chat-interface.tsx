@@ -1055,7 +1055,7 @@ export async function* sendMessageStream({
       "x-goog-api-key": storedApiKey,
     };
 
-    response = await fetch(`${url}/v1beta/models/${modelname}:generateContent?alt=sse`, {
+    response = await fetch(`${url}/v1beta/models/${modelname}:streamGenerateContent?alt=sse`, {
       method: "POST",
       headers: headers_gemini,
       body: JSON.stringify({
